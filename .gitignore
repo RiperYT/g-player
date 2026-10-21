@@ -1,0 +1,11 @@
+.DS_Store
+.build/
+build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+# local engine experiments
+*.tar.xz
+*.tar.gz
+!releases/**

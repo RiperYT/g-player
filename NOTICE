@@ -1,0 +1,16 @@
+G-Player
+Copyright 2026 Andrii Kutsenko and G-Player contributors
+
+This product includes software from MacadeKit, part of MaPC (https://mapc.games),
+Copyright 2026 Steale LLC, licensed under the Apache License 2.0:
+  - tools/chromium-helper-wrapper/wrapper.c (the Chromium helper wrapper)
+  - the engine pins and the Steam launch recipe in Sources/GPlayerCore
+    (EngineCatalog, AppPresets, ChromiumHelperWrapper), adapted.
+
+G-Player downloads, but does not include, these third-party components at run time:
+  - Wine Staging for macOS (LGPL-2.1+), built by Gcenx: https://github.com/Gcenx/macOS_Wine_builds
+  - DXVK for macOS (zlib), by Gcenx: https://github.com/Gcenx/DXVK-macOS
+  - Store installers (Steam, Epic Games Launcher, GOG Galaxy, Ubisoft Connect) from their publishers.
+
+Apple's Game Porting Toolkit and D3DMetal are never part of G-Player. G-Player only uses a copy
+the user installed themselves (Homebrew cask gcenx/wine/game-porting-toolkit).
