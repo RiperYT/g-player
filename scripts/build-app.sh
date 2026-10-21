@@ -14,7 +14,8 @@ APP=build/G-Player.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/GPlayer"
-cp Sources/GPlayerCore/Resources/chromium-helper-wrapper.exe "$APP/Contents/Resources/"
+# Everything in GPlayerCore/Resources (wrapper, fix database, detection rules, licenses) goes into the bundle.
+cp -R Sources/GPlayerCore/Resources/. "$APP/Contents/Resources/"
 [ -f build/AppIcon.icns ] || swift scripts/make-icon.swift build/AppIcon.icns
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp LICENSE NOTICE "$APP/Contents/Resources/"

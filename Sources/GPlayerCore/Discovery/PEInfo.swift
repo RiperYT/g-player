@@ -1,7 +1,7 @@
 import Foundation
 
 /// What a Windows executable is built for, read from its PE header.
-public enum PEArchitecture: String, Sendable, Equatable {
+public enum PEArchitecture: String, Codable, Sendable, Hashable {
     case x86, x64, arm64, other
 
     public var displayName: String {
