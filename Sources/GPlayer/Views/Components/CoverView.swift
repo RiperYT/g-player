@@ -16,14 +16,17 @@ struct CoverView: View {
                 if let image = model.coverImage(for: game) {
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                         .frame(width: geo.size.width, height: geo.size.height).clipped()
+                } else if game.kind == .app {
+                    AppIconTile(icon: model.iconImage(for: game), color: space?.color ?? .gray, symbol: game.symbol,
+                                width: geo.size.width)
                 } else {
                     TypographicCover(title: game.title, color: space?.color ?? .gray, symbol: game.symbol,
-                                     width: geo.size.width)
+                                     icon: model.iconImage(for: game), width: geo.size.width)
                 }
                 if showLabel, let space { CartridgeLabel(space: space, game: game, running: model.isRunning(game)) }
             }
         }
-        .aspectRatio(Theme.coverAspect, contentMode: .fit)
+        .aspectRatio(game.kind == .app ? 1 : Theme.coverAspect, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: Theme.coverRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.coverRadius, style: .continuous)
             .strokeBorder(.primary.opacity(0.08), lineWidth: 1))
@@ -35,6 +38,7 @@ struct TypographicCover: View {
     let title: String
     let color: Color
     let symbol: String
+    var icon: NSImage? = nil
     let width: CGFloat
 
     var body: some View {
@@ -43,9 +47,18 @@ struct TypographicCover: View {
             color
             // A soft fold of darker colour at the bottom, so the title sits on something.
             LinearGradient(colors: [.clear, .black.opacity(0.28)], startPoint: .center, endPoint: .bottom)
+            if let icon {
+                // The program's own icon, centred in the upper part of the cover.
+                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                    .frame(width: width * Theme.coverIconScale, height: width * Theme.coverIconScale)
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                    .frame(maxWidth: .infinity).padding(.top, width * Theme.coverIconTopInset)
+            }
             VStack(alignment: .leading, spacing: 0) {
-                Image(systemName: symbol).font(.system(size: size * 0.55, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
+                if icon == nil {
+                    Image(systemName: symbol).font(.system(size: size * 0.55, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
                 Spacer(minLength: 0)
                 Text(title)
                     .font(Theme.coverTitle(size: size))
@@ -56,6 +69,32 @@ struct TypographicCover: View {
                     .padding(.bottom, 26)
             }
             .padding(.horizontal, 14).padding(.top, 14)
+        }
+    }
+}
+
+/// A launcher (Steam, Epic…): a square tile with the program's icon, like an app on the Mac.
+struct AppIconTile: View {
+    let icon: NSImage?
+    let color: Color
+    let symbol: String
+    let width: CGFloat
+
+    var body: some View {
+        ZStack {
+            color
+            LinearGradient(colors: [.white.opacity(0.08), .black.opacity(0.18)], startPoint: .top, endPoint: .bottom)
+            Group {
+                if let icon {
+                    Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                } else {
+                    Image(systemName: symbol).resizable().aspectRatio(contentMode: .fit)
+                        .fontWeight(.light).foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .frame(width: width * Theme.tileIconScale, height: width * Theme.tileIconScale)
+            .offset(y: -Theme.tileIconLift)
         }
     }
 }

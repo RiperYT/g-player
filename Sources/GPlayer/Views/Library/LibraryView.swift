@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct LibraryView: View {
-    enum Filter { case all, recent }
+    enum Filter { case all, recent, hidden }
 
     @Environment(AppModel.self) private var model
     let filter: Filter
@@ -11,7 +11,7 @@ struct LibraryView: View {
     @State private var dropTargeted = false
 
     private var items: [Game] {
-        var list = model.games
+        var list = filter == .hidden ? model.hiddenGames : model.visibleGames
         if let spaceID { list = list.filter { $0.spaceID == spaceID } }
         if filter == .recent { list = list.filter { $0.lastPlayedAt != nil }.sorted { $0.lastPlayedAt! > $1.lastPlayedAt! } }
         else { list.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending } }
@@ -20,26 +20,33 @@ struct LibraryView: View {
         return list
     }
 
+    private var title: String {
+        switch filter {
+        case .all: "All Games"
+        case .recent: "Recently Played"
+        case .hidden: "Hidden"
+        }
+    }
+
+    /// The selected game, if this view lists it (a hidden game only shows in Hidden).
+    private var inspected: Game? {
+        guard let g = model.game(model.selectedGameID), g.isHidden == (filter == .hidden) else { return nil }
+        return g
+    }
+
     var body: some View {
         @Bindable var model = model
-        let apps = items.filter { $0.kind == .app }, games = items.filter { $0.kind == .game }
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
-                if items.isEmpty {
-                    emptyState
-                } else {
-                    if !apps.isEmpty, filter == .all { GameGrid(title: "Apps", games: apps) }
-                    if !games.isEmpty { GameGrid(title: filter == .recent ? "Recently played" : "Games", games: games) }
-                }
+                if items.isEmpty { emptyState } else { grids(items) }
             }
             .padding(Theme.pagePadding)
         }
-        .navigationTitle(filter == .recent ? "Recently Played" : "All Games")
+        .navigationTitle(title)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search games")
         .toolbar { LibraryToolbar() }
-        .inspector(isPresented: Binding(get: { model.selectedGameID != nil && model.game(model.selectedGameID) != nil },
-                                        set: { if !$0 { model.selectedGameID = nil } })) {
-            if let g = model.game(model.selectedGameID) {
+        .inspector(isPresented: Binding(get: { inspected != nil }, set: { if !$0 { model.selectedGameID = nil } })) {
+            if let g = inspected {
                 GameInspector(game: g).inspectorColumnWidth(min: 280, ideal: 310, max: 380)
             }
         }
@@ -57,12 +64,25 @@ struct LibraryView: View {
         }
     }
 
+    @ViewBuilder private func grids(_ list: [Game]) -> some View {
+        if filter == .hidden {
+            GameGrid(title: "Hidden", games: list)
+        } else {
+            let apps = list.filter { $0.kind == .app }, games = list.filter { $0.kind == .game }
+            if !apps.isEmpty, filter == .all { GameGrid(title: "Apps", games: apps) }
+            if !games.isEmpty { GameGrid(title: filter == .recent ? "Recently played" : "Games", games: games) }
+        }
+    }
+
     @ViewBuilder private var emptyState: some View {
         if !model.searchText.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
         } else if filter == .recent {
             ContentUnavailableView("Nothing played yet", systemImage: "clock",
                                    description: Text("Games you start show up here."))
+        } else if filter == .hidden {
+            ContentUnavailableView("Nothing hidden", systemImage: "eye.slash",
+                                   description: Text("Games you hide show up here."))
         } else {
             DropZone(title: "Add your first game",
                      message: "Drop a game folder, a zip or rar archive, or an installer here. G-Player copies it into a space and finds the program that starts it.",
@@ -165,6 +185,13 @@ struct GameMenu: View {
             Button("Go to Space “\(s.name)”") { model.selection = .space(s.id) }
         }
         Divider()
-        Button("Remove from Library", role: .destructive) { model.remove(game) }
+        if game.isHidden {
+            Button("Show in Library") { model.setHidden(game, false) }
+        } else {
+            Button("Hide") { model.setHidden(game, true) }
+        }
+        if game.canRemove {
+            Button("Remove from Library…", role: .destructive) { model.gamePendingRemoval = game }
+        }
     }
 }

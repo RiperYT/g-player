@@ -36,16 +36,26 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
     public var addedAt: Date
     public var lastPlayedAt: Date?
     public var secondsPlayed: Double
+    /// Hidden from All Games, Recently Played, spaces and search. Optional so older library files still load.
+    public var hidden: Bool?
+    /// The program's own icon, read from its .exe, as a PNG file name inside the library's Covers folder.
+    public var iconFile: String?
 
     public init(id: UUID = UUID(), title: String, kind: Kind = .game, spaceID: UUID, source: Source = .executable,
                 executablePath: String? = nil, arguments: [String] = [], graphics: GraphicsBackend = .auto,
                 environment: [String: String] = [:], coverFile: String? = nil, addedAt: Date = Date(),
-                lastPlayedAt: Date? = nil, secondsPlayed: Double = 0) {
+                lastPlayedAt: Date? = nil, secondsPlayed: Double = 0, hidden: Bool? = nil, iconFile: String? = nil) {
         self.id = id; self.title = title; self.kind = kind; self.spaceID = spaceID; self.source = source
         self.executablePath = executablePath; self.arguments = arguments; self.graphics = graphics
         self.environment = environment; self.coverFile = coverFile; self.addedAt = addedAt
-        self.lastPlayedAt = lastPlayedAt; self.secondsPlayed = secondsPlayed
+        self.lastPlayedAt = lastPlayedAt; self.secondsPlayed = secondsPlayed; self.hidden = hidden
+        self.iconFile = iconFile
     }
+
+    public var isHidden: Bool { hidden == true }
+
+    /// Only games the user added can be removed. A store game would come back, a launcher is rebuilt, so those are hidden instead.
+    public var canRemove: Bool { source == .executable && kind == .game }
 
     /// The executable on the Mac.
     public func executableURL(in space: Space) -> URL? {
@@ -59,7 +69,9 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// Identity used to avoid adding the same store game twice.
-    public var storeKey: String? {
+    public var storeKey: String? { Self.storeKey(for: source) }
+
+    public static func storeKey(for source: Source) -> String? {
         switch source {
         case .executable: nil
         case .steam(let id): "steam:\(id)"

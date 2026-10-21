@@ -10,7 +10,8 @@ struct SpaceView: View {
     @State private var pendingEngine: String?
 
     var body: some View {
-        let games = model.state.games(in: space)
+        let all = model.state.games(in: space), games = model.visibleGames(in: space)
+        let hiddenCount = model.hiddenGames(in: space).count
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 header
@@ -18,20 +19,23 @@ struct SpaceView: View {
                     presetMissing(preset)
                 }
                 if !games.isEmpty { GameGrid(title: "In this space", games: games.sorted { $0.title < $1.title }) }
-                if !newFound(games).isEmpty { foundPrograms(newFound(games)) }
-                if games.isEmpty && newFound(games).isEmpty {
-                    DropZone(title: "Nothing here yet",
-                             message: "Drop a game or an installer on the library, or run a program in this space.",
-                             actions: AnyView(Button("Run a Program…") { runProgram() }))
+                if !newFound(all).isEmpty { foundPrograms(newFound(all)) }
+                if games.isEmpty && newFound(all).isEmpty {
+                    if hiddenCount > 0 {
+                        HiddenOnlyNote(count: hiddenCount)
+                    } else {
+                        DropZone(title: "Nothing here yet",
+                                 message: "Drop a game or an installer on the library, or run a program in this space.",
+                                 actions: AnyView(Button("Run a Program…") { runProgram() }))
+                    }
                 }
             }
             .padding(Theme.pagePadding)
         }
         .navigationTitle(space.name)
         .toolbar { LibraryToolbar() }
-        .inspector(isPresented: Binding(get: { model.selectedGameID != nil && model.game(model.selectedGameID)?.spaceID == space.id },
-                                        set: { if !$0 { model.selectedGameID = nil } })) {
-            if let g = model.game(model.selectedGameID) { GameInspector(game: g).inspectorColumnWidth(min: 280, ideal: 310, max: 380) }
+        .inspector(isPresented: Binding(get: { inspected != nil }, set: { if !$0 { model.selectedGameID = nil } })) {
+            if let g = inspected { GameInspector(game: g).inspectorColumnWidth(min: 280, ideal: 310, max: 380) }
         }
         .task(id: space.id) { await reload() }
         .confirmationDialog(removeTitle, isPresented: $confirmRemove) {
@@ -52,6 +56,12 @@ struct SpaceView: View {
         } message: {
             Text("A newer Wine updates the space the first time it starts, and an older Wine may not open it afterwards.")
         }
+    }
+
+    /// The selected game, if it is one of this space's visible games.
+    private var inspected: Game? {
+        guard let g = model.game(model.selectedGameID), g.spaceID == space.id, !g.isHidden else { return nil }
+        return g
     }
 
     private var removeTitle: String { "Remove “\(space.name)”?" }
@@ -155,6 +165,23 @@ struct SpaceView: View {
         let s = space
         found = await Task.detached { ShortcutScanner.programs(in: s) }.value
         size = await Task.detached { Files.allocatedSize(of: s.url) }.value
+    }
+}
+
+/// Shown instead of "Nothing here yet" when every game in the space is hidden.
+private struct HiddenOnlyNote: View {
+    @Environment(AppModel.self) private var model
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "eye.slash").font(.title2).frame(width: 36)
+            Text("\(count) hidden \(count == 1 ? "game" : "games") in this space").font(.headline)
+            Spacer()
+            Button("Show Hidden") { model.selection = .hidden }
+        }
+        .padding(16)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

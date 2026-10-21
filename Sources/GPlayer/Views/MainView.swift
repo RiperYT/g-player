@@ -15,6 +15,7 @@ struct MainView: View {
                 switch model.selection ?? .allGames {
                 case .allGames: LibraryView(filter: .all)
                 case .recent: LibraryView(filter: .recent)
+                case .hidden: LibraryView(filter: .hidden)
                 case .space(let id): if let s = model.space(id) { SpaceView(space: s) } else { LibraryView(filter: .all) }
                 case .files: FilesView()
                 case .apps: AppsView()
@@ -24,6 +25,13 @@ struct MainView: View {
         }
         .sheet(isPresented: $model.showAddGame) { AddGameSheet(initialSource: model.addGameSource) }
         .sheet(isPresented: $model.showNewSpace) { NewSpaceSheet() }
+        .confirmationDialog("Remove from Library?", isPresented: Binding(get: { model.gamePendingRemoval != nil },
+                                                                        set: { if !$0 { model.gamePendingRemoval = nil } }),
+                            titleVisibility: .visible, presenting: model.gamePendingRemoval) { game in
+            Button("Remove “\(game.title)”", role: .destructive) { model.remove(game) }
+        } message: { game in
+            Text("“\(game.title)” leaves the library. Its files stay in the space, and you can add it again.")
+        }
     }
 }
 
@@ -36,6 +44,7 @@ struct Sidebar: View {
             Section("Library") {
                 Label("All Games", systemImage: "square.grid.2x2").tag(SidebarItem.allGames)
                 Label("Recently Played", systemImage: "clock").tag(SidebarItem.recent)
+                if !model.hiddenGames.isEmpty { HiddenRow(count: model.hiddenGames.count).tag(SidebarItem.hidden) }
             }
             Section("Spaces") {
                 ForEach(model.spaces) { space in
@@ -43,7 +52,7 @@ struct Sidebar: View {
                         RoundedRectangle(cornerRadius: 3, style: .continuous).fill(space.color).frame(width: 12, height: 12)
                         Text(space.name).lineLimit(1)
                         Spacer()
-                        let count = model.state.games(in: space).count
+                        let count = model.visibleGames(in: space).count
                         if count > 0 { Text("\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit() }
                     }
                     .tag(SidebarItem.space(space.id))
@@ -64,5 +73,18 @@ struct Sidebar: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { ActivityPanel() }
+    }
+}
+
+/// "Hidden" under Library, with how many games are in it.
+private struct HiddenRow: View {
+    let count: Int
+
+    var body: some View {
+        HStack {
+            Label("Hidden", systemImage: "eye.slash")
+            Spacer()
+            Text("\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+        }
     }
 }

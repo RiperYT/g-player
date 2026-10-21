@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0] - 2026-10-22
+
+- Real icons: G-Player reads each program's icon from its .exe. Launchers (Steam, Epic…) get square tiles with
+  their icon, games without cover art show their icon on the text cover.
+- Hide any game, including ones Steam or Epic added on their own. Hidden games have their own place in the
+  sidebar and come back with "Show in Library". Games you added yourself can still be removed.
+- Files: the space you're browsing is a big switcher at the top left, with quick places below it (C: drive,
+  Games, Program Files, Documents, AppData, the space folder). A folder that links to your Mac, such as
+  Documents, says "(Mac)".
+- The game inspector shows whether a program is 32- or 64-bit (or .NET) and says when a 32-bit program may
+  not start on Wine for macOS.
+- Steam and Epic games that are being updated no longer drop out of the library, and keep their hidden state.
+
 ## [0.1.0] - 2026-10-21
 
 First public build.

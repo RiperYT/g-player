@@ -3,14 +3,16 @@
 ```
 Sources/
   GPlayerCore/          everything that decides how a Windows program runs (no SwiftUI)
-    Model/              Space, Game, GraphicsBackend, LibraryState
+    Model/              Space, SpacePlaces, Game, GraphicsBackend, LibraryState
     Storage/            LibraryPaths (the folders), LibraryStore (library.json)
     Engines/            EngineCatalog (pinned downloads), EngineManager, FileDownloader
     Wine/               WineEnvironment (env + DLL overrides), WineLauncher, SpaceManager,
                         ChromiumHelperWrapper
     Import/             ArchiveExtractor (bsdtar), ExecutableScanner (which .exe is the game),
                         ProgramSnapshot (what an installer added), GameImporter
-    Discovery/          VDF + SteamLibrary, EpicLibrary, ShellLink + ShortcutScanner (.lnk),
+    Discovery/          VDF + SteamLibrary, EpicLibrary, StoreMerge (keeps the library in line with the
+                        stores, hidden state included), ShellLink + ShortcutScanner (.lnk),
+                        PEInfo (CPU, .NET, 32-bit warning) + PEIcon (.exe icon → .ico) read from PE headers,
                         EnvironmentFinder (CrossOver/Whisky/~/Games prefixes, old launcher scripts)
     Presets/            AppPreset (Steam, Epic, GOG, Ubisoft), PresetInstaller, LaunchPlanner
     Resources/          chromium-helper-wrapper.exe (built from tools/)
@@ -38,10 +40,10 @@ Chosen on first launch, `~/Games/G-Player` by default:
 
 ```
 G-Player/
-  library.json      spaces, games, hidden store games
+  library.json      spaces, games (a game can be hidden)
   Spaces/<name>/    Wine prefixes G-Player created
   Engines/<id>/     Wine Staging, DXVK
-  Covers/           cover art
+  Covers/           cover art and program icons
   Logs/             one log per launch (the command, the DLL overrides, Wine's output)
   Downloads/        installers while they run
 ```

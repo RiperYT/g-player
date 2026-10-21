@@ -4,7 +4,7 @@ import GPlayerCore
 import Observation
 
 enum SidebarItem: Hashable {
-    case allGames, recent, space(UUID), files, apps
+    case allGames, recent, hidden, space(UUID), files, apps
 }
 
 /// Long work shown at the bottom of the sidebar (engine downloads, store setup, imports).
@@ -29,7 +29,10 @@ final class AppModel {
     }
 
     // MARK: State
-    private(set) var state = LibraryState()
+    private(set) var state = LibraryState() {
+        // The Hidden item disappears with the last hidden game, so don't leave it selected.
+        didSet { if selection == .hidden, state.hiddenGames.isEmpty { selection = .allGames } }
+    }
     var selection: SidebarItem? = .allGames
     var selectedGameID: UUID?
     var searchText = ""
@@ -38,6 +41,8 @@ final class AppModel {
     var addGameSource: ImportSource?
     var showAddGame = false
     var showNewSpace = false
+    /// The game waiting for the "Remove from Library" confirmation.
+    var gamePendingRemoval: Game?
     /// The space the Files browser shows.
     var filesSpaceID: UUID?
     private(set) var running: [UUID: RunningProgram] = [:]
@@ -64,6 +69,10 @@ final class AppModel {
     var paths: LibraryPaths? { libraryRoot.map(LibraryPaths.init) }
     var spaces: [Space] { state.spaces }
     var games: [Game] { state.games }
+    var visibleGames: [Game] { state.visibleGames }
+    var hiddenGames: [Game] { state.hiddenGames }
+    func visibleGames(in space: Space) -> [Game] { state.visibleGames(in: space) }
+    func hiddenGames(in space: Space) -> [Game] { state.hiddenGames(in: space) }
     func space(_ id: UUID?) -> Space? { id.flatMap { state.space($0) } }
     func game(_ id: UUID?) -> Game? { id.flatMap { gid in state.games.first { $0.id == gid } } }
 
@@ -71,6 +80,7 @@ final class AppModel {
 
     func load() {
         guard let paths else { return }
+        images.removeAllObjects()
         do {
             try paths.createFolders()
             state = try LibraryStore(paths: paths).load()
@@ -194,10 +204,12 @@ final class AppModel {
             do { try SpaceManager(paths: paths).delete(space) }
             catch { errorMessage = "Couldn't delete the space: \(error.localizedDescription)"; return }
         }
+        let icons = state.games(in: space).compactMap(\.iconFile)
         mutate { s in
             s.games.removeAll { $0.spaceID == space.id }
             s.spaces.removeAll { $0.id == space.id }
         }
+        icons.forEach(deleteIcon)
         if selection == .space(space.id) { selection = .allGames }
     }
 
@@ -243,11 +255,13 @@ final class AppModel {
 
     // MARK: Store discovery
 
-    /// Adds games that Steam or Epic installed and drops ones that were uninstalled.
+    /// Adds games that Steam or Epic installed and drops ones they no longer list. A game that is being updated
+    /// stays, with its hidden state and playtime.
     func refreshStores() {
         guard paths != nil else { return }
         var changed = false
         var next = state
+        var keys = state.hiddenStoreKeys
         for space in state.spaces where space.exists {
             if let preset = AppPresets.preset(space.presetID), preset.isInstalled(in: space) {
                 let path = Game.storedPath(for: preset.executableURL(in: space), in: space)
@@ -257,48 +271,108 @@ final class AppModel {
                 }
             }
             var found: [StoreGame] = []
-            if AppPresets.steam.isInstalled(in: space) { found += SteamLibrary.scan(space).filter(\.installed) }
-            if AppPresets.epic.isInstalled(in: space) { found += EpicLibrary.scan(space).filter(\.installed) }
-            let keys = Set(found.map { key(for: $0.source) })
-            for g in found {
-                let k = key(for: g.source)
-                guard !next.hiddenStoreKeys.contains(k), !next.games.contains(where: { $0.storeKey == k && $0.spaceID == space.id }) else { continue }
-                next.games.append(Game(title: g.title, spaceID: space.id, source: g.source))
-                changed = true
-            }
-            let before = next.games.count
-            next.games.removeAll { $0.spaceID == space.id && $0.storeKey != nil && !keys.contains($0.storeKey!) }
-            changed = changed || next.games.count != before
+            if AppPresets.steam.isInstalled(in: space) { found += SteamLibrary.scan(space) }
+            if AppPresets.epic.isInstalled(in: space) { found += EpicLibrary.scan(space) }
+            let merged = StoreMerge.merge(existing: next.games, found: found, hiddenKeys: keys, spaceID: space.id)
+            next.games = merged.games
+            keys = merged.hiddenKeys
+            changed = changed || merged.changed
         }
+        next.hiddenStoreKeys = keys
         if changed { state = next; save() }
         fetchMissingCovers()
+        extractMissingIcons()
     }
 
-    private func key(for source: Game.Source) -> String {
-        Game(title: "", spaceID: UUID(), source: source).storeKey ?? ""
+    // MARK: Covers and icons
+
+    /// Decoded covers and icons by file name, so a redraw doesn't read the file again.
+    private let images = NSCache<NSString, NSImage>()
+    private var coverFetches = Set<UUID>()
+    private var iconAttempts = Set<UUID>()
+
+    /// A file inside the Covers folder. Only plain file names count, so a damaged library file
+    /// can't point at (or delete) anything outside that folder.
+    private func coverURL(_ file: String) -> URL? {
+        guard let paths, !file.isEmpty, !file.contains("/"), file != ".", file != ".." else { return nil }
+        return paths.covers.appendingPathComponent(file)
     }
 
-    // MARK: Covers
-
-    func coverImage(for game: Game) -> NSImage? {
-        guard let paths, let file = game.coverFile else { return nil }
-        return NSImage(contentsOf: paths.covers.appendingPathComponent(file))
+    private func image(named file: String?) -> NSImage? {
+        guard let file, let url = coverURL(file) else { return nil }
+        if let cached = images.object(forKey: file as NSString) { return cached }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        images.setObject(image, forKey: file as NSString)
+        return image
     }
+
+    private func forgetImage(_ file: String?) {
+        if let file { images.removeObject(forKey: file as NSString) }
+    }
+
+    func coverImage(for game: Game) -> NSImage? { image(named: game.coverFile) }
+
+    func iconImage(for game: Game) -> NSImage? { image(named: game.iconFile) }
 
     func setCover(_ image: URL, for game: Game) {
-        guard let paths else { return }
+        guard let paths, var g = self.game(game.id) else { return }
         let name = "\(game.id.uuidString).\(image.pathExtension.isEmpty ? "png" : image.pathExtension.lowercased())"
         let target = paths.covers.appendingPathComponent(name)
         do {
             try? FileManager.default.removeItem(at: target)
             try FileManager.default.copyItem(at: image, to: target)
-            var g = game; g.coverFile = name; update(g)
+            forgetImage(name)
+            g.coverFile = name; update(g)
         } catch { errorMessage = "Couldn't use that image: \(error.localizedDescription)" }
     }
 
-    func clearCover(for game: Game) { var g = game; g.coverFile = nil; update(g) }
+    func clearCover(for game: Game) {
+        guard var g = self.game(game.id) else { return }
+        forgetImage(g.coverFile)
+        g.coverFile = nil; update(g)
+    }
 
-    private var coverFetches = Set<UUID>()
+    /// Deletes a game's icon PNG.
+    private func deleteIcon(_ file: String) {
+        forgetImage(file)
+        if let url = coverURL(file) { try? FileManager.default.removeItem(at: url) }
+    }
+
+    /// Reads each added program's icon from its .exe once, off the main thread, and keeps it as a PNG.
+    func extractMissingIcons() {
+        for game in state.games where game.iconFile == nil && !iconAttempts.contains(game.id) {
+            guard case .executable = game.source, let space = space(game.spaceID),
+                  let exe = game.executableURL(in: space), exe.pathExtension.lowercased() == "exe" else { continue }
+            // A name of its own each time, so a slow read of an old program can't overwrite a newer icon.
+            let id = game.id, file = "icon-\(UUID().uuidString).png"
+            guard let target = coverURL(file) else { continue }
+            iconAttempts.insert(id)
+            Task.detached(priority: .utility) {
+                guard let ico = PEIcon.icoData(fromExecutableAt: exe), let png = Self.largestPNG(fromICO: ico) else { return }
+                do { try png.write(to: target, options: .atomic) } catch { return }
+                await MainActor.run {
+                    // Keep the icon only if the game still starts this program and has no icon yet.
+                    guard var g = self.game(id), g.iconFile == nil,
+                          self.space(g.spaceID).flatMap({ g.executableURL(in: $0) }) == exe else {
+                        try? FileManager.default.removeItem(at: target)
+                        return
+                    }
+                    g.iconFile = file
+                    self.update(g)
+                }
+            }
+        }
+    }
+
+    /// The biggest image in an .ico (PNG or BMP entries) as PNG data. Images over 512 pixels are skipped,
+    /// so a crafted file can't make G-Player decode something huge.
+    nonisolated static func largestPNG(fromICO data: Data) -> Data? {
+        guard let image = NSImage(data: data) else { return nil }
+        let reps = image.representations.compactMap { $0 as? NSBitmapImageRep }
+            .filter { $0.pixelsWide <= 512 && $0.pixelsHigh <= 512 }
+        guard let best = reps.max(by: { $0.pixelsWide < $1.pixelsWide }) else { return nil }
+        return best.representation(using: .png, properties: [:])
+    }
 
     private func fetchMissingCovers() {
         guard let paths else { return }
@@ -323,15 +397,37 @@ final class AppModel {
 
     func addGame(_ game: Game) {
         mutate { $0.games.append(game) }
+        extractMissingIcons()
         selectedGameID = game.id
     }
 
-    func remove(_ game: Game) {
-        mutate { s in
-            s.games.removeAll { $0.id == game.id }
-            if let k = game.storeKey { s.hiddenStoreKeys.insert(k) }
-        }
+    /// Hides a game from the library views, or shows it again. The game stays in `library.json`.
+    func setHidden(_ game: Game, _ hidden: Bool) {
+        guard var g = self.game(game.id) else { return }
+        g.hidden = hidden ? true : nil
+        update(g)
         if selectedGameID == game.id { selectedGameID = nil }
+    }
+
+    /// Removes a game the user added, and its icon. Its files stay in the space.
+    func remove(_ game: Game) {
+        guard game.canRemove else { return }
+        let icon = (self.game(game.id) ?? game).iconFile
+        mutate { $0.games.removeAll { $0.id == game.id } }
+        if let icon { deleteIcon(icon) }
+        if selectedGameID == game.id { selectedGameID = nil }
+    }
+
+    /// Points a game at another program. Its icon is read again from the new one.
+    func setExecutable(_ game: Game, to url: URL) {
+        guard var g = self.game(game.id), let space = space(g.spaceID) else { return }
+        let oldIcon = g.iconFile
+        g.executablePath = Game.storedPath(for: url, in: space)
+        g.iconFile = nil
+        update(g)
+        if let oldIcon { deleteIcon(oldIcon) }
+        iconAttempts.remove(g.id)
+        extractMissingIcons()
     }
 
     func isRunning(_ game: Game) -> Bool { running[game.id]?.isRunning == true }
@@ -353,9 +449,8 @@ final class AppModel {
                 ) { [weak self] _ in
                     Task { @MainActor in self?.finished(gameID) }
                 }
-                var g = game
-                g.lastPlayedAt = Date()
-                update(g)
+                // The game may have changed while Wine was starting (hidden, new icon), so write to the current one.
+                if var current = self.game(game.id) { current.lastPlayedAt = Date(); update(current) }
                 if case .executable = game.source { running[game.id] = program }
             } catch {
                 errorMessage = error.localizedDescription

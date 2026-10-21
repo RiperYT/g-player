@@ -20,7 +20,7 @@ struct GeneralSettings: View {
             Section("Library") {
                 if let root = model.libraryRoot { LabeledContent("Location") { PathRow(url: root) } }
                 LabeledContent("Spaces", value: "\(model.spaces.count)")
-                LabeledContent("Games", value: "\(model.games.filter { $0.kind == .game }.count)")
+                LabeledContent("Games", value: "\(model.visibleGames.filter { $0.kind == .game }.count)")
             }
             Section {
                 Button("Show Welcome Again…") { model.resetOnboarding() }

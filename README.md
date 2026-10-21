@@ -7,6 +7,8 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 
 - **One library.** Steam and Epic games show up on their own. Add any other game by dropping its folder,
   its zip/rar/7z archive or its installer onto the window.
+- **Your library, your way.** Real icons read from each program, cover art for Steam games, and any game
+  can be hidden and brought back later.
 - **Spaces.** Each space is a separate Windows (a Wine prefix) with its own C: drive. Browse its files,
   run any program in it, and see exactly where everything lives on your Mac.
 - **Steam that draws.** Steam's 2026 client shows a black window under plain Wine on macOS. G-Player fixes

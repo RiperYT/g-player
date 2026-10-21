@@ -10,6 +10,12 @@ enum Theme {
     static let tileMinWidth: CGFloat = 148
     static let gridSpacing: CGFloat = 22
     static let pagePadding: CGFloat = 28
+    /// A program's icon on a text cover: its size and its distance from the top, as fractions of the cover width.
+    static let coverIconScale: CGFloat = 0.44
+    static let coverIconTopInset: CGFloat = 0.26
+    /// The icon on a launcher tile: its size as a fraction of the tile width, and how far it sits above the centre.
+    static let tileIconScale: CGFloat = 0.5
+    static let tileIconLift: CGFloat = 10
 
     static func spaceColor(_ index: Int) -> Color {
         let c = SpaceColor.palette[index % SpaceColor.palette.count]

@@ -7,6 +7,8 @@ struct GameInspector: View {
     @State private var title = ""
     @State private var arguments = ""
     @State private var coverTargeted = false
+    /// Read from the .exe header once per game, off the main thread.
+    @State private var details: PEDetails?
 
     var body: some View {
         let space = model.space(game.spaceID)
@@ -52,15 +54,37 @@ struct GameInspector: View {
                 }
 
                 Divider()
-                Button("Remove from Library", role: .destructive) { model.remove(game) }
-                    .buttonStyle(.link).foregroundStyle(.red)
-                Text("Removing keeps the game's files. Delete them from the space's files if you want the disk space back.")
-                    .font(.caption).foregroundStyle(.secondary)
+                libraryActions
             }
             .padding(18)
         }
         .onAppear(perform: sync)
         .onChange(of: game.id) { sync() }
+        .task(id: [game.id.uuidString, game.executablePath ?? ""]) {
+            details = nil
+            let exe = model.space(game.spaceID).flatMap { game.executableURL(in: $0) }
+            let found = await Task.detached { exe.flatMap { PEInfo.details(ofExecutableAt: $0) } }.value
+            guard !Task.isCancelled else { return }
+            details = found
+        }
+    }
+
+    @ViewBuilder private var libraryActions: some View {
+        if game.isHidden {
+            Button { model.setHidden(game, false) } label: { Label("Show in Library", systemImage: "eye") }
+            Text("Puts it back in All Games, Recently Played, search and its space.")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Button { model.setHidden(game, true) } label: { Label("Hide", systemImage: "eye.slash") }
+            Text("Takes it out of All Games, Recently Played, search and its space. Find it under Hidden.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        if game.canRemove {
+            Button("Remove from Library…", role: .destructive) { model.gamePendingRemoval = game }
+                .buttonStyle(.link).foregroundStyle(.red)
+            Text("Removing keeps the game's files. Delete them from the space's files if you want the disk space back.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func sync() {
@@ -92,6 +116,9 @@ struct GameInspector: View {
                 }
             }
             GridRow { Text("Source").foregroundStyle(.secondary); Text(game.source.label) }
+            if let details {
+                GridRow { Text("Program").foregroundStyle(.secondary); Text(details.label) }
+            }
             if game.secondsPlayed > 0 {
                 GridRow { Text("Played").foregroundStyle(.secondary); Text(game.secondsPlayed.playtime) }
             }
@@ -100,6 +127,9 @@ struct GameInspector: View {
             }
         }
         .font(.callout)
+        if let note = details.flatMap(PEInfo.compatibilityNote) {
+            Label(note, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder private func executableSettings(_ space: Space) -> some View {
@@ -115,7 +145,7 @@ struct GameInspector: View {
                     let start = game.executableURL(in: space)?.deletingLastPathComponent() ?? space.driveC
                     if let u = Panels.chooseFile(message: "Choose the program that starts the game.", start: start,
                                                  types: ["exe", "bat", "msi"]) {
-                        var g = game; g.executablePath = Game.storedPath(for: u, in: space); model.update(g)
+                        model.setExecutable(game, to: u)
                     }
                 }
             }

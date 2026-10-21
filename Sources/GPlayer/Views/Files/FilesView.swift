@@ -12,44 +12,32 @@ struct FileItem: Identifiable, Hashable {
     var isProgram: Bool { ["exe", "msi", "bat"].contains(url.pathExtension.lowercased()) }
 }
 
-/// Browses a space's files, starting at its C: drive.
+/// Browses a space's files: spaces and quick places on the left, the folder on the right.
 struct FilesView: View {
     @Environment(AppModel.self) private var model
     @State private var folder: URL?
     @State private var items: [FileItem] = []
+    @State private var places: [SpacePlace] = []
     @State private var selection = Set<URL>()
     @State private var sort = [KeyPathComparator(\FileItem.name, comparator: .localizedStandard)]
 
     private var space: Space? { model.space(model.filesSpaceID) ?? model.spaces.first }
 
+    /// The folder the table shows: where you went, as long as it is inside this space, otherwise the C: drive.
+    /// Switching space needs no reset this way, so it loads once.
+    private func current(in space: Space) -> URL {
+        if let folder, Files.relativePath(of: folder, to: space.url) != nil { return folder }
+        return space.driveC
+    }
+
     var body: some View {
-        @Bindable var model = model
-        VStack(spacing: 0) {
+        Group {
             if let space {
-                pathBar(space)
-                Divider()
-                Table(items.sorted(using: sort), selection: $selection, sortOrder: $sort) {
-                    TableColumn("Name", value: \.name, comparator: .localizedStandard) { item in
-                        HStack(spacing: 8) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 16, height: 16)
-                            Text(item.name).lineLimit(1)
-                        }
-                    }
-                    TableColumn("Size", value: \.size) { item in
-                        Text(item.isFolder ? "—" : item.size.formattedBytes).foregroundStyle(.secondary).monospacedDigit()
-                    }
-                    .width(min: 70, ideal: 90, max: 120)
-                    TableColumn("Modified") { (item: FileItem) in
-                        Text(item.modified?.formatted(date: .abbreviated, time: .shortened) ?? "").foregroundStyle(.secondary)
-                    }
-                    .width(min: 120, ideal: 150, max: 200)
-                }
-                .contextMenu(forSelectionType: URL.self) { urls in
-                    menu(for: urls, space: space)
-                } primaryAction: { urls in
-                    guard let u = urls.first, let item = items.first(where: { $0.url == u }) else { return }
-                    if item.isFolder { folder = u } else if item.isProgram { model.run(u, in: space) }
-                    else { NSWorkspace.shared.open(u) }
+                HStack(spacing: 0) {
+                    FilesSidebar(space: space, places: places, current: current(in: space)) { folder = $0 }
+                        .frame(width: 210)
+                    Divider()
+                    browser(space)
                 }
             } else {
                 ContentUnavailableView("No spaces yet", systemImage: "folder",
@@ -57,44 +45,100 @@ struct FilesView: View {
             }
         }
         .navigationTitle("Files")
+        .navigationSubtitle(space?.name ?? "")
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button { if let f = folder, let s = space, f.standardizedFileURL != s.url.standardizedFileURL { folder = f.deletingLastPathComponent() } } label: {
-                    Image(systemName: "chevron.backward")
-                }
-                .disabled(folder == nil || folder?.standardizedFileURL == space?.url.standardizedFileURL)
-                .help("Enclosing folder")
+                Button { goUp() } label: { Image(systemName: "chevron.backward") }
+                    .disabled(!canGoUp)
+                    .help("Enclosing folder")
             }
             ToolbarItem(placement: .primaryAction) {
-                Picker("Space", selection: Binding(get: { space?.id }, set: { model.filesSpaceID = $0; folder = nil })) {
-                    ForEach(model.spaces) { s in Text(s.name).tag(Optional(s.id)) }
-                }
-                .fixedSize()
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button { if let f = folder ?? space?.driveC { NSWorkspace.shared.activateFileViewerSelecting([f]) } } label: {
+                Button { if let space { NSWorkspace.shared.activateFileViewerSelecting([current(in: space)]) } } label: {
                     Label("Show in Finder", systemImage: "arrow.up.forward.app")
                 }
             }
         }
-        .task(id: [space?.id.uuidString ?? "", folder?.path ?? ""].joined()) { load() }
+        .task(id: space?.id) {
+            folder = nil
+            places = space.map { SpacePlaces.find(in: $0) } ?? []
+        }
+        .task(id: space.map { current(in: $0) }) { load() }
     }
 
+    private func browser(_ space: Space) -> some View {
+        VStack(spacing: 0) {
+            pathBar(space)
+            Divider()
+            fileTable(space)
+        }
+    }
+
+    private func fileTable(_ space: Space) -> some View {
+        Table(items.sorted(using: sort), selection: $selection, sortOrder: $sort) {
+            TableColumn("Name", value: \.name, comparator: .localizedStandard) { item in
+                HStack(spacing: 8) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 16, height: 16)
+                    Text(item.name).lineLimit(1)
+                }
+            }
+            TableColumn("Size", value: \.size) { item in
+                Text(item.isFolder ? "—" : item.size.formattedBytes).foregroundStyle(.secondary).monospacedDigit()
+            }
+            .width(min: 70, ideal: 90, max: 120)
+            TableColumn("Modified") { (item: FileItem) in
+                Text(item.modified?.formatted(date: .abbreviated, time: .shortened) ?? "").foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 200)
+        }
+        .contextMenu(forSelectionType: URL.self) { urls in
+            menu(for: urls, space: space)
+        } primaryAction: { urls in
+            guard let u = urls.first, let item = items.first(where: { $0.url == u }) else { return }
+            if item.isFolder { folder = u } else if item.isProgram { model.run(u, in: space) }
+            else { NSWorkspace.shared.open(u) }
+        }
+    }
+
+    private var canGoUp: Bool {
+        guard let space else { return false }
+        return current(in: space).standardizedFileURL != space.url.standardizedFileURL
+    }
+
+    private func goUp() {
+        guard let space, canGoUp else { return }
+        folder = current(in: space).deletingLastPathComponent()
+    }
+
+    /// The space, then "C:" › "Program Files" …. The first crumb carries the space's colour.
     private func pathBar(_ space: Space) -> some View {
-        let current = folder ?? space.driveC
-        let crumbs = breadcrumbs(current, space: space)
+        let here = current(in: space)
+        let crumbs = breadcrumbs(here, space: space)
         return HStack(spacing: 4) {
             ForEach(crumbs, id: \.1) { name, url in
-                Button(name) { folder = url }.buttonStyle(.plain)
-                    .foregroundStyle(url == crumbs.last?.1 ? .primary : .secondary)
+                crumb(name, url, space: space, isFirst: url == crumbs.first?.1, isLast: url == crumbs.last?.1)
                 if url != crumbs.last?.1 { Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary) }
             }
             Spacer()
-            Text(current.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+            Text(here.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                 .font(Theme.path).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.head).textSelection(.enabled)
         }
         .font(.callout)
         .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    private func crumb(_ name: String, _ url: URL, space: Space, isFirst: Bool, isLast: Bool) -> some View {
+        Button { folder = url } label: {
+            if isFirst {
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous).fill(space.color).frame(width: 12, height: 12)
+                    Text(name).fontWeight(.semibold)
+                }
+            } else {
+                Text(name)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isLast ? .primary : .secondary)
     }
 
     /// "Steam" › "C:" › "Program Files" …, starting from the space.
@@ -137,7 +181,7 @@ struct FilesView: View {
 
     private func load() {
         guard let space else { items = []; return }
-        let dir = folder ?? space.driveC
+        let dir = current(in: space)
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys,
                                                                  options: [.skipsHiddenFiles])) ?? []
