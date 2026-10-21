@@ -10,7 +10,7 @@ OUT="releases/v$VERSION"
 mkdir -p "$OUT"
 ZIP="$OUT/G-Player-$VERSION.zip"
 rm -f "$ZIP"
-ditto -c -k --sequesterRsrc --keepParent build/G-Player.app "$ZIP"
+ditto -c -k --norsrc --keepParent build/G-Player.app "$ZIP"
 (cd "$OUT" && shasum -a 256 "G-Player-$VERSION.zip" > SHA256SUMS)
 echo "release: $ZIP"
 cat "$OUT/SHA256SUMS"
