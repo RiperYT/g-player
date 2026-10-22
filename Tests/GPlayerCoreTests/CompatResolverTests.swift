@@ -67,17 +67,27 @@ import Testing
     }
 
     @Test func thirtyTwoBitDirectX11IsAWarningOnStaging() {
-        let plan = resolve(GameAnalysis(engine: .unity, graphics: [.d3d11], architecture: .x86))
+        let plan = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86))
         #expect(plan.warnings.contains { $0.title.contains("32-bit") })
         let dotnet = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86, isDotNet: true))
         #expect(!dotnet.warnings.contains { $0.title.contains("32-bit") })
     }
 
-    @Test func unityWithoutVisibleDirectXCountsAsDirectX11() {
-        // Overcooked: Unity, 32-bit, only opengl32 in its imports.
+    @Test func thirtyTwoBitUnityIsABlocker() {
+        // Unity, 32-bit, only opengl32 in its imports (Overcooked and others): DirectX 11 in 32 bits, which macOS can't give.
         let plan = resolve(GameAnalysis(engineName: "Unity", engine: .unity, graphics: [.opengl], architecture: .x86))
-        #expect(plan.warnings.contains { $0.title.contains("32-bit") })
+        #expect(plan.blockers.contains { $0.title.contains("32-bit Unity") })
         #expect(!plan.arguments.contains("-force-d3d11"))
+        let modern = resolve(GameAnalysis(engineName: "Unity", engine: .unity, graphics: [.d3d11], architecture: .x64))
+        #expect(!modern.blockers.contains { $0.title.contains("32-bit") })
+    }
+
+    @Test func a32BitDirectX11FailureSaysItWontHelpToInstallAnything() {
+        let unityLog = "d3d11: failed to create device and context (80004005).\nFailed to initialize graphics.\nInitializeEngineGraphics failed"
+        let found = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: 4, profile: .recommended, is32Bit: true)
+        #expect(found.first?.title == "32-bit DirectX 11 doesn't run on a Mac yet" && found.first?.remedy == Diagnosis.Remedy.none)
+        let modern = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: 4, profile: .recommended)
+        #expect(modern.first?.remedy == .useProfile(.compatible))
     }
 
     @Test func togglesBecomeRegistryAndEnvironment() {

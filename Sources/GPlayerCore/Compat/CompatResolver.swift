@@ -117,6 +117,9 @@ public enum CompatResolver {
         }
     }
 
+    /// Why 32-bit DirectX 10/11 games don't start, for notes and diagnoses.
+    public static let no32BitDirectX11 = "They need DirectX 11 in 32 bits. On macOS, DXVK can't get 32-bit Vulkan memory from MoltenVK, and WineD3D can't give DirectX 11 on Apple's OpenGL 4.1, so Windows components won't help."
+
     public static func resolve(_ input: Input) -> CompatPlan {
         let a = input.analysis ?? GameAnalysis()
         let options = input.options
@@ -206,8 +209,12 @@ public enum CompatResolver {
                 "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in its settings."))
         }
         if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, input.engine.kind == .wineStaging {
-            plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : d3d == .d3d11 ? "11" : "12") game",
-                "Many of these don't start with Wine on macOS yet. If it doesn't open, Compatible mode is worth a try."))
+            if a.engine == .unity {
+                plan.notes.append(CompatNote(.blocker, "32-bit Unity games don't run on a Mac yet", Self.no32BitDirectX11))
+            } else {
+                plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : d3d == .d3d11 ? "11" : "12") game",
+                    "Most of these don't start with Wine on macOS yet. Games that can also use an older DirectX may work in Compatible mode."))
+            }
         }
         // A store starts and updates its own launchers, so only games added by hand need them in the space.
         if !input.isStoreGame {

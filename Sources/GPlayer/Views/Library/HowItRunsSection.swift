@@ -170,7 +170,6 @@ private struct NoteRow: View {
 
 /// What went wrong last time, with one button for the next thing to try.
 private struct DiagnosisBanner: View {
-    @Environment(AppModel.self) private var model
     let game: Game
     let diagnosis: Diagnosis
 
@@ -178,27 +177,76 @@ private struct DiagnosisBanner: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(diagnosis.title, systemImage: "stethoscope").font(.callout.weight(.semibold))
             Text(diagnosis.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            switch diagnosis.remedy {
-            case .installComponents(let ids):
-                if model.isCommonSet(ids) {
-                    Button("Install Common Windows Parts\(model.sizeLabel(ids)) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
-                        .buttonStyle(.borderedProminent).controlSize(.regular)
-                    Text("DirectX 9 and 11 helpers, game audio, controller support, OpenAL and Windows fonts. Many older games need some of these.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Button("Install \(model.componentsLabel(ids)) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
-                        .buttonStyle(.borderedProminent).controlSize(.small)
-                }
-            case .useProfile(let p):
-                Button("Try \(p.title) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
-            case .none:
-                EmptyView()
-            }
+            RemedyButton(game: game, diagnosis: diagnosis, large: false)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// The next thing to try for a diagnosis, as one button (nothing when there is nothing to try).
+struct RemedyButton: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+    let diagnosis: Diagnosis
+    let large: Bool
+    var then: () -> Void = {}
+
+    var body: some View {
+        switch diagnosis.remedy {
+        case .installComponents(let ids):
+            VStack(alignment: .leading, spacing: 4) {
+                Button(model.isCommonSet(ids) ? "Install Common Windows Parts\(model.sizeLabel(ids)) and Play"
+                                              : "Install \(model.componentsLabel(ids)) and Play") {
+                    model.applyRemedy(diagnosis.remedy, for: game); then()
+                }
+                .buttonStyle(.borderedProminent).controlSize(large ? .large : .regular)
+                if model.isCommonSet(ids) {
+                    Text("DirectX 9 and 11 helpers, game audio, controller support, OpenAL and Windows fonts. Many older games need some of these.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        case .useProfile(let p):
+            Button("Try \(p.title) and Play") { model.applyRemedy(diagnosis.remedy, for: game); then() }
+                .buttonStyle(.borderedProminent).controlSize(large ? .large : .regular)
+        case .none:
+            EmptyView()
+        }
+    }
+}
+
+/// After a launch the user just made fails: what happened and what to try, in front of everything.
+struct FailedLaunchSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let game: Game
+
+    var body: some View {
+        let found = (model.diagnoses[game.id] ?? []).filter { $0.title != AppModel.componentsLaterTitle }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("“\(game.title)” didn't start").font(.title3.weight(.semibold))
+                    Text(found.first?.title ?? "").font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            ForEach(found) { d in
+                Text(d.detail).font(.callout).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button("Show in Library") { model.selectedGameID = game.id; dismiss() }
+                Spacer()
+                Button("Close", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                if let first = found.first(where: { $0.remedy != .none }) {
+                    RemedyButton(game: game, diagnosis: first, large: false) { dismiss() }
+                        .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+        .padding(22)
+        .frame(width: 460)
     }
 }
 

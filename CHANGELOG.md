@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.4] - 2026-10-22
+
+- **A launch that fails says so in the middle of the window**, with what happened and the one thing to try, and
+  G-Player comes to the front. The inspector keeps the same note.
+- **Windows parts can install for Steam games.** Installers need the space to themselves, so with Steam open they
+  used to wait forever and the same offer came back after every try. Now G-Player asks to close Steam for a minute,
+  installs, and starts the game again.
+- **Honest answers for 32-bit DirectX 11 games.** 32-bit Unity games (DirectX 11 in 32 bits) are flagged before
+  launch, and a 32-bit DirectX 11 failure says that no component will help: DXVK can't get 32-bit Vulkan memory
+  from MoltenVK and WineD3D can't give DirectX 11 on Apple's OpenGL 4.1.
+- Unity games started by Steam are diagnosed from their own `Player.log`.
+
 ## [0.3.3] - 2026-10-22
 
 - **Steam's window no longer turns black after Steam updates itself.** A Steam client update on start replaces the

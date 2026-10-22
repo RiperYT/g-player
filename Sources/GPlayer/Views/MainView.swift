@@ -25,6 +25,17 @@ struct MainView: View {
         }
         .sheet(isPresented: $model.showAddGame) { AddGameSheet(initialSource: model.addGameSource) }
         .sheet(isPresented: $model.showNewSpace) { NewSpaceSheet() }
+        .sheet(isPresented: Binding(get: { model.failedLaunch != nil }, set: { if !$0 { model.failedLaunch = nil } })) {
+            if let g = model.game(model.failedLaunch) { FailedLaunchSheet(game: g) }
+        }
+        .alert("Steam has to close for a minute", isPresented: Binding(get: { model.launcherQuit != nil },
+                                                                     set: { if !$0 { model.launcherQuit = nil } }),
+               presenting: model.launcherQuit) { request in
+            Button("Close Steam and Install") { model.quitSteamThenInstall(request) }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text("Windows installers need the space to themselves. G-Player closes Steam, installs \(model.componentsLabel(request.components)), then starts \(model.game(request.gameID)?.title ?? "the game") again, which opens Steam with it.")
+        }
         .alert("This game may not run", isPresented: Binding(get: { model.blockedLaunch != nil },
                                                              set: { if !$0 { model.blockedLaunch = nil } }),
                presenting: model.blockedLaunch) { blocked in

@@ -28,6 +28,13 @@ struct SteamRestart: Identifiable {
     let skipped: Set<PlayCheck>
 }
 
+/// Components the user asked for, waiting for Steam to be closed so they can install.
+struct LauncherQuit: Identifiable {
+    var id: UUID { gameID }
+    let gameID: UUID
+    let components: [String]
+}
+
 /// An external space G-Player wants to change, waiting for the user's answer.
 struct ChangesRequest: Identifiable {
     let id = UUID()
@@ -128,11 +135,12 @@ extension AppModel {
             guard let space = space(game.spaceID) else { return }
             let install = {
                 Task {
-                    self.skippedComponents[space.id]?.subtract(ids)
-                    let result = await self.installComponents(ids, in: space, reason: "for \(game.title)", retryFailed: true)
-                    // Stop means stop: the game doesn't start (and doesn't install the same components again).
-                    guard result != .cancelled else { return }
-                    if let g = self.game(game.id) { self.play(g) }
+                    // Installers need the space to themselves. When it's only Steam, offer to close it for a minute.
+                    if await Self.isBusy(space), await Self.isSteamRunning(in: space) {
+                        self.launcherQuit = LauncherQuit(gameID: game.id, components: ids)
+                        return
+                    }
+                    await self.installThenPlay(ids, game: game, in: space)
                 }
             }
             // Pressing the button in a space G-Player may not change asks again, even after an earlier "Don't Allow".
@@ -335,27 +343,60 @@ extension AppModel {
         }
     }
 
+    /// Installs components the user asked for, then starts the game again.
+    func installThenPlay(_ ids: [String], game: Game, in space: Space) async {
+        skippedComponents[space.id]?.subtract(ids)
+        let result = await installComponents(ids, in: space, reason: "for \(game.title)", retryFailed: true)
+        // Stop means stop: the game doesn't start (and doesn't install the same components again).
+        guard result != .cancelled else { return }
+        if result == .waiting {
+            errorMessage = "Something else is open in “\(space.name)”. Close it, then press the button again."
+            return
+        }
+        if let g = self.game(game.id) { play(g) }
+    }
+
+    /// Closes Steam, installs what the game needs, then starts it (which opens Steam again).
+    func quitSteamThenInstall(_ request: LauncherQuit) {
+        guard let game = game(request.gameID), let space = space(game.spaceID) else { return }
+        preparing.insert(game.id)
+        Task {
+            let quit = await quitSteam(in: space)
+            preparing.remove(game.id)
+            guard quit else {
+                errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press the button again."
+                return
+            }
+            await installThenPlay(request.components, game: game, in: space)
+        }
+    }
+
+    /// Asks Steam to quit and waits for it, up to a minute. True when it is gone.
+    func quitSteam(in space: Space) async -> Bool {
+        guard let paths, let engine = engine(for: space) else { return false }
+        let activity = begin("Closing Steam", "Waiting for Steam to quit")
+        defer { end(activity) }
+        let steam = AppPresets.steam
+        let exe = steam.executableURL(in: space)
+        _ = try? WineLauncher.start(engine: engine, space: space, arguments: [exe.path, "-shutdown"],
+                                    workingDirectory: exe.deletingLastPathComponent(), backend: .auto,
+                                    tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides, environment: steam.environment),
+                                    logsFolder: paths.logs, logName: "Steam shutdown")
+        for _ in 0..<40 {
+            try? await Task.sleep(for: .seconds(1.5))
+            if !(await Self.isSteamRunning(in: space)) { return true }
+        }
+        return false
+    }
+
     // MARK: Steam
 
     /// Quits the running Steam, waits for it, then starts the game, so Steam passes on the game's settings.
     func restartSteamAndPlay(_ request: SteamRestart) {
-        guard let paths, let game = game(request.gameID), let space = space(game.spaceID),
-              let engine = engine(for: space) else { return }
+        guard let game = game(request.gameID), let space = space(game.spaceID) else { return }
         preparing.insert(game.id)
         Task {
-            let activity = begin("Restarting Steam", "Waiting for Steam to quit")
-            let steam = AppPresets.steam
-            let exe = steam.executableURL(in: space)
-            _ = try? WineLauncher.start(engine: engine, space: space, arguments: [exe.path, "-shutdown"],
-                                        workingDirectory: exe.deletingLastPathComponent(), backend: .auto,
-                                        tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides, environment: steam.environment),
-                                        logsFolder: paths.logs, logName: "Steam shutdown")
-            var quit = false
-            for _ in 0..<40 {
-                try? await Task.sleep(for: .seconds(1.5))
-                if !(await Self.isSteamRunning(in: space)) { quit = true; break }
-            }
-            end(activity)
+            let quit = await quitSteam(in: space)
             preparing.remove(game.id)
             guard quit else {
                 errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press Play again."

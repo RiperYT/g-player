@@ -83,6 +83,10 @@ final class AppModel {
     var preparing = Set<UUID>()
     /// A Steam game waiting for the user to restart Steam or play with the running one.
     var steamRestart: SteamRestart?
+    /// Components waiting for the user to let G-Player close Steam.
+    var launcherQuit: LauncherQuit?
+    /// A game the user just started that didn't start: shown in a dialog in the middle of the window.
+    var failedLaunch: UUID?
     /// External spaces waiting for the user to allow or refuse changes, first one shown.
     var changesRequests: [ChangesRequest] = []
     var changesRequest: ChangesRequest? { changesRequests.first }
@@ -697,30 +701,51 @@ final class AppModel {
             firstSeen[id] = nil
             if let launched = storeLaunches.removeValue(forKey: id), now.timeIntervalSince(launched) < 300,
                now.timeIntervalSince(seen) < 45 {
-                diagnoseStoreGame(id, seconds: now.timeIntervalSince(seen), opened: true)
+                diagnoseStoreGame(id, seconds: now.timeIntervalSince(seen), opened: true, launched: launched)
             }
         }
         for (id, until) in startingUntil where until <= now && found[id] == nil && firstSeen[id] == nil {
-            if storeLaunches.removeValue(forKey: id) != nil { diagnoseStoreGame(id, seconds: 0, opened: false) }
+            if let launched = storeLaunches.removeValue(forKey: id) { diagnoseStoreGame(id, seconds: 0, opened: false, launched: launched) }
         }
         let stillStarting = startingUntil.filter { $0.value > now && found[$0.key] == nil }
         if stillStarting != startingUntil { startingUntil = stillStarting }
         storeLaunches = storeLaunches.filter { now.timeIntervalSince($0.value) < 300 }
     }
 
-    private func diagnoseStoreGame(_ id: UUID, seconds: Double, opened: Bool) {
+    /// A store game that came and went (or never came). A Unity game's own log says why, when it wrote one.
+    private func diagnoseStoreGame(_ id: UUID, seconds: Double, opened: Bool, launched: Date) {
         guard let game = game(id), let space = space(game.spaceID), let paths else { return }
         let profile = game.launchOptions.profile
+        let is32Bit = game.analysis?.architecture == .x86
         Task {
-            let installed = await Task.detached { RuntimeInstaller(paths: paths).installed(in: space) }.value
-            var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
-            if !opened {
-                d = Diagnosis(kind: .closedRightAway, title: "The game didn't open",
-                              detail: "Steam started it, but no window came up within a minute. It may have closed right away.",
-                              remedy: d.remedy)
+            let (installed, unityLog) = await Task.detached { () -> (Set<String>, String?) in
+                let log = LogDiagnosis.unityLog(in: space, since: launched.addingTimeInterval(-5)).map { LogDiagnosis.tail(of: $0) }
+                return (RuntimeInstaller(paths: paths).installed(in: space), log)
+            }.value
+            var found: [Diagnosis] = []
+            if let unityLog {
+                found = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: max(seconds, 1), profile: profile,
+                                              installed: installed, is32Bit: is32Bit)
             }
-            diagnoses[id] = [d]
+            if found.isEmpty {
+                var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
+                if !opened {
+                    d = Diagnosis(kind: .closedRightAway, title: "The game didn't open",
+                                  detail: "Steam started it, but no window came up within a minute. It may have closed right away.",
+                                  remedy: d.remedy)
+                }
+                found = [d]
+            }
+            report(found, for: id)
         }
+    }
+
+    /// Shows what went wrong with a launch the user just made: in the inspector, and in a dialog in front.
+    func report(_ found: [Diagnosis], for id: UUID) {
+        diagnoses[id] = found.isEmpty ? nil : found
+        guard !found.isEmpty, found.contains(where: { $0.title != Self.componentsLaterTitle }) else { return }
+        failedLaunch = id
+        NSApp.activate()
     }
 
     /// Looks again every 4 seconds while G-Player is in front, every 20 seconds behind other windows.
@@ -874,12 +899,13 @@ final class AppModel {
             let profile = record.profile
             let paths = self.paths
             let gameSpace = game(gameID).flatMap { self.space($0.spaceID) }
+            let is32Bit = game(gameID)?.analysis?.architecture == .x86
             Task.detached(priority: .utility) {
                 var installed: Set<String> = []
                 if let paths, let gameSpace { installed = RuntimeInstaller(paths: paths).installed(in: gameSpace) }
                 let found = LogDiagnosis.diagnose(log: LogDiagnosis.tail(of: log), exitStatus: status,
-                                                  seconds: seconds, profile: profile, installed: installed)
-                await MainActor.run { self.diagnoses[gameID] = found.isEmpty ? nil : found }
+                                                  seconds: seconds, profile: profile, installed: installed, is32Bit: is32Bit)
+                await MainActor.run { self.report(found, for: gameID) }
             }
         }
         if launches[gameID]?.program.isRunning == false { launches[gameID] = nil }

@@ -23,6 +23,7 @@ public struct Diagnosis: Hashable, Sendable, Identifiable {
 /// Reads a launch log (G-Player's header plus Wine's output) after a game quits.
 public enum LogDiagnosis {
     static let graphicsFailures = [
+        "failed to create device and context",
         "failed to create d3d11 device", "failed to create d3d12 device", "d3d11createdevice failed",
         "initializeenginegraphics failed", "failed to initialize player", "unable to create direct3d device",
         "dx11 feature level 10.0 is required", "a d3d11-compatible gpu", "failed to create the d3d device",
@@ -36,8 +37,9 @@ public enum LogDiagnosis {
     ///   - seconds: how long the game ran.
     ///   - profile: the profile it ran with, so the advice moves on to the next one.
     ///   - installed: the components already in the space, so the common set is offered only while some are missing.
+    ///   - is32Bit: a 32-bit program, for which a DirectX 11 failure has no remedy on macOS yet.
     public static func diagnose(log: String, exitStatus: Int32, seconds: Double, profile: LaunchProfile,
-                                installed: Set<String> = []) -> [Diagnosis] {
+                                installed: Set<String> = [], is32Bit: Bool = false) -> [Diagnosis] {
         let lower = withoutHeader(log).lowercased()
         var results: [Diagnosis] = []
 
@@ -70,9 +72,14 @@ public enum LogDiagnosis {
         }
 
         if graphicsFailures.contains(where: lower.contains) {
-            results.append(Diagnosis(kind: .graphics, title: "Graphics didn't start",
-                                     detail: "The game couldn't create its graphics device.",
-                                     remedy: profile == .compatible ? .none : .useProfile(.compatible)))
+            if is32Bit && (lower.contains("d3d11") || lower.contains("dx11") || lower.contains("directx 11")) {
+                results.append(Diagnosis(kind: .graphics, title: "32-bit DirectX 11 doesn't run on a Mac yet",
+                                         detail: CompatResolver.no32BitDirectX11, remedy: .none))
+            } else {
+                results.append(Diagnosis(kind: .graphics, title: "Graphics didn't start",
+                                         detail: "The game couldn't create its graphics device.",
+                                         remedy: profile == .compatible ? .none : .useProfile(.compatible)))
+            }
         }
 
         let crashed = lower.contains("unhandled page fault") || lower.contains("unhandled exception")
@@ -87,6 +94,26 @@ public enum LogDiagnosis {
             results.append(closedRightAway(seconds: seconds, profile: profile, installed: installed))
         }
         return results
+    }
+
+    /// The newest Unity `Player.log` in the space written since `since`: a Unity game started by Steam writes its
+    /// log there (AppData/LocalLow/<company>/<product>), while its console output goes to Steam.
+    public static func unityLog(in space: Space, since: Date) -> URL? {
+        let fm = FileManager.default
+        let users = space.driveC.appendingPathComponent("users", isDirectory: true)
+        var best: (URL, Date)?
+        for user in (try? fm.contentsOfDirectory(at: users, includingPropertiesForKeys: nil)) ?? [] {
+            let low = user.appendingPathComponent("AppData/LocalLow", isDirectory: true)
+            for company in (try? fm.contentsOfDirectory(at: low, includingPropertiesForKeys: nil)) ?? [] {
+                for product in (try? fm.contentsOfDirectory(at: company, includingPropertiesForKeys: nil)) ?? [] {
+                    let log = product.appendingPathComponent("Player.log")
+                    guard let date = (try? fm.attributesOfItem(atPath: log.path))?[.modificationDate] as? Date,
+                          date >= since, date > (best?.1 ?? .distantPast) else { continue }
+                    best = (log, date)
+                }
+            }
+        }
+        return best?.0
     }
 
     /// A game that quit within seconds without a log that says why (a store game's output goes to its launcher, so
