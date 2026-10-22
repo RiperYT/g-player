@@ -22,21 +22,6 @@ public struct Diagnosis: Hashable, Sendable, Identifiable {
 
 /// Reads a launch log (G-Player's header plus Wine's output) after a game quits.
 public enum LogDiagnosis {
-    /// Windows DLL → the runtime component that provides it.
-    static let componentForDLL: [(prefix: String, component: String)] = [
-        ("msvcp140", "vcrun2022"), ("vcruntime140", "vcrun2022"), ("concrt140", "vcrun2022"), ("vcomp140", "vcrun2022"),
-        ("mfc140", "mfc140"),
-        ("msvcp120", "vcrun2013"), ("msvcr120", "vcrun2013"),
-        ("msvcp110", "vcrun2012"), ("msvcr110", "vcrun2012"),
-        ("msvcp100", "vcrun2010"), ("msvcr100", "vcrun2010"),
-        ("msvcp90", "vcrun2008"), ("msvcr90", "vcrun2008"),
-        ("d3dx9_", "d3dx9"), ("d3dx10_", "d3dx10"), ("d3dx11_", "d3dx11_43"),
-        ("d3dcompiler_43", "d3dcompiler_43"), ("d3dcompiler_47", "d3dcompiler_47"),
-        ("xinput1_", "xinput"), ("xaudio2_", "xact"), ("x3daudio1_", "xact"), ("xactengine", "xact"),
-        ("physxloader", "physx"), ("physx3", "physx"), ("physxcudart", "physx"),
-        ("openal32", "openal"), ("mscoree", "dotnet48"), ("xnafx40", "xna40"),
-    ]
-
     static let graphicsFailures = [
         "failed to create d3d11 device", "failed to create d3d12 device", "d3d11createdevice failed",
         "initializeenginegraphics failed", "failed to initialize player", "unable to create direct3d device",
@@ -50,7 +35,9 @@ public enum LogDiagnosis {
     ///   - exitStatus: the Wine process's exit status.
     ///   - seconds: how long the game ran.
     ///   - profile: the profile it ran with, so the advice moves on to the next one.
-    public static func diagnose(log: String, exitStatus: Int32, seconds: Double, profile: LaunchProfile) -> [Diagnosis] {
+    ///   - installed: the components already in the space, so the common set is offered only while some are missing.
+    public static func diagnose(log: String, exitStatus: Int32, seconds: Double, profile: LaunchProfile,
+                                installed: Set<String> = []) -> [Diagnosis] {
         let lower = withoutHeader(log).lowercased()
         var results: [Diagnosis] = []
 
@@ -62,7 +49,7 @@ public enum LogDiagnosis {
             }
         }
         let components = Array(Set(missing.compactMap { dll in
-            componentForDLL.first { dll.hasPrefix($0.prefix) }?.component
+            RuntimeCatalog.component(forDLL: dll)
         })).sorted()
         if !components.isEmpty {
             let dlls = Array(Set(missing)).sorted().prefix(4).joined(separator: ", ")
@@ -93,15 +80,29 @@ public enum LogDiagnosis {
         if results.isEmpty && crashed {
             results.append(Diagnosis(kind: .crash, title: "The game crashed",
                                      detail: "Wine reported a crash while the game was starting.",
-                                     remedy: profile == .compatible ? .none : .useProfile(.compatible)))
+                                     remedy: nextStep(profile: profile, installed: installed)))
         }
 
         if results.isEmpty && seconds < 15 && exitStatus != 0 {
-            results.append(Diagnosis(kind: .closedRightAway, title: "The game closed right away",
-                                     detail: "It quit after \(Int(seconds)) seconds without saying why.",
-                                     remedy: profile == .compatible ? .none : .useProfile(.compatible)))
+            results.append(closedRightAway(seconds: seconds, profile: profile, installed: installed))
         }
         return results
+    }
+
+    /// A game that quit within seconds without a log that says why (a store game's output goes to its launcher, so
+    /// G-Player only sees it come and go).
+    public static func closedRightAway(seconds: Double, profile: LaunchProfile, installed: Set<String>) -> Diagnosis {
+        Diagnosis(kind: .closedRightAway, title: "The game closed right away",
+                  detail: "It quit after \(max(1, Int(seconds))) seconds without saying why.",
+                  remedy: nextStep(profile: profile, installed: installed))
+    }
+
+    /// What to try when nothing says what went wrong: the common runtimes first (they are cheap and often the cause),
+    /// then the Compatible profile.
+    static func nextStep(profile: LaunchProfile, installed: Set<String>) -> Diagnosis.Remedy {
+        let missing = RuntimeCatalog.commonSet.filter { !installed.contains($0) }
+        if !missing.isEmpty { return .installComponents(missing) }
+        return profile == .compatible ? .none : .useProfile(.compatible)
     }
 
     /// The log without G-Player's own header. `WineLauncher.start` begins every log with "G-Player launch", the engine, the

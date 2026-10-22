@@ -155,7 +155,12 @@ struct GameTile: View {
                     .strokeBorder(Color.accentColor, lineWidth: selected ? 3 : 0).padding(-4))
                 .scaleEffect(hovering ? 1.015 : 1)
             Text(game.title).font(.callout.weight(.medium)).lineLimit(1)
-            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if model.didNotStart(game) && !model.isRunning(game) && !model.isPreparing(game) {
+                Label("Didn't start · see what to try", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.orange).lineLimit(1)
+            } else {
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
         .contentShape(Rectangle())
         .onHover { h in withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) { hovering = h } }

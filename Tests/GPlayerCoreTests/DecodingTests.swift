@@ -74,7 +74,7 @@ import Testing
     }
 
     @Test func theAnalyzerSaysWhichProgramItReadAndWhichVersionItIs() throws {
-        #expect(GameAnalysis.currentVersion == 2)
+        #expect(GameAnalysis.currentVersion == 3)          // 3: components from imports
         let tmp = TempFolder()
         let exe = tmp.file("Game/Game.exe", contents: try Data(contentsOf: fixture("D3D11Fixture.exe")))
         let analysis = GameAnalyzer.analyze(executable: exe)

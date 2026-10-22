@@ -85,7 +85,7 @@ import Testing
     }
 
     @Test func everyComponentTheLogDiagnosisSuggestsCanBeInstalled() {
-        for (_, component) in LogDiagnosis.componentForDLL { #expect(RuntimeCatalog.isInstallable(component), "\(component)") }
+        for (_, component) in RuntimeCatalog.componentForDLL { #expect(RuntimeCatalog.isInstallable(component), "\(component)") }
     }
 
     // MARK: The resolver and the ids of real fixes

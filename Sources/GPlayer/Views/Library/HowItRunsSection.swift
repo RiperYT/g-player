@@ -180,8 +180,15 @@ private struct DiagnosisBanner: View {
             Text(diagnosis.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             switch diagnosis.remedy {
             case .installComponents(let ids):
-                Button("Install \(model.componentsLabel(ids)) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
+                if model.isCommonSet(ids) {
+                    Button("Install Common Windows Parts\(model.sizeLabel(ids)) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
+                        .buttonStyle(.borderedProminent).controlSize(.regular)
+                    Text("DirectX 9 and 11 helpers, game audio, controller support, OpenAL and Windows fonts. Many older games need some of these.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Button("Install \(model.componentsLabel(ids)) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
             case .useProfile(let p):
                 Button("Try \(p.title) and Play") { model.applyRemedy(diagnosis.remedy, for: game) }
                     .buttonStyle(.borderedProminent).controlSize(.small)

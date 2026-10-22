@@ -120,7 +120,7 @@ public enum KnownEngine: String, Codable, Sendable, Hashable, CaseIterable {
 /// What a game is, worked out from its files. Cached on the game; recomputed when its program changes.
 public struct GameAnalysis: Codable, Sendable, Hashable {
     /// Bumped when the analyzer learns something new, so older cached results are worked out again.
-    public static let currentVersion = 2
+    public static let currentVersion = 3
 
     /// Engine name as the detection rules call it ("Unity", "Unreal", "Godot"…), if any.
     public var engineName: String?
@@ -136,13 +136,15 @@ public struct GameAnalysis: Codable, Sendable, Hashable {
     public var programPath: String?
     /// `currentVersion` when this result was made. Nil for results made before versions existed.
     public var version: Int?
+    /// Runtime components the game's files use (from their import tables) and don't bring along themselves.
+    public var neededComponents: [String]
 
     public init(engineName: String? = nil, engine: KnownEngine? = nil, antiCheat: [String] = [], launchers: [String] = [],
                 graphics: [GraphicsAPI] = [], architecture: PEArchitecture? = nil, isDotNet: Bool = false,
-                programPath: String? = nil, version: Int? = nil) {
+                programPath: String? = nil, version: Int? = nil, neededComponents: [String] = []) {
         self.engineName = engineName; self.engine = engine; self.antiCheat = antiCheat; self.launchers = launchers
         self.graphics = graphics; self.architecture = architecture; self.isDotNet = isDotNet
-        self.programPath = programPath; self.version = version
+        self.programPath = programPath; self.version = version; self.neededComponents = neededComponents
     }
 
     /// Every field is optional on disk, so a library written by an older or newer G-Player still opens.
@@ -157,6 +159,7 @@ public struct GameAnalysis: Codable, Sendable, Hashable {
         isDotNet = c.value(.isDotNet, default: false)
         programPath = c.value(.programPath, default: nil)
         version = c.value(.version, default: nil)
+        neededComponents = c.value(.neededComponents, default: [])
     }
 
     /// The newest Direct3D the program imports, if any.

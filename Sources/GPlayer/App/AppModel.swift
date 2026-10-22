@@ -641,6 +641,10 @@ final class AppModel {
     private(set) var gamePrograms: [UUID: [WineProcess]] = [:]
     /// Store games until their program shows up (Steam takes a while to start a game), so Play isn't offered twice.
     private(set) var startingUntil: [UUID: Date] = [:]
+    /// Store games G-Player started in the last minutes, and when each was first seen running: a game Steam starts
+    /// writes no log G-Player can read, so coming and going within seconds is how it tells "closed right away".
+    private var storeLaunches: [UUID: Date] = [:]
+    private var firstSeen: [UUID: Date] = [:]
     private var lookingAtPrograms = false
 
     /// Looks at which programs run, off the main thread. A look already under way makes this a no-op.
@@ -654,9 +658,41 @@ final class AppModel {
             }.value
             lookingAtPrograms = false
             if found != gamePrograms { gamePrograms = found }
-            let now = Date()
-            let stillStarting = startingUntil.filter { $0.value > now && found[$0.key] == nil }
-            if stillStarting != startingUntil { startingUntil = stillStarting }
+            noticeStoreGames(found)
+        }
+    }
+
+    /// Store games that closed within seconds, or never opened, get the same advice as a game whose log says nothing.
+    private func noticeStoreGames(_ found: [UUID: [WineProcess]]) {
+        let now = Date()
+        for id in found.keys where firstSeen[id] == nil { firstSeen[id] = now }
+        for (id, seen) in firstSeen where found[id] == nil {
+            firstSeen[id] = nil
+            if let launched = storeLaunches.removeValue(forKey: id), now.timeIntervalSince(launched) < 300,
+               now.timeIntervalSince(seen) < 45 {
+                diagnoseStoreGame(id, seconds: now.timeIntervalSince(seen), opened: true)
+            }
+        }
+        for (id, until) in startingUntil where until <= now && found[id] == nil && firstSeen[id] == nil {
+            if storeLaunches.removeValue(forKey: id) != nil { diagnoseStoreGame(id, seconds: 0, opened: false) }
+        }
+        let stillStarting = startingUntil.filter { $0.value > now && found[$0.key] == nil }
+        if stillStarting != startingUntil { startingUntil = stillStarting }
+        storeLaunches = storeLaunches.filter { now.timeIntervalSince($0.value) < 300 }
+    }
+
+    private func diagnoseStoreGame(_ id: UUID, seconds: Double, opened: Bool) {
+        guard let game = game(id), let space = space(game.spaceID), let paths else { return }
+        let profile = game.launchOptions.profile
+        Task {
+            let installed = await Task.detached { RuntimeInstaller(paths: paths).installed(in: space) }.value
+            var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
+            if !opened {
+                d = Diagnosis(kind: .closedRightAway, title: "The game didn't open",
+                              detail: "Steam started it, but no window came up within a minute. It may have closed right away.",
+                              remedy: d.remedy)
+            }
+            diagnoses[id] = [d]
         }
     }
 
@@ -666,7 +702,10 @@ final class AppModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 self.refreshPrograms()
-                try? await Task.sleep(for: .seconds(NSApp?.isActive == true ? 4 : 20))
+                // Closely while a store game is starting, so one that closes within seconds is seen at all.
+                let seconds: Double = !self.startingUntil.isEmpty || !self.firstSeen.isEmpty ? 1.5
+                    : NSApp?.isActive == true ? 4 : 20
+                try? await Task.sleep(for: .seconds(seconds))
             }
         }
     }
@@ -740,7 +779,11 @@ final class AppModel {
             // A program that died before it was recorded: its exit came first and found nothing to clear.
             if !program.isRunning { finished(game.id, status: program.process.terminationStatus) }
             // A store game starts through its launcher: "Starting…" until it shows up, and look for it soon.
-            if current.storeKey != nil && current.kind == .game { startingUntil[game.id] = Date().addingTimeInterval(60) }
+            if current.storeKey != nil && current.kind == .game {
+                startingUntil[game.id] = Date().addingTimeInterval(60)
+                storeLaunches[game.id] = Date()
+                firstSeen[game.id] = nil
+            }
             Task { try? await Task.sleep(for: .seconds(5)); refreshPrograms() }
         } catch {
             errorMessage = error.localizedDescription
@@ -801,9 +844,13 @@ final class AppModel {
             let seconds = Date().timeIntervalSince(record.program.startedAt)
             let log = record.program.logFile
             let profile = record.profile
+            let paths = self.paths
+            let gameSpace = game(gameID).flatMap { self.space($0.spaceID) }
             Task.detached(priority: .utility) {
+                var installed: Set<String> = []
+                if let paths, let gameSpace { installed = RuntimeInstaller(paths: paths).installed(in: gameSpace) }
                 let found = LogDiagnosis.diagnose(log: LogDiagnosis.tail(of: log), exitStatus: status,
-                                                  seconds: seconds, profile: profile)
+                                                  seconds: seconds, profile: profile, installed: installed)
                 await MainActor.run { self.diagnoses[gameID] = found.isEmpty ? nil : found }
             }
         }

@@ -60,6 +60,35 @@ public enum RuntimeCatalog {
 
     public static func component(_ id: String) -> RuntimeComponent? { all.first { $0.id == id } }
 
+    /// Windows DLL → the runtime component that provides it.
+    static let componentForDLL: [(prefix: String, component: String)] = [
+        ("msvcp140", "vcrun2022"), ("vcruntime140", "vcrun2022"), ("concrt140", "vcrun2022"), ("vcomp140", "vcrun2022"),
+        ("mfc140", "mfc140"),
+        ("msvcp120", "vcrun2013"), ("msvcr120", "vcrun2013"),
+        ("msvcp110", "vcrun2012"), ("msvcr110", "vcrun2012"),
+        ("msvcp100", "vcrun2010"), ("msvcr100", "vcrun2010"),
+        ("msvcp90", "vcrun2008"), ("msvcr90", "vcrun2008"),
+        ("d3dx9_", "d3dx9"), ("d3dx10_", "d3dx10"), ("d3dx11_", "d3dx11_43"),
+        ("d3dcompiler_43", "d3dcompiler_43"), ("d3dcompiler_47", "d3dcompiler_47"),
+        ("xinput1_", "xinput"), ("xaudio2_", "xact"), ("x3daudio1_", "xact"), ("xactengine", "xact"),
+        ("physxloader", "physx"), ("physx3", "physx"), ("physxcudart", "physx"),
+        ("openal32", "openal"), ("mscoree", "dotnet48"), ("xnafx40", "xna40"),
+    ]
+
+    /// The component that provides a Windows DLL (`d3dx9_43.dll` → `d3dx9`), if G-Player knows one.
+    public static func component(forDLL dll: String) -> String? {
+        let name = dll.lowercased()
+        return componentForDLL.first { name.hasPrefix($0.prefix) }?.component
+    }
+
+    /// Components G-Player installs on its own when a game's files use them. .NET is left out: Wine Mono runs most
+    /// .NET games, and Microsoft's .NET is large and replaces it.
+    public static func installsByItself(_ id: String) -> Bool { id != "dotnet48" && isInstallable(id) }
+
+    /// Runtimes many older games use, offered in one go when a game doesn't start and the log doesn't say why.
+    /// The DirectX parts share one download, so the whole set is about 105 MB.
+    public static let commonSet = ["d3dx9", "d3dx11_43", "xact", "xinput", "openal", "corefonts"]
+
     // MARK: Aliases and what can be installed
 
     /// Runtimes that the newer one replaces. The 2015, 2017 and 2019 Visual C++ runtimes are one family: the 2015–2022

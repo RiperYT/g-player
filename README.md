@@ -23,7 +23,8 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 Get the latest `G-Player-<version>.zip` from [Releases](https://github.com/RiperYT/g-player/releases)
 (the same files are kept in [`releases/`](releases/)). Unzip it and move **G-Player.app** to Applications.
 
-The app isn't notarized yet, so the first time macOS blocks it. Open it once with **right-click › Open**, or run:
+The app isn't notarized yet, so the first time macOS blocks it. Double-click it once, then open
+**System Settings › Privacy & Security**, scroll down and press **Open Anyway** next to G-Player. Or run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/G-Player.app
@@ -39,6 +40,7 @@ install it), about 1 GB for the engine plus room for games.
 | Steam client and most DirectX 9–11 games through DXVK | Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) |
 | Portable games, Unity, Unreal, Electron and RPG Maker games | Games that need a GPU driver Wine can't fake |
 | DirectX 12 through Apple's D3DMetal, if you installed it (see below) | 32-bit DirectX 10/11 games, often |
+| 32-bit games (with G-Player's Rosetta fix for Wine) | OpenGL games that need more than OpenGL 4.1 (macOS's limit) |
 
 The first minutes of a game can stutter while shaders compile. That settles once the cache is built.
 

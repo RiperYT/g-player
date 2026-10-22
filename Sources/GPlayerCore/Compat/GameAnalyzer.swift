@@ -28,6 +28,7 @@ public enum GameAnalyzer {
         analysis.antiCheat = names(found.matches["AntiCheat"])
         analysis.launchers = names(found.matches["Launcher"])
         analysis.graphics = graphics(of: exe, root: root, files: files)
+        analysis.neededComponents = neededComponents(of: exe, files: files)
         if let details = PEInfo.details(ofExecutableAt: exe) {
             analysis.architecture = details.architecture
             analysis.isDotNet = details.isDotNet
@@ -65,6 +66,31 @@ public enum GameAnalyzer {
 
     private static func names(_ rules: Set<String>?) -> [String] {
         (rules ?? []).map(displayName).sorted()
+    }
+
+    // MARK: Runtime components
+
+    /// The components the program and the DLLs next to it import, minus DLLs the game brings along itself (many games
+    /// ship their own openal32.dll or msvcr100.dll).
+    static func neededComponents(of exe: URL, files: [String]) -> [String] {
+        let shipped = Set(files.map { ($0 as NSString).lastPathComponent.lowercased() })
+        let folder = exe.deletingLastPathComponent()
+        let neighbours = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension.lowercased() == "dll" }.prefix(200)
+        var imported = Set<String>()
+        for url in [exe] + neighbours {
+            for dll in PEImports.importedDLLs(ofExecutableAt: url) ?? [] { imported.insert(dll.lowercased()) }
+        }
+        return components(forImports: imported, shipped: shipped)
+    }
+
+    /// Imported DLL names → components to install, leaving out DLLs the game ships and what G-Player won't install
+    /// by itself.
+    static func components(forImports imported: Set<String>, shipped: Set<String>) -> [String] {
+        let ids = imported.map { $0.lowercased() }.filter { !shipped.contains($0) }
+            .compactMap(RuntimeCatalog.component(forDLL:)).map(RuntimeCatalog.canonicalID)
+            .filter(RuntimeCatalog.installsByItself)
+        return Array(Set(ids)).sorted()
     }
 
     // MARK: Graphics

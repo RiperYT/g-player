@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2] - 2026-10-22
+
+- **Components a game needs go in on their own.** G-Player reads which Windows DLLs a game's files import
+  (DirectX 9–11 helpers, XAudio/XACT, XInput, Visual C++ 2008–2013, OpenAL, PhysX, XNA) and installs the matching
+  components before the game first starts, skipping DLLs the game brings along. .NET is left to Wine Mono.
+- **"Didn't start" is easy to act on.** A game that crashes or closes without saying why gets one big button,
+  "Install Common Windows Parts (105 MB) and Play", and only then the Compatible profile. Its tile says
+  "Didn't start · see what to try".
+- Steam games that close within seconds, or never open, are noticed too (G-Player watches them come and go, since
+  their output goes to Steam).
+- README: how to open the app on macOS 15 and later (Privacy & Security › Open Anyway).
+
 ## [0.3.1] - 2026-10-22
 
 - **32-bit Windows programs no longer crash under Rosetta 2.** Wine 11's switch between 32- and 64-bit code

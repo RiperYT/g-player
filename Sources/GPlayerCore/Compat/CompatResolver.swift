@@ -136,6 +136,13 @@ public enum CompatResolver {
                     "Online play with \(name) may not work under Wine on macOS."))
             }
         }
+        // Runtimes the game's own files use, installed before it first starts.
+        let fromFiles = unique(a.neededComponents.map(RuntimeCatalog.canonicalID)
+            .filter { RuntimeCatalog.installsByItself($0) && !baseComponents.contains($0) })
+        if !fromFiles.isEmpty {
+            plan.components += fromFiles
+            plan.notes.append(CompatNote(.applied, "Adds \(list(fromFiles.map(plainName)))", "The game's files use them."))
+        }
         let fixes = options.useKnownFixes
             ? input.fixes.filter { !options.disabledFixIDs.contains($0.id) } : []
         for fix in input.fixes where fix.macStatus == .broken {

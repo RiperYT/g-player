@@ -156,6 +156,23 @@ extension AppModel {
         return "\(list) (\(Set(sizes.compactMap { $0 }).reduce(0, +).formattedBytes))"
     }
 
+    /// The last launch went wrong (not just "components install later").
+    func didNotStart(_ game: Game) -> Bool {
+        diagnoses[game.id]?.contains { $0.title != AppModel.componentsLaterTitle } ?? false
+    }
+
+    /// True for the "it didn't start" set (or what is left of it).
+    func isCommonSet(_ ids: [String]) -> Bool {
+        ids.count > 1 && Set(ids).isSubset(of: RuntimeCatalog.commonSet)
+    }
+
+    /// " (105 MB)": the download size when every part's size is known (shared downloads counted once).
+    func sizeLabel(_ ids: [String]) -> String {
+        let sizes = ids.map { RuntimeCatalog.component(RuntimeCatalog.canonicalID($0))?.approximateBytes }
+        guard !sizes.isEmpty, !sizes.contains(nil) else { return "" }
+        return " (\(Set(sizes.compactMap { $0 }).reduce(0, +).formattedBytes))"
+    }
+
     // MARK: Changing external spaces
 
     /// Asks once whether G-Player may change an external space; `then` runs with the answer. Requests for a space
