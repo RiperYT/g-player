@@ -7,7 +7,7 @@ import Foundation
 /// MaPC's MacadeKit, Apache-2.0) takes the helper's place, starts `<name>_real.exe` and adds
 /// `--disable-gpu --disable-gpu-compositing --in-process-gpu`. Steam ignores `-cef-*` flags on its own
 /// command line since 2026, so the flags have to go to the helper itself. Updates restore the vendor helper,
-/// so `apply` runs before every launch.
+/// so `apply` runs before every launch, and again while the launcher runs (it updates itself on start).
 public enum ChromiumHelperWrapper {
     static let marker = Data("macade-chromium-wrapper/2".utf8)
 
@@ -89,6 +89,16 @@ public enum ChromiumHelperWrapper {
         try current.write(to: real, options: .atomic)
         try wrapper.write(to: helper, options: .atomic)
         return true
+    }
+
+    /// Helper processes that run the vendor binary instead of the wrapper. With the wrapper, Chromium's subprocesses
+    /// (`--type=…`) run as `<name>_real.exe`; under the helper's own name they mean the wrapper wasn't there when the
+    /// helper started (the launcher had just updated itself), so the window is black. Returns every process with the
+    /// helper's name then, the main one too: once they quit, the launcher starts its helper again, through the wrapper.
+    public static func unwrappedProcesses(helpers: [String], in processes: [WineProcess]) -> [WineProcess] {
+        let names = Set(helpers.compactMap { $0.split(separator: "/").last.map { $0.lowercased() } })
+        let running = processes.filter { p in p.programName.map(names.contains) ?? false }
+        return running.contains { $0.command.contains("--type=") } ? running : []
     }
 
     /// Puts the vendor helpers back (used before a repair).

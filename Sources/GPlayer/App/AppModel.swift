@@ -645,6 +645,10 @@ final class AppModel {
     /// writes no log G-Player can read, so coming and going within seconds is how it tells "closed right away".
     private var storeLaunches: [UUID: Date] = [:]
     private var firstSeen: [UUID: Date] = [:]
+    /// Spaces whose launcher was just started: watched closely, as it may update itself and drop the helper wrapper.
+    private var helperWatchUntil: [UUID: Date] = [:]
+    /// When helpers running without the wrapper were first seen, per space.
+    private var unwrappedSince: [UUID: Date] = [:]
     private var lookingAtPrograms = false
 
     /// Looks at which programs run, off the main thread. A look already under way makes this a no-op.
@@ -653,12 +657,35 @@ final class AppModel {
         lookingAtPrograms = true
         let entries = state.games.compactMap { g in space(g.spaceID).map { (game: g, space: $0) } }
         Task {
-            let found = await Task.detached(priority: .utility) {
-                RunningGames.programs(of: entries, in: WineProcesses.snapshot())
+            let (all, found) = await Task.detached(priority: .utility) { () -> ([WineProcess], [UUID: [WineProcess]]) in
+                let all = WineProcesses.snapshot()
+                return (all, RunningGames.programs(of: entries, in: all))
             }.value
             lookingAtPrograms = false
             if found != gamePrograms { gamePrograms = found }
             noticeStoreGames(found)
+            guardHelperWrappers(all)
+        }
+    }
+
+    /// Steam replaces its helper when it updates itself on start, and its window turns black again. While a launcher
+    /// with Chromium helpers runs, the wrapper is put back as soon as it is gone; helpers that already started without
+    /// it are stopped after 15 seconds if they haven't quit by themselves, and the launcher starts them again.
+    private func guardHelperWrappers(_ all: [WineProcess]) {
+        let now = Date()
+        helperWatchUntil = helperWatchUntil.filter { $0.value > now }
+        for space in state.spaces where space.mayChange {
+            guard let helpers = AppPresets.preset(space.presetID)?.chromiumHelpers, !helpers.isEmpty else { continue }
+            let mine = WineProcesses.programs(in: space, from: all)
+            guard mine.contains(where: { !$0.isWineService }) else { unwrappedSince[space.id] = nil; continue }
+            let stale = ChromiumHelperWrapper.unwrappedProcesses(helpers: helpers, in: mine)
+            if stale.isEmpty { unwrappedSince[space.id] = nil } else if unwrappedSince[space.id] == nil { unwrappedSince[space.id] = now }
+            let restart = unwrappedSince[space.id].map { now.timeIntervalSince($0) > 15 } ?? false
+            if restart { unwrappedSince[space.id] = nil }
+            Task.detached(priority: .utility) {
+                _ = try? ChromiumHelperWrapper.apply(helpers: helpers, in: space)
+                if restart { stale.forEach { kill($0.pid, SIGKILL) } }
+            }
         }
     }
 
@@ -703,8 +730,8 @@ final class AppModel {
                 guard let self else { return }
                 self.refreshPrograms()
                 // Closely while a store game is starting, so one that closes within seconds is seen at all.
-                let seconds: Double = !self.startingUntil.isEmpty || !self.firstSeen.isEmpty ? 1.5
-                    : NSApp?.isActive == true ? 4 : 20
+                let watching = !self.startingUntil.isEmpty || !self.firstSeen.isEmpty || !self.helperWatchUntil.isEmpty
+                let seconds: Double = watching ? 1.5 : NSApp?.isActive == true ? 4 : 20
                 try? await Task.sleep(for: .seconds(seconds))
             }
         }
@@ -779,6 +806,7 @@ final class AppModel {
             // A program that died before it was recorded: its exit came first and found nothing to clear.
             if !program.isRunning { finished(game.id, status: program.process.terminationStatus) }
             // A store game starts through its launcher: "Starting…" until it shows up, and look for it soon.
+            if !plan.chromiumHelpers.isEmpty { helperWatchUntil[space.id] = Date().addingTimeInterval(180) }
             if current.storeKey != nil && current.kind == .game {
                 startingUntil[game.id] = Date().addingTimeInterval(60)
                 storeLaunches[game.id] = Date()

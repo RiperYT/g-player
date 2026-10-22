@@ -128,3 +128,25 @@ import Testing
         #expect(found.keys.sorted { $0.uuidString < $1.uuidString } == [rpg.id])
     }
 }
+
+@Suite struct UnwrappedHelperTests {
+    let helpers = ["Program Files (x86)/Steam/bin/cef/cef.*/steamwebhelper.exe"]
+
+    @Test func helpersThatStartedWithoutTheWrapperAreFound() {
+        let unwrapped = [
+            WineProcess(pid: 1, command: #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe -nocrashdialog"#),
+            WineProcess(pid: 2, command: #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe --type=gpu-process"#),
+            WineProcess(pid: 3, command: #"C:\Program Files (x86)\Steam\steam.exe -silent"#),
+        ]
+        #expect(ChromiumHelperWrapper.unwrappedProcesses(helpers: helpers, in: unwrapped).map(\.pid) == [1, 2])
+    }
+
+    @Test func wrappedHelpersAreLeftAlone() {
+        let wrapped = [
+            WineProcess(pid: 1, command: #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe -nocrashdialog"#),
+            WineProcess(pid: 2, command: #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper_real.exe -nocrashdialog"#),
+            WineProcess(pid: 3, command: #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper_real.exe --type=renderer"#),
+        ]
+        #expect(ChromiumHelperWrapper.unwrappedProcesses(helpers: helpers, in: wrapped).isEmpty)
+    }
+}

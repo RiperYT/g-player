@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3] - 2026-10-22
+
+- **Steam's window no longer turns black after Steam updates itself.** A Steam client update on start replaces the
+  helper G-Player wraps, and Steam then opens its window without the fix. While Steam (or another launcher with
+  Chromium helpers) runs, G-Player now puts the wrapper back as soon as it is gone, and restarts helpers that
+  started without it if they don't stop by themselves; Steam starts them again with the fix. The first three
+  minutes after opening Steam are watched closely.
+
 ## [0.3.2] - 2026-10-22
 
 - **Components a game needs go in on their own.** G-Player reads which Windows DLLs a game's files import
