@@ -35,25 +35,33 @@ struct GeneralSettings: View {
 struct EngineSettings: View {
     @Environment(AppModel.self) private var model
     var body: some View {
-        @Bindable var model = model
         Form {
-            let staging = EngineCatalog.wineStaging
-            Section(staging.name) {
-                Text(staging.summary).foregroundStyle(.secondary)
-                LabeledContent("Version", value: staging.version)
-                LabeledContent("Graphics", value: staging.backends.map(\.displayName).joined(separator: ", "))
-                if model.isInstalled(staging) {
-                    LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-                    Button("Remove", role: .destructive) { model.removeEngine(staging) }
-                } else {
-                    let mb = staging.downloads.reduce(0) { $0 + $1.approximateBytes } / 1_000_000
-                    Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(staging) } }
-                        .disabled(model.isEngineBusy)
-                }
-            }
+            EngineSection(info: EngineCatalog.wineStaging)
+            EngineSection(info: EngineCatalog.crossover)
             AppleToolkitSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+/// An engine G-Player downloads: what it is, and install or remove.
+struct EngineSection: View {
+    @Environment(AppModel.self) private var model
+    let info: EngineInfo
+    var body: some View {
+        Section(info.name) {
+            Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            LabeledContent("Version", value: info.version)
+            LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
+            if model.isInstalled(info) {
+                LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                Button("Remove", role: .destructive) { model.removeEngine(info) }
+            } else {
+                let mb = info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)) / 1_000_000
+                Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
+                    .disabled(model.isEngineBusy)
+            }
+        }
     }
 }
 
@@ -65,19 +73,44 @@ struct AppleToolkitSection: View {
         let info = EngineCatalog.gptk
         Section {
             Toggle("Use Apple's Game Porting Toolkit", isOn: $model.useAppleToolkit)
-            Text("Adds Apple's D3DMetal for DirectX 11 and 12 games. G-Player never includes or downloads Apple's files; it only uses a copy you installed. Apple's license allows the toolkit for developing, testing and evaluating games, so check that it fits how you use it.")
+            Text("Adds Apple's D3DMetal for DirectX 11 and 12 games. G-Player never includes or downloads Apple's files. Turned on, it copies D3DMetal from the toolkit you installed or downloaded from Apple (checking that D3DMetal.framework and libd3dshared.dylib are signed by Apple) into your library and G-Player Wine; turned off, G-Player Wine goes back to Wine's own Direct3D. Apple's license allows the toolkit for developing, testing and evaluating games, so check that it fits how you use it.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if model.useAppleToolkit {
-                if model.isInstalled(info) {
-                    LabeledContent("Status") { Label("Found on this Mac", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-                } else {
-                    LabeledContent("Status") { Text("Not found").foregroundStyle(.secondary) }
+                LabeledContent("Toolkit") {
+                    if model.isInstalled(info) { Label("Found on this Mac", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                    else { Text("Not installed").foregroundStyle(.secondary) }
                 }
+                LabeledContent("D3DMetal for G-Player Wine") {
+                    if model.isImportingD3DMetal { ProgressView().controlSize(.small) }
+                    else if let d = model.d3dMetal { Text("\(d.version), from \(d.source)") }
+                    else { Text("Not copied yet").foregroundStyle(.secondary) }
+                }
+                HStack {
+                    if let source = D3DMetalStore.toolkitSource {
+                        Button("Copy from the Installed Toolkit") { Task { await model.importD3DMetal(from: source) } }
+                    }
+                    Button("Choose a Toolkit Download…") { chooseDownload() }
+                }
+                .disabled(model.isImportingD3DMetal)
+                Text("Apple's download is a disk image: open it in Finder once and agree to Apple's license, then choose it or the opened disk here.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if model.d3dMetal != nil {
+                Button("Turn Off and Remove the Copied D3DMetal", role: .destructive) { Task { await model.removeD3DMetal() } }
             }
             Link("About the Game Porting Toolkit", destination: EngineCatalog.gptkInfoURL)
         } header: {
             Text("Advanced")
         }
+    }
+
+    private func chooseDownload() {
+        let panel = NSOpenPanel()
+        panel.message = "Choose Apple's Game Porting Toolkit disk image, or an opened toolkit disk."
+        panel.allowedContentTypes = [.diskImage, .folder]
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        if panel.runModal() == .OK, let url = panel.url { Task { await model.importD3DMetal(from: url) } }
     }
 }
 

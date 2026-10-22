@@ -4,6 +4,17 @@ import Testing
 
 /// Telling which space, and which game, a Windows program belongs to.
 @Suite struct WineProcessesTests {
+    @Test func aSpaceUnderVarIsFoundThroughPrivate() {
+        // The kernel says /private/var/folders/… for a space the library keeps as /var/folders/….
+        let s = Space(name: "Steam", path: "/var/folders/xy/T/lib/Spaces/Steam", engineID: "e", origin: .managed)
+        let p = WineProcess(pid: 1, command: #"C:\Program Files (x86)\Steam\steam.exe"#,
+                            directory: "/private/var/folders/xy/T/lib/Spaces/Steam/drive_c/Program Files (x86)/Steam")
+        #expect(WineProcesses.programs(in: s, from: [p]).count == 1)
+        let back = Space(name: "Steam", path: "/private/tmp/lib/Steam", engineID: "e", origin: .managed)
+        let q = WineProcess(pid: 2, command: #"C:\windows\system32\notepad.exe"#, directory: "/tmp/lib/Steam/drive_c/windows")
+        #expect(WineProcesses.programs(in: back, from: [q]).count == 1)
+    }
+
     let steam = Space(name: "Steam", path: "/Users/me/Bottles/Steam", engineID: "x", origin: .external)
     let steam2 = Space(name: "Steam 2", path: "/Users/me/Bottles/Steam 2", engineID: "x", origin: .external)
     let indie = Space(name: "Indie", path: "/Users/me/Games/Indie", engineID: "x", origin: .external)

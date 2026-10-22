@@ -39,17 +39,29 @@ install it), about 1 GB for the engine plus room for games.
 |---|---|
 | Steam client and most DirectX 9–11 games through DXVK | Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) |
 | Portable games, Unity, Unreal, Electron and RPG Maker games | Games that need a GPU driver Wine can't fake |
-| DirectX 12 through Apple's D3DMetal, if you installed it (see below) | DirectX 12 without Apple's D3DMetal |
+| DirectX 12 through Apple's D3DMetal on G-Player Wine, with Steam open (see below) | DirectX 12 without Apple's D3DMetal |
 | 32-bit games, with G-Player's fixes for Wine; 32-bit DirectX 10/11 through DXVK since 0.3.5 (checked on a few Unity games so far) | OpenGL games that need more than OpenGL 4.1 (macOS's limit) |
 
 The first minutes of a game can stutter while shaders compile. That settles once the cache is built.
 
-### Apple's Game Porting Toolkit (optional, off by default)
+### Engines
 
-G-Player never includes, downloads or installs Apple's files. If you installed Apple's Game Porting Toolkit
-yourself, you can turn it on in **Settings › Engines** and use its D3DMetal for DirectX 11 and 12 games.
-Apple's license allows the toolkit for developing, testing and evaluating games; check that it fits how you
-use it. See [docs/LEGAL.md](docs/LEGAL.md).
+- **Wine Staging 11.18** (Gcenx's build) with DXVK: open source, runs Steam and most DirectX 9–11 games.
+- **G-Player Wine**: Wine 11 that G-Player builds from CodeWeavers' CrossOver 26.3 source
+  ([scripts/build-engine-cx.sh](scripts/build-engine-cx.sh)), with DXMT (DirectX 10/11 straight to Metal) and DXVK.
+  CrossOver's Wine has what Apple's D3DMetal needs, so with D3DMetal (below) 64-bit DirectX 10–12 games run through
+  it in the same space as Steam, with Steam signed in. G-Player Wine isn't CrossOver and isn't made by CodeWeavers.
+- **Apple's Game Porting Toolkit**: Apple's own wine 7.7, if you installed it. Steam doesn't run on it.
+
+Each space picks its engine. Moving between Wine Staging and G-Player Wine keeps the space's files, saves and Steam
+login; G-Player asks first, since the other Wine updates the space for itself.
+
+### Apple's D3DMetal (optional, off by default)
+
+G-Player never includes, downloads or installs Apple's files. If you installed Apple's Game Porting Toolkit or
+downloaded it from Apple, turn it on in **Settings › Engines**: G-Player copies D3DMetal from it, checking that
+D3DMetal.framework and libd3dshared.dylib are signed by Apple, into your library and G-Player Wine. Apple's license allows the toolkit for developing,
+testing and evaluating games; check that it fits how you use it. See [docs/LEGAL.md](docs/LEGAL.md).
 
 ## Build from source
 

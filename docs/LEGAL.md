@@ -23,6 +23,7 @@ The user's Mac fetches these from their original sources and checks each against
 | Component | License | From |
 |---|---|---|
 | Wine Staging 11.18 | LGPL-2.1+ | Gcenx's macOS builds on GitHub |
+| G-Player Wine (Wine 11 from CodeWeavers' CrossOver 26.3.0 source with `tools/wine-patches/cx-real-user-name.patch`, DXMT v0.80, MoltenVK 1.4.2) | LGPL-2.1+ (Wine), MIT (DXMT), Apache-2.0 and others (MoltenVK) | G-Player's own GitHub release `engine-cx26.3.0-1`, built by `scripts/build-engine-cx.sh`. The exact Wine source it was built from is attached to the same release; with the patch and the script it is the complete corresponding source. Its runtime libraries come from Gcenx's Wine Staging download (row above) on the user's Mac, not from G-Player's archive. "CrossOver" is CodeWeavers' trademark; G-Player Wine isn't CrossOver. |
 | DXVK for macOS 1.10.3 | zlib | Gcenx on GitHub |
 | winetricks 20260125 | LGPL-2.1+ | GitHub; run as a separate program |
 | Visual C++ 2015–2022 Redistributable | Microsoft | Microsoft's download servers |
@@ -41,8 +42,10 @@ license lets you use the toolkit to develop, test and evaluate games, and allows
 non-commercial purposes. This is a summary; the license is the authority, and it is linked from
 [Apple's Game Porting Toolkit page](https://developer.apple.com/games/game-porting-toolkit/). So:
 
-- G-Player's support for it is **off by default**. People who installed the toolkit themselves can turn it on
-  in Settings › Engines; the app says what Apple's license allows.
+- G-Player's support for it is **off by default**. People who installed the toolkit themselves, or downloaded it
+  from Apple, can turn it on in Settings › Engines; the app says what Apple's license allows. With it on, G-Player
+  copies D3DMetal, checking that D3DMetal.framework and libd3dshared.dylib are signed by Apple, from that toolkit into their own library and their G-Player
+  Wine engine. It is never uploaded, shared or bundled.
 - G-Player doesn't point to third-party repackagings of Apple's files.
 - Nothing in this repository or in a release contains Apple's files. Keep it that way: pull requests that add
   them are refused.

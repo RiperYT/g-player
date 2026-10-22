@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0] - 2026-10-22
+
+- **G-Player Wine: DirectX 12 with Steam open.** A new engine, Wine 11 that G-Player builds from CodeWeavers' CrossOver
+  26.3 source (`scripts/build-engine-cx.sh`), with DXMT and MoltenVK 1.4.2. Steam runs on it, and with Apple's D3DMetal
+  64-bit DirectX 10–12 games run through D3DMetal in the same space as Steam, with Steam signed in. Checked with a
+  DirectX 12-only Unreal Engine 5.7 game started from Steam (it reached its menu and its online services), and with
+  test programs on every backend.
+- **Apple's D3DMetal from your own toolkit.** With Apple's toolkit turned on in Settings › Engines, G-Player copies
+  D3DMetal, checking that D3DMetal.framework and libd3dshared.dylib are signed by Apple, from the toolkit you installed or from Apple's disk image you downloaded.
+  It never ships or downloads Apple's files.
+- **A blocked DirectX 12 game offers the way out:** "Move Space to G-Player Wine…" says what happens, downloads the
+  engine, closes Steam, moves the space and starts the game (an outside space asks for changes first); without D3DMetal
+  it opens Settings.
+- Steam restarts for a game only when the game needs other settings than the ones G-Player started Steam with.
+- New graphics backend **DXMT** (DirectX 10/11 straight to Metal, 32- and 64-bit) on G-Player Wine.
+- A space keeps its saves and Steam login when it moves between Wine Staging and G-Player Wine: G-Player Wine uses the
+  Mac user's name and profile folder, as Wine Staging does, where CrossOver's Wine says "crossover". (A bottle CrossOver
+  itself made keeps its old `C:\users\crossover` folder, which neither engine uses.)
+- G-Player now sees the programs of spaces kept under `/var` or `/tmp` (the kernel reports them through `/private`).
+- The engine's release carries the exact Wine source it was built from. G-Player Wine isn't CrossOver and isn't made or
+  endorsed by CodeWeavers.
+
 ## [0.3.5] - 2026-10-22
 
 - **32-bit DirectX 10/11 games can start.** 32-bit Unity games such as Overcooked and other 32-bit DirectX 10/11

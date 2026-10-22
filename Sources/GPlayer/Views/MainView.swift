@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var model = model
@@ -39,6 +40,14 @@ struct MainView: View {
         .alert("This game may not run", isPresented: Binding(get: { model.blockedLaunch != nil },
                                                              set: { if !$0 { model.blockedLaunch = nil } }),
                presenting: model.blockedLaunch) { blocked in
+            if blocked.notes.contains(where: { $0.title == CompatResolver.needsDirectX12 }),
+               let space = model.game(blocked.gameID).flatMap({ model.space($0.spaceID) }) {
+                if !model.d3dMetalAvailable {
+                    Button("Set Up Apple's D3DMetal…") { openSettings() }
+                } else if space.engineID != EngineCatalog.crossover.id {
+                    Button("Move Space to G-Player Wine…") { model.offerGPlayerWine(for: blocked.gameID) }
+                }
+            }
             Button("Play Anyway") {
                 model.acknowledgedBlockers.insert(blocked.gameID)
                 if let g = model.game(blocked.gameID) { model.play(g, skipping: blocked.skipped.union([.blockers])) }
@@ -46,6 +55,14 @@ struct MainView: View {
             Button("Cancel", role: .cancel) {}
         } message: { blocked in
             Text(blocked.notes.map { [$0.title, $0.detail].compactMap { $0 }.joined(separator: ". ") }.joined(separator: "\n\n"))
+        }
+        .alert("Move this space to G-Player Wine?", isPresented: Binding(get: { model.engineMove != nil },
+                                                                        set: { if !$0 { model.engineMove = nil } }),
+               presenting: model.engineMove) { move in
+            Button("Move and Play") { model.moveToGPlayerWine(move.gameID) }
+            Button("Cancel", role: .cancel) {}
+        } message: { move in
+            Text("Every program in “\(move.spaceName)” will run on G-Player Wine (Wine 11.0, from CrossOver's source) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "") You can switch back in the space's settings.")
         }
         .alert("Steam is already running", isPresented: Binding(get: { model.steamRestart != nil },
                                                                 set: { if !$0 { model.steamRestart = nil } }),

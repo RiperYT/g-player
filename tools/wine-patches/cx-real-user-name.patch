@@ -1,0 +1,61 @@
+G-Player patch for CodeWeavers' CrossOver 26.3.0 Wine source (LGPL-2.1+, like Wine itself).
+
+Takes back CrossOver Hack 12735, which names every user "crossover": GetUserName and the user profile folder
+(C:\users\<name>) become the Mac user's again, as in upstream Wine 11.18. A space then keeps the same profile
+folder, saves and Steam login (DPAPI is keyed on the user name) whether G-Player runs it on Wine Staging or on this
+engine. A bottle CrossOver itself made keeps its old C:\users\crossover folder, which this engine doesn't use.
+
+Applied by scripts/build-engine-cx.sh.
+
+--- a/dlls/advapi32/advapi.c	2026-10-22 13:56:02
++++ b/dlls/advapi32/advapi.c	2026-10-22 13:56:02
+@@ -47,16 +47,6 @@
+ {
+     DWORD len = GetEnvironmentVariableA( "WINEUSERNAME", name, *size );
+     BOOL ret;
+-
+-    /* CrossOver Hack 12735: Use a consistent username */
+-    if (!getenv( "CX_REPORT_REAL_USERNAME" ))
+-    {
+-        len = sizeof("crossover");
+-        if ((ret = (len <= *size))) strcpy( name, "crossover" );
+-        else SetLastError( ERROR_INSUFFICIENT_BUFFER );
+-        *size = len;
+-        return ret;
+-    }
+ 
+     if (!len) return FALSE;
+     if ((ret = (len < *size))) len++;
+@@ -72,16 +62,6 @@
+ {
+     DWORD len = GetEnvironmentVariableW( L"WINEUSERNAME", name, *size );
+     BOOL ret;
+-
+-    /* CrossOver Hack 12735: Use a consistent username */
+-    if (!getenv( "CX_REPORT_REAL_USERNAME" ))
+-    {
+-        len = ARRAY_SIZE( L"crossover" );
+-        if ((ret = (len <= *size))) wcscpy( name, L"crossover" );
+-        else SetLastError( ERROR_INSUFFICIENT_BUFFER );
+-        *size = len;
+-        return ret;
+-    }
+ 
+     if (!len) return FALSE;
+     if ((ret = (len < *size))) len++;
+--- a/dlls/shell32/shellpath.c	2026-10-22 13:56:02
++++ b/dlls/shell32/shellpath.c	2026-10-22 13:56:02
+@@ -2632,10 +2632,11 @@
+         }
+         else if (!wcsnicmp(szTemp, L"%USERPROFILE%", lstrlenW(L"%USERPROFILE%")))
+         {
+-            /* CrossOver Hack 12735 */
+-            static const WCHAR userName[] = {'c','r','o','s','s','o','v','e','r',0};
++            WCHAR userName[MAX_PATH];
++            DWORD userLen = MAX_PATH;
+ 
+             lstrcpyW(szDest, szProfilesPrefix);
++            GetUserNameW(userName, &userLen);
+             PathAppendW(szDest, userName);
+             PathAppendW(szDest, szTemp + lstrlenW(L"%USERPROFILE%"));
+         }

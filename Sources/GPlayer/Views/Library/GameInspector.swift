@@ -177,7 +177,7 @@ struct GameInspector: View {
     }
 
     @ViewBuilder private func graphicsSettings(_ space: Space) -> some View {
-        let info = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let info = model.engineInfo(for: space)
         VStack(alignment: .leading, spacing: 8) {
             Text("Graphics").sectionTitle()
             Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },

@@ -24,6 +24,8 @@ public struct LibraryPaths: Sendable, Equatable {
     public var covers: URL { root.appendingPathComponent("Covers", isDirectory: true) }
     public var logs: URL { root.appendingPathComponent("Logs", isDirectory: true) }
     public var downloads: URL { root.appendingPathComponent("Downloads", isDirectory: true) }
+    /// Apple's D3DMetal, copied from the user's own Game Porting Toolkit (`D3DMetalStore`).
+    public var d3dMetal: URL { root.appendingPathComponent("D3DMetal", isDirectory: true) }
 
     public func createFolders() throws {
         for dir in [root, spaces, engines, covers, logs, downloads] {

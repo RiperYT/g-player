@@ -42,5 +42,7 @@ func space(at url: URL, preset: String? = nil) -> Space {
 
 func fakeEngine(_ info: EngineInfo = EngineCatalog.wineStaging) -> Engine {
     let root = URL(fileURLWithPath: "/tmp/engine/wine")
-    return Engine(info: info, wineRoot: root, wine: root.appendingPathComponent("bin/wine"), dxvk: nil)
+    // DXVK counts as there, as in an installed Wine Staging.
+    return Engine(info: info, wineRoot: root, wine: root.appendingPathComponent("bin/wine"),
+                  dxvk: info.backends.contains(.dxvk) ? URL(fileURLWithPath: "/tmp/engine/dxvk") : nil)
 }

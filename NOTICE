@@ -6,10 +6,23 @@ Copyright 2026 Steale LLC, licensed under the Apache License 2.0:
   - tools/chromium-helper-wrapper/wrapper.c (the Chromium helper wrapper)
   - the engine pins and the Steam launch recipe in Sources/GPlayerCore
     (EngineCatalog, AppPresets, ChromiumHelperWrapper), adapted.
+  - scripts/build-engine-cx.sh (from engine/build-engine-d3dmetal.sh) and Sources/GPlayerCore/Engines/D3DMetal.swift
+    (from MacadeKit's D3DMetalStore), adapted.
 
 G-Player downloads, but does not include, these third-party components at run time, each from its
 original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - Wine Staging for macOS (LGPL-2.1+), built by Gcenx: https://github.com/Gcenx/macOS_Wine_builds
+  - G-Player Wine, from G-Player's own GitHub release engine-cx26.3.0-1: Wine (LGPL-2.1+) built by
+    scripts/build-engine-cx.sh from CodeWeavers' CrossOver 26.3.0 source
+    (https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz, SHA-256
+    ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872) with tools/wine-patches/cx-real-user-name.patch
+    (LGPL-2.1+), DXMT v0.80 (MIT, Copyright (c) 2023 Feifan He, https://github.com/3Shain/dxmt) and MoltenVK 1.4.2.
+    The exact Wine source it was built from, patch applied, is attached to the same release
+    (g-player-engine-cx26.3.0-1-wine-source.tar.xz); that, the patch and the build script are its complete
+    corresponding source. The engine carries its own license texts and notice. Its runtime libraries (FreeType,
+    GnuTLS, SDL2 and what they use) are not in G-Player's archive: G-Player copies them on the user's Mac from Gcenx's
+    Wine Staging 11.18 download, under their own licenses. "CrossOver" is a trademark of CodeWeavers, Inc.; G-Player
+    Wine isn't CrossOver and isn't made or endorsed by CodeWeavers.
   - DXVK for macOS (zlib), by Gcenx: https://github.com/Gcenx/DXVK-macOS
   - winetricks 20260125 (LGPL-2.1+): https://github.com/Winetricks/winetricks. G-Player runs it as a separate
     program and, on the user's Mac, writes a copy that refuses unverified downloads.
@@ -45,7 +58,8 @@ covers MoltenVK, SPIRV-Cross, SPIRV-Tools and Vulkan-Headers; SPIRV-Headers-LICE
 the app's Resources/licenses folder. scripts/fetch-moltenvk.sh fetches each of them, checked against a pinned SHA-256.
 
 Apple's Game Porting Toolkit and D3DMetal are never part of G-Player and are never downloaded by it.
-G-Player can use a copy the user installed themselves, only when they turn it on in Settings.
+G-Player can use a copy the user installed or downloaded from Apple themselves, only when they turn it on in Settings;
+it then copies D3DMetal, checking that D3DMetal.framework and libd3dshared.dylib are signed by Apple, into the user's library and their G-Player Wine engine.
 
 G-Player's game fix database (Sources/GPlayerCore/Resources/GameFixes.json) includes data derived from
 umu-protonfixes (https://github.com/Open-Wine-Components/umu-protonfixes), licensed under the BSD 2-Clause License:

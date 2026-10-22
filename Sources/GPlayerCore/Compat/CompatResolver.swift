@@ -121,8 +121,13 @@ public enum CompatResolver {
     /// the Wine Staging it downloads, see `EngineFixes.moltenVK`).
     public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. G-Player updates it only in the Wine Staging 11.18 it downloads, over the exact file it knows. Windows components won't help; a space on that engine will."
 
+    /// The blocker for a game that only Apple's D3DMetal can run here, which the app offers to fix.
+    public static let needsDirectX12 = "Needs DirectX 12"
     /// Why an Unreal game built for DirectX 12 alone doesn't start on an engine without D3DMetal.
-    public static let onlyDirect3D12 = "The game is built for DirectX 12 alone, which Wine Staging can't give on a Mac, and it stops at start when asked for DirectX 11. Apple's D3DMetal can run it: add its program to a space on Apple's toolkit (Settings › Engines) and start it there. A Steam game then runs without Steam, if it allows that (offline play)."
+    public static let onlyDirect3D12 = "The game is built for DirectX 12 alone, and it stops at start when asked for DirectX 11. Only Apple's D3DMetal gives DirectX 12 on a Mac."
+    static let useCrossOver = "Switch this space to G-Player Wine and turn on Apple's D3DMetal in Settings › Engines: Steam keeps running there too."
+    static let turnOnD3DMetal = "Turn on Apple's D3DMetal in Settings › Engines; G-Player copies it from your own Game Porting Toolkit."
+    static let chooseD3DMetal = "This space has D3DMetal: choose the Recommended profile, or D3DMetal under Advanced."
 
     public static func resolve(_ input: Input) -> CompatPlan {
         let a = input.analysis ?? GameAnalysis()
@@ -157,12 +162,20 @@ public enum CompatResolver {
         }
 
         // Graphics backend per profile. Fast only gets here on an engine with D3DMetal.
-        let supportsMetal = input.engine.backends.contains(.d3dmetal)
+        // D3DMetal runs 64-bit programs only.
+        let supportsMetal = input.engine.backends.contains(.d3dmetal) && !(a.architecture == .x86 && !a.isDotNet)
         let newest = a.likelyDirect3D
+        // On G-Player Wine D3DMetal takes 64-bit DirectX 10–12 in Recommended too: Apple's path to Metal is the most
+        // direct one. DirectX 9, OpenGL and Vulkan stay on Wine's own (D3DMetal has no Direct3D 9).
+        let direct3D10to12 = newest.map { $0 >= .d3d10 && $0 <= .d3d12 } ?? false
+        let metalByDefault = input.engine.kind == .crossover && direct3D10to12
         switch profile {
         case .recommended, .fast:
-            if supportsMetal && (profile == .fast || newest == .d3d12) { plan.backend = .d3dmetal }
-            else { plan.backend = input.engine.defaultBackend }
+            if supportsMetal && (newest == .d3d12 || metalByDefault || (profile == .fast && (direct3D10to12 || input.engine.kind == .gptk))) {
+                plan.backend = .d3dmetal
+            } else {
+                plan.backend = input.engine.backends.first { $0 != .d3dmetal || supportsMetal } ?? .wined3d
+            }
         case .compatible:
             plan.backend = .wined3d
             plan.environment["WINEESYNC"] = "0"
@@ -190,7 +203,9 @@ public enum CompatResolver {
         case .unreal:
             if newest == .d3d12 && plan.backend != .d3dmetal {
                 if a.onlyDirect3D12 {
-                    plan.notes.append(CompatNote(.blocker, "Needs DirectX 12", Self.onlyDirect3D12))
+                    let advice = supportsMetal ? Self.chooseD3DMetal
+                        : input.engine.kind == .crossover ? Self.turnOnD3DMetal : Self.useCrossOver
+                    plan.notes.append(CompatNote(.blocker, Self.needsDirectX12, Self.onlyDirect3D12 + " " + advice))
                 } else {
                     plan.arguments.append("-dx11")
                     plan.notes.append(CompatNote(.applied, "Starts with DirectX 11", "Unreal Engine can fall back from DirectX 12."))
@@ -218,7 +233,7 @@ public enum CompatResolver {
         }
         // 32-bit DirectX 10/11 runs through DXVK only: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1.
         if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, d3d < .d3d12,
-           input.engine.kind == .wineStaging, plan.backend == .wined3d {
+           input.engine.kind != .gptk, plan.backend == .wined3d {
             plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : "11") needs DXVK",
                 "Wine's own renderer can't give it on Apple's OpenGL, so the game most likely won't start this way. The Recommended profile uses DXVK."))
         }

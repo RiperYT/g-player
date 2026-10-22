@@ -22,3 +22,13 @@ with `lretq`. Elsewhere nothing changes.
 
 Rebuilding gives a file that differs from the bundled one only in the PE time stamp, header checksum and build id;
 `scripts/build-wow64cpu.sh` compares the code and data sections and says whether they match.
+
+## cx-real-user-name.patch
+
+For G-Player Wine, built from CodeWeavers' CrossOver 26.3.0 source by `scripts/build-engine-cx.sh`. CrossOver names
+every user "crossover" (CrossOver Hack 12735): `GetUserName` says so and the profile folder is `C:\users\crossover`.
+The patch takes that back to upstream Wine's behaviour, the Mac user's name, as Wine Staging has it. A space then keeps
+the same profile folder, saves and Steam login (Wine's DPAPI is keyed on the user name) on either engine.
+
+- Applied to the extracted source before `configure`; the exact patched tree is published with the engine's release
+  (`g-player-engine-cx26.3.0-<revision>-wine-source.tar.xz`), with this patch and the script inside the engine too.

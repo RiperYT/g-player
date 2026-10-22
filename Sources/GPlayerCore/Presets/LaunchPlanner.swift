@@ -23,10 +23,11 @@ public struct LaunchPlan: Sendable, Equatable {
 
 extension LaunchPlan {
     /// True when carrying out the plan writes into the space: components, registry values, Steam's helper wrapper,
-    /// or DXVK's DLLs (copied over Wine's own when the backend is DXVK). An external space needs the user's consent
-    /// for any of these.
+    /// or DXVK's or DXMT's DLLs (copied over Wine's own when the backend is one of them). An external space needs the
+    /// user's consent for any of these.
     public func writesToSpace(engine: EngineInfo) -> Bool {
-        !components.isEmpty || !registry.isEmpty || !chromiumHelpers.isEmpty || engine.resolve(backend) == .dxvk
+        let resolved = engine.resolve(backend)
+        return !components.isEmpty || !registry.isEmpty || !chromiumHelpers.isEmpty || resolved == .dxvk || resolved == .dxmt
     }
 }
 
@@ -46,10 +47,15 @@ public enum LaunchPlanner {
     ///   - programNames: the file names of the programs the game starts, when the caller has them (the app keeps them
     ///     for Steam games). Nil: a Steam game's are looked for in its folder, a program the user added is its own .exe.
     ///   - screen: the screen size for a Unity game that saved 0×0 (see `UnityScreen`); the main display's when nil.
+    ///   - ready: the backends the installed engine can run now (`Engine.readyBackends`); all of them when nil.
+    ///   - launcherBackend: the backend the running Steam was started with, when G-Player knows; the engine's
+    ///     default otherwise. A Steam game whose backend differs needs Steam restarted.
     public static func plan(for game: Game, in space: Space, fixes: [GameFix] = [], verboseLogs: Bool = false,
-                            programNames: [String]? = nil, screen: CGSize? = nil) throws -> LaunchPlan {
+                            programNames: [String]? = nil, screen: CGSize? = nil,
+                            ready: [GraphicsBackend]? = nil, launcherBackend: GraphicsBackend? = nil) throws -> LaunchPlan {
         let preset = AppPresets.preset(space.presetID)
-        let engine = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let catalogued = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let engine = ready.map { catalogued.limited(to: $0) } ?? catalogued
         let isLauncher = game.kind == .app
         let names = isLauncher ? [] : self.programNames(of: game, in: space, fixes: fixes, given: programNames)
         // Launchers (Steam itself) run with their preset's recipe only; games get the compatibility layers.
@@ -66,7 +72,7 @@ public enum LaunchPlanner {
         let tweaks = LaunchTweaks(dllOverrides: overrides, environment: environment, verboseLogs: verboseLogs,
                                   dotNetAvailable: dotNet)
         let helpers = preset?.chromiumHelpers ?? []
-        let backend = compat?.backend ?? game.graphics
+        let backend = compat?.backend ?? (isLauncher ? Self.launcherBackend(on: engine, chosen: game.graphics) : game.graphics)
         var registry = compat?.registry ?? []
 
         /// Engine/fix arguments first, then the user's, without the options the user sets themselves.
@@ -119,7 +125,7 @@ public enum LaunchPlanner {
                 + ["-applaunch", appID] + CompatResolver.apply(compat?.replacements ?? [], to: gameArguments())
             let needsFresh = !(compat?.environment.isEmpty ?? true) || !game.environment.isEmpty
                 || game.launchOptions.profile.effective(on: engine) != .recommended
-                || engine.resolve(backend) != engine.defaultBackend
+                || engine.resolve(backend) != engine.resolve(launcherBackend ?? Self.launcherBackend(on: engine, chosen: .auto))
             return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
                               tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides + overrides.filter { !steam.dllOverrides.contains($0) },
                                                    environment: environment, verboseLogs: verboseLogs, dotNetAvailable: dotNet),
@@ -146,6 +152,12 @@ public enum LaunchPlanner {
             else { groups[groups.count - 1].append(arg) }
         }
         return groups.filter { !user.contains($0[0]) }.flatMap { $0 }
+    }
+
+    /// What a store launcher runs with when the user chose nothing: on G-Player Wine with D3DMetal, D3DMetal, which
+    /// most games it starts take (64-bit DirectX 10–12), so they don't need it restarted; the engine's default otherwise.
+    static func launcherBackend(on engine: EngineInfo, chosen: GraphicsBackend) -> GraphicsBackend {
+        chosen == .auto && engine.kind == .crossover && engine.backends.contains(.d3dmetal) ? .d3dmetal : chosen
     }
 
     /// The programs a game starts, for settings Wine keeps per program. Searching a Steam game's folder is slow, so it only

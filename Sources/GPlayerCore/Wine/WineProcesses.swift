@@ -99,9 +99,17 @@ public enum WineProcesses {
 
     // MARK: Paths
 
-    /// A folder's path as given and with symlinks resolved, without a trailing slash.
+    /// A folder's path as given and with symlinks resolved, without a trailing slash. The kernel reports working
+    /// folders through `/private` (`/private/var/folders/…`), which `resolvingSymlinksInPath` strips, so both forms
+    /// are kept.
     static func paths(of url: URL) -> Set<String> {
-        Set([url.standardizedFileURL.path, url.resolvingSymlinksInPath().path].map { standardized($0) })
+        var all = [url.standardizedFileURL.path, url.resolvingSymlinksInPath().path]
+        if let real = realpath(url.path, nil) { all.append(String(cString: real)); free(real) }
+        for path in all {
+            if path.hasPrefix("/private/") { all.append(String(path.dropFirst("/private".count))) }
+            else if ["/var/", "/tmp/", "/etc/"].contains(where: path.hasPrefix) { all.append("/private" + path) }
+        }
+        return Set(all.map { standardized($0) })
     }
 
     static func standardized(_ path: String) -> String {

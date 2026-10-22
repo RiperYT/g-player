@@ -103,10 +103,11 @@ extension AppModel {
         return GameFixDatabase.bundled.fixes(steamAppID: steamID, exeName: programName(of: game))
     }
 
-    /// What the layers would do for this game right now, for the inspector. No disk reads, no file writes.
+    /// What the layers would do for this game right now, for the inspector. No file writes; the engine's ready backends
+    /// are read from disk once per change of engines (`engineInfo`).
     func compatPreview(for game: Game) -> CompatPlan? {
         guard game.kind == .game, let space = space(game.spaceID) else { return nil }
-        let engine = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let engine = engineInfo(for: space)
         return CompatResolver.resolve(.init(engine: engine, analysis: game.analysis, fixes: fixes(for: game),
                                             options: game.launchOptions, userBackend: game.graphics,
                                             isStoreGame: game.storeKey != nil,

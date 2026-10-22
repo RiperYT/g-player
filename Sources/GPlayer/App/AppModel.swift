@@ -46,8 +46,23 @@ final class AppModel {
     }
     /// Use Apple's Game Porting Toolkit when the user installed it. Off by default (Apple's license).
     var useAppleToolkit: Bool {
-        didSet { UserDefaults.standard.set(useAppleToolkit, forKey: "useAppleToolkit"); engineVersion += 1 }
+        didSet {
+            UserDefaults.standard.set(useAppleToolkit, forKey: "useAppleToolkit"); engineVersion += 1
+            if useAppleToolkit != oldValue { syncD3DMetal() }
+        }
     }
+    /// Apple's D3DMetal as copied from the user's toolkit, if it has been (`D3DMetalStore`).
+    var d3dMetal: D3DMetalStore.Info?
+    var isImportingD3DMetal = false
+    /// The space move to G-Player Wine waiting for the user's answer, and spaces being moved.
+    var engineMove: EngineMove?
+    var movingSpaces: Set<UUID> = []
+    /// A G-Player Wine engine had programs open when D3DMetal was to go in or out; tried again once they quit.
+    @ObservationIgnored var d3dMetalWaiting = false
+    /// The last D3DMetal link or unlink, so the next one waits for it.
+    @ObservationIgnored var d3dMetalWork: Task<Void, Never>?
+    /// Which backends each installed engine can run, read from disk once per change of engines (views ask often).
+    @ObservationIgnored private let readyCache = ReadyCache()
 
     // MARK: State
     private(set) var state = LibraryState() {
@@ -97,7 +112,7 @@ final class AppModel {
     /// Installs and store setups queued or running, per space (launches use the queue too but don't count).
     private var queuedInstalls: [UUID: Int] = [:]
     private var queuedWork: [UUID: Int] = [:]
-    private(set) var engineVersion = 0           // bumps when engines change, so views re-read them
+    var engineVersion = 0                        // bumps when engines change, so views re-read them
     var componentsVersion = 0                    // bumps when components are installed
 
     init() {
@@ -147,6 +162,7 @@ final class AppModel {
             migrateAppleToolkitSetting()
             migrateManualGraphics()
             applyEngineFixes()
+            syncD3DMetal()
         } catch {
             errorMessage = "Couldn't read the library: \(error.localizedDescription)"
         }
@@ -181,6 +197,24 @@ final class AppModel {
         _ = engineVersion
         if info.kind == .gptk && !useAppleToolkit { return false }
         return engineManager?.isInstalled(info) ?? false
+    }
+
+    /// The space's engine as far as decisions go: only the backends it can run now (D3DMetal once it is copied in,
+    /// say), or the catalogue's list while the engine isn't installed yet.
+    func engineInfo(for space: Space) -> EngineInfo {
+        let info = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        if readyCache.version != engineVersion || readyCache.toolkitOn != useAppleToolkit {
+            readyCache.backends = [:]; readyCache.version = engineVersion; readyCache.toolkitOn = useAppleToolkit
+        }
+        if let ready = readyCache.backends[info.id] { return ready.map { info.limited(to: $0) } ?? info }
+        let ready = engine(for: space).map(readyBackends(of:))
+        readyCache.backends[info.id] = .some(ready)
+        return ready.map { info.limited(to: $0) } ?? info
+    }
+
+    /// What `engine` can run now, with D3DMetal only while Apple's toolkit is turned on.
+    func readyBackends(of engine: Engine) -> [GraphicsBackend] {
+        engine.readyBackends.filter { $0 != .d3dmetal || useAppleToolkit }
     }
 
     /// Engines to offer when choosing one: Apple's toolkit only when it is turned on.
@@ -253,6 +287,7 @@ final class AppModel {
                 Task { @MainActor in self?.progress(activity, fraction, message) }
             }
             engineVersion += 1
+            if info.kind == .crossover { await prepareD3DMetal() }     // D3DMetal only while Apple's toolkit is on
             return engine
         } catch is CancellationError {
             return nil
@@ -643,6 +678,8 @@ final class AppModel {
 
     /// The running Windows programs of each library entry, from the last look at the process table.
     private(set) var gamePrograms: [UUID: [WineProcess]] = [:]
+    /// The backend each space's Steam was started with by G-Player, while that Steam runs.
+    private var launcherBackends: [UUID: GraphicsBackend] = [:]
     /// Store games until their program shows up (Steam takes a while to start a game), so Play isn't offered twice.
     private(set) var startingUntil: [UUID: Date] = [:]
     /// Store games G-Player started in the last minutes, and when each was first seen running: a game Steam starts
@@ -667,6 +704,14 @@ final class AppModel {
             }.value
             lookingAtPrograms = false
             if found != gamePrograms { gamePrograms = found }
+            for id in launcherBackends.keys where !(space(id).map { WineProcesses.isSteamRunning(in: $0, processes: all) } ?? false) {
+                launcherBackends[id] = nil
+            }
+            if d3dMetalWaiting, !state.spaces.contains(where: { $0.engineID == EngineCatalog.crossover.id
+                                                              && WineProcesses.isRunning(in: $0, processes: all) }) {
+                d3dMetalWaiting = false
+                syncD3DMetal()
+            }
             noticeStoreGames(found)
             guardHelperWrappers(all)
         }
@@ -789,10 +834,14 @@ final class AppModel {
             var current = self.game(game.id) ?? game
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
             let fixes = current.kind == .game ? self.fixes(for: current) : []
-            let planned = current, verbose = verboseLogs
+            let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine)
+            let startsSteam = space.presetID == AppPresets.steam.id && (current.kind == .app || current.storeKey != nil)
+            let steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
+            let launcherBackend = steamWasRunning ? launcherBackends[space.id] : nil
             // Planning reads the game's folder (program names, .NET), so it runs off the main thread.
             let plan = try await Task.detached(priority: .userInitiated) {
-                try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose)
+                try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
+                                       launcherBackend: launcherBackend)
             }.value
             if let blockers = plan.compat?.blockers, !blockers.isEmpty, !skipped.contains(.blockers),
                !acknowledgedBlockers.contains(game.id) {
@@ -804,7 +853,7 @@ final class AppModel {
                 steamRestart = SteamRestart(gameID: game.id, skipped: skipped)
                 return
             }
-            if plan.writesToSpace(engine: engine.info), space.origin == .external,
+            if plan.writesToSpace(engine: engine.info.limited(to: ready)), space.origin == .external,
                self.space(space.id)?.allowsChanges == nil {
                 // Asked once per space; either answer starts the game.
                 askToChange(space) { [weak self] _ in
@@ -819,6 +868,8 @@ final class AppModel {
                 await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths)
             }.value
             let program = try started.get()
+            // Steam started now runs with this launch's settings, and games it starts later inherit them.
+            if startsSteam && !steamWasRunning { launcherBackends[space.id] = engine.resolve(plan.backend) }
             if launches[game.id]?.program.isRunning != true {
                 launches[game.id] = LaunchRecord(program: program, profile: current.launchOptions.profile,
                                                  diagnose: current.kind == .game && current.storeKey == nil)
@@ -989,3 +1040,11 @@ final class AppModel {
 extension EngineInfo {
     static var wineStaging: EngineInfo { EngineCatalog.wineStaging }
 }
+
+/// `AppModel.engineInfo`'s memory: per engine id, its ready backends (nil while it isn't installed).
+final class ReadyCache {
+    var version = -1
+    var toolkitOn = false
+    var backends: [String: [GraphicsBackend]?] = [:]
+}
+

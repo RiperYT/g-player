@@ -97,7 +97,7 @@ private struct ProfilePicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            let engine = model.space(game.spaceID).flatMap { EngineCatalog.info($0.engineID) } ?? EngineCatalog.wineStaging
+            let engine = model.space(game.spaceID).map(model.engineInfo) ?? EngineCatalog.wineStaging
             let shown = options.profile.effective(on: engine)
             Picker("Profile", selection: Binding(get: { shown }, set: { p in
                 var o = options; o.profile = p; model.setOptions(o, for: game)
@@ -257,7 +257,7 @@ private struct AdvancedGraphics: View {
     let space: Space
 
     var body: some View {
-        let info = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let info = model.engineInfo(for: space)
         VStack(alignment: .leading, spacing: 6) {
             // A choice the space's engine doesn't have (it was switched) shows as Automatic.
             Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },

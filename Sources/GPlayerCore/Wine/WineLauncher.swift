@@ -28,7 +28,7 @@ public enum WineLauncher {
         let handle = try FileHandle(forWritingTo: log)
         let env = WineEnvironment.make(engine: engine, space: space, backend: backend, tweaks: tweaks)
         let header = "G-Player launch\nengine: \(engine.info.name) \(engine.info.version)\nspace: \(space.path)\n"
-            + "backend: \(engine.info.resolve(backend).displayName)\ncommand: \(arguments.joined(separator: " "))\n"
+            + "backend: \(engine.resolve(backend).displayName)\ncommand: \(arguments.joined(separator: " "))\n"
             + "WINEDLLOVERRIDES=\(env["WINEDLLOVERRIDES"] ?? "")\n\n"
         handle.write(Data(header.utf8))
 

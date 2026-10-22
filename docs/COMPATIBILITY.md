@@ -128,6 +128,32 @@ Windows component (with a button that installs it and plays again), graphics tha
 button that tries Compatible), anti-cheat, or a crash. G-Player's own header at the top of the log (the paths and
 title you chose) is left out of the reading, so a game folder called "BattlEye" doesn't look like a failure.
 
+## Engines and graphics backends
+
+| Engine | Wine | Backends (default first) | Steam |
+|---|---|---|---|
+| Wine Staging 11.18 (Gcenx) | upstream Wine Staging | DXVK, WineD3D | yes |
+| G-Player Wine | Wine 11 from CodeWeavers' CrossOver 26.3 source (`scripts/build-engine-cx.sh`) | DXVK, D3DMetal once it is copied in (taken for 64-bit DirectX 10–12), DXMT, WineD3D | yes |
+| Apple's Game Porting Toolkit | Apple's wine 7.7 | D3DMetal, WineD3D | no |
+
+- **D3DMetal** (Apple) turns DirectX 11 and 12 straight into Metal, for 64-bit programs only. G-Player Wine runs it next to
+  Steam, so DirectX 12 games run with Steam signed in. G-Player copies it from the user's own Game Porting Toolkit, checking
+  that D3DMetal.framework and libd3dshared.dylib are signed by Apple, into `~/Games/G-Player/D3DMetal` and from there into G-Player Wine, replacing Wine's
+  builtin `d3d10`, `d3d11`, `d3d12` and `dxgi` (Wine's are kept in `lib/wine-d3d`, and put back when the toolkit is
+  turned off). Launches get `CX_APPLEGPTK_LIBD3DSHARED_PATH` and `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal`.
+- **DXVK** (Gcenx's 1.10.3) goes through Vulkan and MoltenVK 1.4.2. On G-Player Wine with D3DMetal in, Wine's own
+  `dxgi` goes into the space's system32 for DXVK launches (`dxgi=n,b`): DXVK can't present with Apple's.
+- **DXMT** (3Shain, v0.80, MIT) turns DirectX 10 and 11 straight into Metal, 32- and 64-bit. Its DLLs go into the
+  space as native ones for DXMT launches (`dxgi,d3d11,d3d10core=n,b`).
+- **WineD3D** is Wine's own, on Apple's OpenGL 4.1: DirectX 9, not 10 or 11.
+
+On G-Player Wine the Recommended profile takes D3DMetal for 64-bit DirectX 10–12 once it is in, DXVK otherwise and for
+32-bit programs. G-Player Wine also differs from CrossOver's own Wine in two ways: the user name and profile folder are
+the Mac user's (`tools/wine-patches/cx-real-user-name.patch`, so a space keeps its saves and Steam login on either engine),
+and Microsoft's Visual C++ runtime in a space wins over Wine's builtin (some games check its version before they start).
+Its archive holds no third-party runtime libraries: G-Player copies FreeType, GnuTLS and SDL2 from Gcenx's Wine Staging
+download on the user's Mac. Game videos that go through Media Foundation need GStreamer, which this build doesn't use yet.
+
 ## Fixes in the engine itself
 
 Some problems sit in Wine, not in the game. G-Player keeps a small set of fixed files and puts them into the Wine

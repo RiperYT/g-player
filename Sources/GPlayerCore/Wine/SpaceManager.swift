@@ -30,24 +30,79 @@ public struct SpaceManager: Sendable {
         try FileManager.default.createDirectory(at: space.driveC.appendingPathComponent("Games"), withIntermediateDirectories: true)
     }
 
-    /// Puts DXVK's DLLs into the space when the launch uses DXVK. Wine prefers its builtin DLLs unless the
-    /// launch says `n,b`, so the copies are harmless for WineD3D launches.
+    /// Puts the DLLs of the launch's backend into the space: DXVK's `d3d11` and `d3d10core`, or DXMT's `d3d11`,
+    /// `d3d10core` and `dxgi`. Wine takes its builtin over a DLL in system32 unless the launch says `n,b`, so copies
+    /// an earlier launch left there are harmless for WineD3D and D3DMetal launches.
     public func prepareGraphics(_ backend: GraphicsBackend, engine: Engine, space: Space) throws {
-        guard engine.info.resolve(backend) == .dxvk, let dxvk = engine.dxvk else { return }
         let fm = FileManager.default
-        for (arch, folder) in [("x64", "system32"), ("x32", "syswow64")] {
+        let source: [(engineFolder: URL, systemFolder: String)]
+        let dlls: [String]
+        let resolved = engine.resolve(backend)
+        switch resolved {
+        case .dxvk:
+            guard let dxvk = engine.dxvk else { return }
+            source = [(dxvk.appendingPathComponent("x64"), "system32"), (dxvk.appendingPathComponent("x32"), "syswow64")]
+            dlls = ["d3d11.dll", "d3d10core.dll"]
+            // With D3DMetal in G-Player Wine the builtin 64-bit dxgi is Apple's, which DXVK can't present with: Wine's
+            // own, kept aside when D3DMetal went in, goes into system32 (the launch says `dxgi=n,b`).
+            let wines = engine.wineRoot.appendingPathComponent("lib/wine-d3d/x86_64-windows/dxgi.dll")
+            if engine.info.kind == .crossover, D3DMetalStore.linkedVersion(in: engine) != nil, let data = fm.contents(atPath: wines.path) {
+                let dst = space.driveC.appendingPathComponent("windows/system32/dxgi.dll")
+                let new = Self.nativeCopy(of: data)
+                if fm.fileExists(atPath: dst.deletingLastPathComponent().path), fm.contents(atPath: dst.path) != new {
+                    let backup = dst.appendingPathExtension("gplayer-wine")
+                    if !fm.fileExists(atPath: backup.path), fm.fileExists(atPath: dst.path) { try? fm.copyItem(at: dst, to: backup) }
+                    try new.write(to: dst, options: .atomic)
+                }
+                // `dxgi=n,b` reaches 32-bit programs too: their dxgi has to be Wine's placeholder for its builtin,
+                // not a DXMT copy an earlier launch left there.
+                let wow = space.driveC.appendingPathComponent("windows/syswow64/dxgi.dll")
+                let placeholder = engine.wineRoot.appendingPathComponent("lib/wine/i386-windows/dxgi.dll")
+                if let data = fm.contents(atPath: placeholder.path), fm.fileExists(atPath: wow.deletingLastPathComponent().path),
+                   fm.contents(atPath: wow.path) != data {
+                    try data.write(to: wow, options: .atomic)
+                }
+            }
+        case .dxmt:
+            guard let dxmt = engine.dxmt else { return }
+            source = [(dxmt.appendingPathComponent("x86_64-windows"), "system32"), (dxmt.appendingPathComponent("i386-windows"), "syswow64")]
+            dlls = ["d3d11.dll", "d3d10core.dll", "dxgi.dll"]
+        default:
+            return
+        }
+        for (from, folder) in source {
             let to = space.driveC.appendingPathComponent("windows/\(folder)")
             guard fm.fileExists(atPath: to.path) else { continue }
-            for dll in ["d3d11.dll", "d3d10core.dll"] {
-                let src = dxvk.appendingPathComponent("\(arch)/\(dll)"), dst = to.appendingPathComponent(dll)
-                guard let new = fm.contents(atPath: src.path) else { continue }
+            for dll in dlls {
+                let dst = to.appendingPathComponent(dll)
+                guard let data = fm.contents(atPath: from.appendingPathComponent(dll).path) else { continue }
+                let new = Self.nativeCopy(of: data)
                 if fm.contents(atPath: dst.path) == new { continue }
                 // Keep Wine's own copy once, so the space can go back to plain Wine.
                 let backup = to.appendingPathComponent(dll + ".gplayer-wine")
                 if !fm.fileExists(atPath: backup.path), fm.fileExists(atPath: dst.path) { try? fm.copyItem(at: dst, to: backup) }
                 try new.write(to: dst, options: .atomic)
             }
+            // DXMT's DLLs load winemetal, its bridge to Metal, which is one of the engine's builtins; the space only
+            // needs Wine's placeholder for it.
+            if resolved == .dxmt {
+                let arch = folder == "system32" ? "x86_64-windows" : "i386-windows"
+                let helper = to.appendingPathComponent("winemetal.dll")
+                let builtin = engine.wineRoot.appendingPathComponent("lib/wine/\(arch)/winemetal.dll")
+                if !fm.fileExists(atPath: helper.path), fm.fileExists(atPath: builtin.path) { try fm.copyItem(at: builtin, to: helper) }
+            }
         }
+    }
+
+    /// A DLL built as one of Wine's builtins (DXMT's are) with that mark cleared, so Wine loads the copy in system32 as
+    /// an ordinary Windows DLL when the launch says `n,b`. DLLs without the mark (DXVK's) come back unchanged.
+    static func nativeCopy(of dll: Data) -> Data {
+        let marker = Data("Wine builtin DLL".utf8)
+        let range = (dll.startIndex + 0x40)..<(dll.startIndex + 0x50)
+        guard dll.count > 0x50, dll[range].elementsEqual(marker) else { return dll }
+        var copy = dll
+        copy.replaceSubrange(range, with: Data(count: 16))
+        return copy
     }
 
     /// Deletes a managed space and everything in it.
