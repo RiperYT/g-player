@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.1] - 2026-10-22
 
 - **Automatic graphics.** With the Recommended or Fast profile, a game that fails because its graphics don't start (or crash)
   is played again with the next backend that makes sense for it (D3DMetal, DXMT, DXVK on G-Player Wine), and the game
