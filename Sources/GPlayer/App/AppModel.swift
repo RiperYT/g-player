@@ -117,8 +117,9 @@ final class AppModel {
             }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshStores() }
+            MainActor.assumeIsolated { self?.refreshStores(); self?.refreshPrograms() }
         }
+        watchPrograms()
     }
 
     var paths: LibraryPaths? { libraryRoot.map(LibraryPaths.init) }
@@ -379,7 +380,7 @@ final class AppModel {
         guard let engine = engineManager?.engine(id: space.engineID) else { return }
         Task {
             await WineLauncher.killAll(engine: engine, space: space)
-            await MainActor.run { for g in state.games(in: space) { running[g.id] = nil } }
+            await MainActor.run { for g in state.games(in: space) { running[g.id] = nil }; refreshPrograms() }
         }
     }
 
@@ -619,7 +620,54 @@ final class AppModel {
         analyzeMissing()
     }
 
-    func isRunning(_ game: Game) -> Bool { running[game.id]?.isRunning == true }
+    /// Started by G-Player and still open, or found running in its space (Steam opened by a game, a game Steam
+    /// started, anything still open from before G-Player was restarted).
+    func isRunning(_ game: Game) -> Bool {
+        if running[game.id]?.isRunning == true { return true }
+        guard let name = runningName(of: game) else { return false }
+        return spacePrograms[game.spaceID]?.contains { $0.programName == name } ?? false
+    }
+
+    /// The program name a running game shows up under: a launcher's own .exe, a game's main program.
+    private func runningName(of game: Game) -> String? {
+        if game.kind == .app, let path = game.executablePath { return (path as NSString).lastPathComponent.lowercased() }
+        return programName(of: game)?.lowercased()
+    }
+
+    // MARK: Programs running in spaces
+
+    /// The Windows programs running in each space (Wine's own services left out), read from the Mac's process list.
+    private(set) var spacePrograms: [UUID: [WineProcess]] = [:]
+
+    /// Reads which programs run in which space, off the main thread.
+    func refreshPrograms() {
+        let spaces = state.spaces
+        Task {
+            let found = await Task.detached(priority: .utility) { () -> [UUID: [WineProcess]] in
+                let all = WineProcesses.snapshot()
+                var bySpace: [UUID: [WineProcess]] = [:]
+                for space in spaces {
+                    let mine = WineProcesses.programs(in: space, from: all).filter { !$0.isWineService }
+                    if !mine.isEmpty { bySpace[space.id] = mine }
+                }
+                return bySpace
+            }.value
+            if found != spacePrograms { spacePrograms = found }
+        }
+    }
+
+    /// Looks again every few seconds while G-Player is in front (every 20 seconds behind other windows), so
+    /// "Running" follows programs it didn't start.
+    private func watchPrograms() {
+        Task { [weak self] in
+            var tick = 0
+            while !Task.isCancelled {
+                if tick % 5 == 0 || NSApp?.isActive == true { self?.refreshPrograms() }
+                tick += 1
+                try? await Task.sleep(for: .seconds(4))
+            }
+        }
+    }
 
     /// True from pressing Play until the program starts.
     func isPreparing(_ game: Game) -> Bool { preparing.contains(game.id) }
@@ -687,6 +735,8 @@ final class AppModel {
             if case .executable = game.source, running[game.id]?.isRunning != true { running[game.id] = program }
             // A program that died before it was recorded: its exit came first and found nothing to clear.
             if !program.isRunning { finished(game.id, status: program.process.terminationStatus) }
+            // A Steam game starts through Steam, so look for it once it had time to open.
+            Task { try? await Task.sleep(for: .seconds(5)); refreshPrograms() }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -755,12 +805,20 @@ final class AppModel {
         if launches[gameID]?.program.isRunning == false { launches[gameID] = nil }
         componentsVersion += 1                              // the space may be free for installs now
         refreshStores()
+        refreshPrograms()
     }
 
+    /// Stops a game. A Steam game is stopped on its own, so Steam stays open; anything else stops everything in its
+    /// space, as the games' own helpers (launchers, crash reporters) may have other names.
     func stop(_ game: Game) {
         guard let space = space(game.spaceID) else { return }
         running[game.id]?.terminate()
-        stopAll(in: space)
+        if case .steam = game.source, let name = runningName(of: game) {
+            for p in spacePrograms[space.id] ?? [] where p.programName == name { kill(p.pid, SIGTERM) }
+        } else {
+            stopAll(in: space)
+        }
+        Task { try? await Task.sleep(for: .seconds(1)); refreshPrograms() }
     }
 
     /// Runs any Windows program in a space without adding it to the library.

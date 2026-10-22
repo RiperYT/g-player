@@ -193,13 +193,13 @@ extension AppModel {
     /// quit, so G-Player doesn't install into a busy space (Steam open, a game running).
     nonisolated static func isBusy(_ space: Space) async -> Bool {
         await Task.detached(priority: .utility) {
-            WineProcesses.isRunning(in: space, commandLines: WineProcesses.commandLines())
+            WineProcesses.isRunning(in: space, processes: WineProcesses.snapshot())
         }.value
     }
 
     nonisolated static func isSteamRunning(in space: Space) async -> Bool {
         await Task.detached(priority: .userInitiated) {
-            WineProcesses.isSteamRunning(in: space, commandLines: WineProcesses.commandLines())
+            WineProcesses.isSteamRunning(in: space, processes: WineProcesses.snapshot())
         }.value
     }
 

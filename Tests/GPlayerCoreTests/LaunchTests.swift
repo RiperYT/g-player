@@ -402,3 +402,69 @@ import Testing
         #expect(plan(.wined3d, helpers: ["Program Files (x86)/Steam/bin/cef/*/steamwebhelper.exe"]).writesToSpace(engine: staging))
     }
 }
+
+/// Telling which space a Windows program belongs to when its command line is a plain Windows path.
+@Suite struct WineProcessSnapshotTests {
+    let steamSpace = Space(name: "Steam", path: "/Users/me/Bottles/Steam", engineID: "x", origin: .external)
+    let other = Space(name: "Steam 2", path: "/Users/me/Bottles/Steam 2", engineID: "x", origin: .external)
+
+    private let ps = """
+          1 /sbin/launchd
+        201 /Users/me/Engines/wine/bin/wineserver
+        213 C:\\windows\\system32\\services.exe
+        240 C:\\Program Files (x86)\\Steam\\bin\\cef\\cef.win64\\steamwebhelper_real.exe --type=renderer
+        300 C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cossacks 3\\cossacks.exe
+        414 /Users/me/Bottles/Steam/drive_c/Program Files (x86)/Steam/steam.exe -silent -applaunch 1
+        500 /Applications/Safari.app/Contents/MacOS/Safari
+        """
+    private let lsof = """
+        p213
+        fcwd
+        n/Users/me/Bottles/Steam/drive_c/windows/system32
+        p240
+        fcwd
+        n/Users/me/Bottles/Steam/drive_c/Program Files (x86)/Steam
+        p300
+        fcwd
+        n/Users/me/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Cossacks 3
+        p414
+        fcwd
+        n/Users/me/Bottles/Steam/drive_c/Program Files (x86)/Steam
+        """
+
+    private var processes: [WineProcess] {
+        let folders = WineProcesses.workingFolders(inLsof: lsof)
+        return WineProcesses.windowsPrograms(inProcessList: ps).map { var p = $0; p.directory = folders[p.pid]; return p }
+    }
+
+    @Test func onlyWindowsProgramsAreKept() {
+        #expect(processes.map(\.pid) == [213, 240, 300, 414])
+    }
+
+    @Test func aGameSteamStartedBelongsToSteamsSpace() {
+        let names = WineProcesses.programs(in: steamSpace, from: processes).compactMap(\.programName)
+        #expect(names == ["services.exe", "steamwebhelper_real.exe", "cossacks.exe", "steam.exe"])
+        #expect(WineProcesses.programs(in: other, from: processes).isEmpty)              // "Steam" is not "Steam 2"
+        #expect(WineProcesses.isRunning(in: steamSpace, processes: processes))
+        #expect(WineProcesses.isSteamRunning(in: steamSpace, processes: processes))
+        #expect(!WineProcesses.isSteamRunning(in: other, processes: processes))
+    }
+
+    @Test func wineServicesAloneDontMakeASpaceBusy() {
+        let services = processes.filter { $0.pid == 213 }
+        #expect(services.first?.isWineService == true)
+        #expect(!WineProcesses.isRunning(in: steamSpace, processes: services))
+    }
+
+    @Test func theProgramNameIsTheExeWithoutItsFolder() {
+        #expect(WineProcess(pid: 1, command: #"C:\Games\My Game\Game.EXE -windowed"#).programName == "game.exe")
+        #expect(WineProcess(pid: 1, command: "/x/drive_c/Steam/steam.exe -silent").programName == "steam.exe")
+        #expect(WineProcess(pid: 1, command: "/usr/bin/true").programName == nil)
+    }
+
+    @Test func theRealSnapshotRuns() {
+        // Whatever runs on this Mac: the call must come back and only list programs it could read.
+        let all = WineProcesses.snapshot()
+        #expect(all.allSatisfy { $0.pid > 0 && !$0.command.isEmpty })
+    }
+}
