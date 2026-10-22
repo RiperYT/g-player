@@ -43,7 +43,7 @@ struct MainView: View {
             if blocked.notes.contains(where: { $0.title == CompatResolver.needsDirectX12 }),
                let space = model.game(blocked.gameID).flatMap({ model.space($0.spaceID) }) {
                 if !model.d3dMetalAvailable {
-                    Button("Set Up Apple's D3DMetal…") { openSettings() }
+                    Button("Set Up Apple's D3DMetal…") { SettingsTab.engines.show(.toolkit); openSettings() }
                 } else if space.engineID != EngineCatalog.crossover.id {
                     Button("Move Space to G-Player Wine…") { model.offerGPlayerWine(for: blocked.gameID) }
                 }
@@ -70,7 +70,7 @@ struct MainView: View {
             Button("Move and Play") { model.moveToGPlayerWine(move.gameID) }
             Button("Cancel", role: .cancel) {}
         } message: { move in
-            Text("Every program in “\(move.spaceName)” will run on G-Player Wine (Wine 11.0, from CrossOver's source) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "") You can switch back in the space's settings.")
+            Text("Every program in “\(move.spaceName)” will run on \(EngineCatalog.crossover.displayName) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "") You can switch back in the space's settings.")
         }
         .alert("Steam is already running", isPresented: Binding(get: { model.steamRestart != nil },
                                                                 set: { if !$0 { model.steamRestart = nil } }),
@@ -83,23 +83,8 @@ struct MainView: View {
         } message: { request in
             Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? "this game")'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
         }
-        // Every answer goes through a button (Esc is Don't Allow), which takes the request off the list.
-        .alert(changesTitle, isPresented: Binding(get: { model.changesRequest != nil }, set: { _ in }),
-               presenting: model.changesRequest) { _ in
-            Button("Allow") { model.answerChangesRequest(true) }
-            Button("Don't Allow", role: .cancel) { model.answerChangesRequest(false) }
-        } message: { request in
-            let where_ = model.space(request.spaceID)?.originNote.map { " (\($0))" } ?? ""
-            Text("""
-            This space\(where_) belongs to another app, and G-Player uses it in place. To help games run, G-Player can:
-            • install Windows components such as Visual C++ into it
-            • change Wine settings in its registry: per-game DLL and Windows-version settings, Retina mode, and removing ones it set before
-            • put DXVK's graphics files and Steam's window fix in place of Wine's own (it keeps Wine's copies)
-            • install a store app such as Steam into it, when you ask
-            • keep small notes next to drive_c about what it added
-
-            Your games and saves stay untouched. If you don't allow it, games start with the space as it is, and may not run. You can change this later in the space.
-            """)
+        .sheet(isPresented: Binding(get: { model.changesRequest != nil }, set: { _ in })) {
+            if let request = model.changesRequest { ChangesRequestSheet(request: request) }
         }
         .confirmationDialog("Remove from Library?", isPresented: Binding(get: { model.gamePendingRemoval != nil },
                                                                         set: { if !$0 { model.gamePendingRemoval = nil } }),
@@ -108,12 +93,6 @@ struct MainView: View {
         } message: { game in
             Text("“\(game.title)” leaves the library. Its files stay in the space, and you can add it again.")
         }
-    }
-}
-
-extension MainView {
-    private var changesTitle: String {
-        "Allow G-Player to change “\(model.space(model.changesRequest?.spaceID)?.name ?? "this space")”?"
     }
 }
 

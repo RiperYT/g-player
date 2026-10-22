@@ -2,14 +2,31 @@ import AppKit
 import GPlayerCore
 import SwiftUI
 
+/// The tabs of Settings. Settings opens on the one it was left on, so a button elsewhere that points to a tab picks it
+/// first (`show`), also when Settings is open already.
+enum SettingsTab: String {
+    case general, engines, advanced
+
+    /// Where on the Engines tab to scroll to, for a button that points to one part of it.
+    enum Focus: String { case none = "", toolkit }
+
+    @MainActor func show(_ focus: Focus = .none) {
+        UserDefaults.standard.set(rawValue, forKey: "settingsTab")
+        UserDefaults.standard.set(focus.rawValue, forKey: "settingsFocus")
+    }
+}
+
 struct SettingsView: View {
+    @AppStorage("settingsTab") private var tab = SettingsTab.general
+    @AppStorage("settingsFocus") private var focus = ""
+
     var body: some View {
-        TabView {
-            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
-            EngineSettings().tabItem { Label("Engines", systemImage: "cpu") }
-            AdvancedSettings().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+        TabView(selection: $tab) {
+            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+            EngineSettings(focus: $focus).tabItem { Label("Engines", systemImage: "cpu") }.tag(SettingsTab.engines)
+            AdvancedSettings().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }.tag(SettingsTab.advanced)
         }
-        .frame(width: 560, height: 380)
+        .frame(width: 560, height: 460)
     }
 }
 
@@ -34,13 +51,23 @@ struct GeneralSettings: View {
 }
 
 struct EngineSettings: View {
-    @Environment(AppModel.self) private var model
+    /// A part of this tab to scroll to when it opens (`SettingsTab.Focus`); emptied once it has.
+    @Binding var focus: String
+
     var body: some View {
-        Form {
-            ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { EngineSection(info: $0) }
-            AppleToolkitSection()
+        ScrollViewReader { proxy in
+            Form {
+                ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { EngineSection(info: $0) }
+                AppleToolkitSection()
+            }
+            .formStyle(.grouped)
+            .task(id: focus) {
+                guard focus == SettingsTab.Focus.toolkit.rawValue else { return }
+                try? await Task.sleep(for: .milliseconds(150))          // after the form has laid itself out
+                proxy.scrollTo(AppleToolkitSection.anchor, anchor: .top)
+                focus = ""
+            }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -70,7 +97,7 @@ struct EngineSection: View {
                         Text("It's in use: programs are running or installing in \(list(busySpaces)). Quit them or wait, then try again.")
                     }
             } else {
-                let mb = info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)) / 1_000_000
+                let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
                     .disabled(model.isEngineBusy || model.libraryProblem != nil)
             }
@@ -112,16 +139,26 @@ struct EngineSection: View {
     }
 }
 
-/// Apple's toolkit: opt-in, never shipped or downloaded by G-Player.
+/// Apple's toolkit: opt-in, never shipped or downloaded by G-Player. Says how to get and turn it on before it is on.
 struct AppleToolkitSection: View {
     @Environment(AppModel.self) private var model
+    /// What the Engines tab scrolls to (`SettingsTab.Focus.toolkit`).
+    static let anchor = "toolkit"
+
     var body: some View {
         @Bindable var model = model
         let info = EngineCatalog.gptk
         Section {
+            Text("Optional. A few newer DirectX 12 games need Apple's D3DMetal. G-Player never includes or downloads Apple's files, so you get the toolkit yourself.")
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).id(Self.anchor)
+            VStack(alignment: .leading, spacing: 8) {
+                ToolkitStep(number: 1, text: "Get the Game Porting Toolkit from Apple. Open its disk image once and agree to Apple's license.")
+                ToolkitStep(number: 2, text: "Turn on the switch below. G-Player copies D3DMetal from the toolkit into G-Player Wine.")
+            }
+            Link("Open Apple's Game Porting Toolkit page", destination: EngineCatalog.gptkInfoURL)
             Toggle("Use Apple's Game Porting Toolkit", isOn: $model.useAppleToolkit)
-            Text("Adds Apple's D3DMetal for DirectX 11 and 12 games. G-Player never includes or downloads Apple's files. Turned on, it copies D3DMetal from the toolkit you installed or downloaded from Apple (checking that D3DMetal.framework and libd3dshared.dylib are signed by Apple) into your library and G-Player Wine; turned off, G-Player Wine goes back to Wine's own Direct3D. Apple's license allows the toolkit for developing, testing and evaluating games, so check that it fits how you use it.")
-                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("Turned off, G-Player Wine goes back to Wine's own Direct3D. Apple's license allows the toolkit for developing, testing and evaluating games, so check that it fits how you use it.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if model.useAppleToolkit {
                 LabeledContent("Toolkit") {
                     if model.isInstalled(info) { Label("Found on this Mac", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -145,9 +182,8 @@ struct AppleToolkitSection: View {
             if model.d3dMetal != nil {
                 Button("Turn Off and Remove the Copied D3DMetal", role: .destructive) { Task { await model.removeD3DMetal() } }
             }
-            Link("About the Game Porting Toolkit", destination: EngineCatalog.gptkInfoURL)
         } header: {
-            Text("Advanced")
+            Text("Apple's Game Porting Toolkit")
         }
     }
 
@@ -158,6 +194,20 @@ struct AppleToolkitSection: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         if panel.runModal() == .OK, let url = panel.url { Task { await model.importD3DMetal(from: url) } }
+    }
+}
+
+/// One numbered step of the toolkit how-to.
+private struct ToolkitStep: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
+                .frame(width: 20, height: 20).background(.quaternary, in: Circle())
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

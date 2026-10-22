@@ -123,6 +123,6 @@ struct CartridgeLabel: View {
     private var engineName: String {
         guard let info = EngineCatalog.info(space.engineID) else { return "?" }
         // G-Player Wine's own number (11.0) would look older than Wine Staging's (11.18) on the strip.
-        return info.kind == .gptk ? "D3DMetal" : info.kind == .crossover ? "G-Player" : "Wine \(info.version)"
+        return info.kind == .gptk ? "D3DMetal" : info.kind == .crossover ? "G-Player Wine" : "Wine \(info.version)"
     }
 }

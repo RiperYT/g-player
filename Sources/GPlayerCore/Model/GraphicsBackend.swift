@@ -28,11 +28,21 @@ public enum GraphicsBackend: String, Codable, CaseIterable, Sendable, Identifiab
 
     public var summary: String {
         switch self {
-        case .auto: "Picks the best option for this engine."
+        case .auto: "G-Player picks the graphics and, if the game doesn't start, tries the next ones by itself."
         case .dxvk: "DirectX 10 and 11 through Vulkan and MoltenVK."
         case .wined3d: "Wine's OpenGL renderer. Good for older DirectX 9 games."
         case .d3dmetal: "Apple's translator for DirectX 11 and 12, from your own Game Porting Toolkit."
         case .dxmt: "DirectX 10 and 11 straight to Metal. Needs the G-Player Wine engine."
         }
+    }
+}
+
+extension EngineInfo {
+    /// The line under a graphics picker. Automatic is the same under every engine: it isn't named after what it picks
+    /// first, as that changes. With the Custom profile it means this engine's usual graphics, which nothing switches.
+    public func graphicsHint(for choice: GraphicsBackend, profile: LaunchProfile) -> String {
+        let shown = backends.contains(choice) ? choice : .auto
+        guard shown == .auto, profile == .custom else { return shown.summary }
+        return "Uses \(defaultBackend.displayName), this engine's usual graphics. G-Player never switches it."
     }
 }

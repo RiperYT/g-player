@@ -142,6 +142,12 @@ final class AppModel {
     /// The first run's engine installs while they run (`installFirstRunEngines`); onboarding shows them.
     private var firstRunInstall: Task<Void, Never>?
     var isInstallingFirstRun: Bool { firstRunInstall != nil }
+    /// The one-time note about G-Player Wine was shown and closed, or isn't for this person (`FirstRunSetup.upgradeNoteApplies`).
+    var engineNoteSeen: Bool {
+        didSet { defaults.set(engineNoteSeen, forKey: "engineNoteSeen") }
+    }
+    /// The store app just set up, while its "ready" note shows in the library (`AppModel+FirstRun`).
+    var storeReadyID: String?
     var engineVersion = 0                        // bumps when engines change, so views re-read them
     var componentsVersion = 0                    // bumps when components are installed
 
@@ -153,6 +159,7 @@ final class AppModel {
         verboseLogs = d.bool(forKey: "verboseLogs")
         useAppleToolkit = d.bool(forKey: "useAppleToolkit")
         firstRunSpaces = d.stringArray(forKey: "firstRunSpaces") ?? []
+        engineNoteSeen = d.bool(forKey: "engineNoteSeen")
         if libraryRoot != nil { load(expectingLibrary: true); cleanEngineLeftovers() }
         // For screenshots and UI checks: `open G-Player.app --args -selectGame "<title>"` (not saved).
         if let title = d.volatileDomain(forName: UserDefaults.argumentDomain)["selectGame"] as? String,
@@ -345,7 +352,7 @@ final class AppModel {
         else if isInstalled(info) { if listsInstalled { notes.append("installed") } }
         else if info.downloads.isEmpty { notes.append("not installed") }
         else {
-            let mb = info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)) / 1_000_000
+            let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)))
             notes.append("\(mb) MB to download")
         }
         return notes.isEmpty ? "" : "  · " + notes.joined(separator: ", ")
@@ -742,6 +749,7 @@ final class AppModel {
                 try await work.value
                 self.ensureLauncherEntry(for: space)
                 self.refreshStores()
+                self.noteStoreReady(preset, in: space)
             } catch is CancellationError {
                 return
             } catch {

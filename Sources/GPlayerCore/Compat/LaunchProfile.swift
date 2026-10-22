@@ -24,10 +24,10 @@ public enum LaunchProfile: String, Codable, CaseIterable, Sendable, Identifiable
 
     public var summary: String {
         switch self {
-        case .recommended: "Known fixes for this game and the best graphics for its engine."
-        case .compatible: "Slower, but starts more games. Try it when a game won't open."
+        case .recommended: "Known fixes for this game and the best graphics for its engine. If the game doesn't start, G-Player tries other graphics by itself."
+        case .compatible: "Slower, but starts more games. Uses Wine's own graphics and never switches by itself. Try it when a game won't open."
         case .fast: "The quickest graphics this space has."
-        case .custom: "Graphics you choose under Advanced."
+        case .custom: "Graphics you choose under Advanced. G-Player never switches them."
         }
     }
 

@@ -23,7 +23,7 @@ enum SnapshotRenderer {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             var files: [String] = []
             for shot in shots {
-                let sandbox = Sandbox()
+                let sandbox = Sandbox(firstRunSpaces: shot.firstRunSpaces)
                 defer { sandbox.dispose() }
                 for (mode, data) in capture(shot.view(sandbox), size: shot.size) {
                     let file = folder.appendingPathComponent("\(shot.name)-\(mode).png")
@@ -45,6 +45,8 @@ enum SnapshotRenderer {
         let name: String
         /// nil: as big as the view wants to be (sheets).
         var size: CGSize?
+        /// The first spaces the first run still has to make, as the settings would say after a first launch.
+        var firstRunSpaces: [String] = []
         let view: (Sandbox) -> AnyView
     }
 
@@ -61,6 +63,8 @@ enum SnapshotRenderer {
             onboarding("onboarding-2-location") { _ in .init(step: .location) },
             onboarding("onboarding-2-location-too-long") { box in .init(step: .location, root: box.tooLongFolder) },
             onboarding("onboarding-3-engines") { _ in .init(step: .engine) },
+            onboarding("onboarding-3-engines-no-rosetta") { _ in .init(step: .engine, rosetta: false) },
+            onboarding("onboarding-3-engines-installing-rosetta") { _ in .init(step: .engine, rosetta: false, installingRosetta: true) },
             Shot(name: "onboarding-3-engines-downloading", size: windowSize) { box in
                 box.downloadingEngines()
                 return AnyView(OnboardingView(preview: .init(step: .engine)).environment(box.model))
@@ -72,13 +76,58 @@ enum SnapshotRenderer {
                 box.finishedOnboarding()
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
+            Shot(name: "main-library-setting-up-engines", size: mainSize, firstRunSpaces: ["main", "steam"]) { box in
+                box.finishedOnboarding()
+                box.downloadingFirstEngine()
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
+            },
+            Shot(name: "main-library-setting-up-spaces", size: mainSize, firstRunSpaces: ["main", "steam"]) { box in
+                box.finishedOnboarding()
+                box.installEngine(EngineCatalog.wineStaging)
+                box.installEngine(EngineCatalog.crossover)
+                _ = box.model.begin("Creating “Main”", "Setting up Windows. This takes about a minute the first time.")
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
+            },
+            Shot(name: "main-library-notes", size: mainSize) { box in
+                box.libraryWithGames()
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
+            },
+            Shot(name: "inspector-launcher", size: CGSize(width: 340, height: 760)) { box in
+                box.libraryWithGames()
+                let steam = box.model.games.first { $0.kind == .app }!
+                return AnyView(GameInspector(game: steam).environment(box.model))
+            },
             Shot(name: "main-space-new", size: mainSize) { box in
                 let space = box.newSpace()
                 return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
             },
             Shot(name: "sheet-new-space") { box in AnyView(NewSpaceSheet().environment(box.model)) },
+            Shot(name: "sheet-new-space-staging-only") { box in
+                box.finishedOnboarding()
+                box.installEngine(EngineCatalog.wineStaging)
+                return AnyView(NewSpaceSheet().environment(box.model))
+            },
+            Shot(name: "sheet-add-existing-space") { box in
+                AnyView(ExistingSpacesView(found: box.foundEnvironments(), back: {}, done: {}).environment(box.model))
+            },
+            Shot(name: "sheet-add-existing-space-none") { box in
+                AnyView(ExistingSpacesView(found: [], back: {}, done: {}).environment(box.model))
+            },
             Shot(name: "sheet-add-game") { box in AnyView(AddGameSheet(initialSource: nil).environment(box.model)) },
-            Shot(name: "settings-engines", size: settingsSize) { box in AnyView(EngineSettings().environment(box.model)) },
+            Shot(name: "sheet-changes-request") { box in
+                let space = box.adoptedSpace()
+                return AnyView(ChangesRequestSheet(request: ChangesRequest(spaceID: space.id, then: [])).environment(box.model))
+            },
+            Shot(name: "sheet-failed-launch") { box in
+                AnyView(FailedLaunchSheet(game: box.failedGame(tryOthers: true)).environment(box.model))
+            },
+            Shot(name: "sheet-failed-launch-nothing-left") { box in
+                AnyView(FailedLaunchSheet(game: box.failedGame(tryOthers: false)).environment(box.model))
+            },
+            Shot(name: "settings-engines", size: settingsSize) { box in AnyView(EngineSettings(focus: .constant("")).environment(box.model)) },
+            Shot(name: "settings-engines-from-d3dmetal-alert", size: CGSize(width: 560, height: 410)) { box in
+                AnyView(EngineSettings(focus: .constant(SettingsTab.Focus.toolkit.rawValue)).environment(box.model))
+            },
             Shot(name: "settings-general-long-path", size: CGSize(width: 560, height: 300)) { box in
                 box.model.libraryRoot = box.tooLongFolder
                 return AnyView(GeneralSettings().environment(box.model))
@@ -159,7 +208,14 @@ enum SnapshotRenderer {
     private final class Sandbox {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("gplayer-snapshot-\(UUID().uuidString.prefix(8))", isDirectory: true)
-        let model = AppModel(defaults: MemoryDefaults(), watching: false)
+        let model: AppModel
+
+        /// - Parameter firstRunSpaces: the first spaces still to make, as a first launch leaves them in the settings.
+        init(firstRunSpaces: [String] = []) {
+            let defaults = MemoryDefaults()
+            if !firstRunSpaces.isEmpty { defaults.set(firstRunSpaces, forKey: "firstRunSpaces") }
+            model = AppModel(defaults: defaults, watching: false)
+        }
 
         func dispose() { try? FileManager.default.removeItem(at: root) }
 
@@ -186,17 +242,77 @@ enum SnapshotRenderer {
             return space
         }
 
+        /// An engine that looks installed to `EngineManager`: a `wine` file that can run. Nothing of it is real.
+        func installEngine(_ info: EngineInfo) {
+            model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
+            let folder = model.engineManager!.folder(for: info)
+            let bin = info.kind == .wineStaging ? folder.appendingPathComponent("Wine Staging.app/Contents/Resources/wine/bin", isDirectory: true)
+                                                : folder.appendingPathComponent("wine/bin", isDirectory: true)
+            try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: bin.appendingPathComponent("wine").path, contents: Data("#!/bin/sh\n".utf8),
+                                           attributes: [.posixPermissions: 0o755])
+        }
+
         /// Wine Staging installed, G-Player Wine on its way: the engine step a minute into the first run.
         func downloadingEngines() {
+            installEngine(EngineCatalog.wineStaging)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 41 of 98 MB", progress: 0.42)
+        }
+
+        /// Nothing installed yet, Wine Staging on its way: the first minute of the first run.
+        func downloadingFirstEngine() {
             model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
-            let staging = model.engineManager!.folder(for: EngineCatalog.wineStaging)
-                .appendingPathComponent("Wine Staging.app/Contents/Resources/wine/bin", isDirectory: true)
-            try? FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-            let wine = staging.appendingPathComponent("wine")
-            FileManager.default.createFile(atPath: wine.path, contents: Data("#!/bin/sh\n".utf8),
-                                           attributes: [.posixPermissions: 0o755])
-            let engine = EngineCatalog.crossover
-            _ = model.begin(AppModel.downloadTitle(engine), "Downloading 41 of 98 MB", progress: 0.42)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.wineStaging), "Downloading 35 of 193 MB", progress: 0.18)
+        }
+
+        /// Spaces on both engines, a few games, and what the library says to someone who just updated and just got Steam.
+        func libraryWithGames() {
+            finishedOnboarding()
+            try? model.paths?.createFolders()
+            let spaces = model.paths!.spaces
+            let main = Space(name: "Main", path: spaces.appendingPathComponent("Main").path, engineID: EngineCatalog.wineStaging.id,
+                             origin: .managed, colorIndex: 0)
+            let steam = Space(name: "Steam", path: spaces.appendingPathComponent("Steam").path, engineID: EngineCatalog.crossover.id,
+                              origin: .managed, presetID: AppPresets.steam.id, colorIndex: 1)
+            let launcher = Game(title: "Steam", kind: .app, spaceID: steam.id, executablePath: "C:\\Program Files (x86)\\Steam\\steam.exe")
+            model.mutate { state in
+                state.spaces += [main, steam]
+                state.games += [Game(title: "Overcooked", spaceID: main.id, executablePath: "C:\\Games\\Overcooked\\Overcooked.exe"),
+                                Game(title: "Cossacks 3", spaceID: steam.id, executablePath: "C:\\Games\\Cossacks 3\\cossacks.exe"),
+                                launcher]
+            }
+            model.storeReadyID = AppPresets.steam.id
+        }
+
+        /// A space found on the Mac and added, which belongs to CrossOver.
+        func adoptedSpace() -> Space {
+            finishedOnboarding()
+            try? model.paths?.createFolders()
+            let space = Space(name: "Sample Bottle", path: root.appendingPathComponent("Sample Bottle").path,
+                              engineID: EngineCatalog.crossover.id, origin: .external, originNote: "CrossOver")
+            model.mutate { $0.spaces.append(space) }
+            return space
+        }
+
+        /// A game that didn't start, with a log that said nothing: Try Other Graphics is on offer, or nothing is.
+        func failedGame(tryOthers: Bool) -> Game {
+            finishedOnboarding()
+            try? model.paths?.createFolders()
+            let space = Space(name: "Main", path: root.appendingPathComponent("Main").path,
+                              engineID: EngineCatalog.crossover.id, origin: .managed)
+            var game = Game(title: "Overcooked", spaceID: space.id, executablePath: "C:\\Games\\Overcooked\\Overcooked.exe")
+            game.analysis = GameAnalysis(graphics: [.d3d11], architecture: .x64)
+            model.mutate { $0.spaces.append(space); $0.games.append(game) }
+            // With Try Other Graphics on offer the log named the graphics; without it, nothing left to try.
+            model.diagnoses[game.id] = [tryOthers
+                ? Diagnosis(kind: .graphics, title: "Graphics didn't start", detail: "The game couldn't create its graphics device.",
+                            remedy: .useProfile(.compatible))
+                : Diagnosis(kind: .crash, title: "The game closed right away", detail: "It quit after 3 seconds without saying why.",
+                            remedy: .none)]
+            if tryOthers {
+                model.failedAutoLaunches[game.id] = AutoLaunch(backend: .dxvk, engineID: space.engineID, startedAt: Date(), retried: false)
+            }
+            return game
         }
 
         /// What the engine step's next screen shows when this Mac has bottles and prefixes: found by the real finder in

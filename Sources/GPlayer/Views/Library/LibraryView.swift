@@ -38,6 +38,7 @@ struct LibraryView: View {
         @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                if filter == .all { notes }
                 if items.isEmpty { emptyState } else { grids(items) }
             }
             .padding(Theme.pagePadding)
@@ -51,7 +52,8 @@ struct LibraryView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first, let source = ImportSource(url) else { return false }
+            // Adding a game needs the engine and Main, which the first run is still making.
+            guard !model.isSettingUp, let url = urls.first, let source = ImportSource(url) else { return false }
             model.addGameSource = source
             model.showAddGame = true
             return true
@@ -83,15 +85,25 @@ struct LibraryView: View {
         } else if filter == .hidden {
             ContentUnavailableView("Nothing hidden", systemImage: "eye.slash",
                                    description: Text("Games you hide show up here."))
+        } else if let status = model.firstRunStatus {
+            SettingUpView(message: status, activity: model.firstRunActivity)
         } else {
             DropZone(title: "Add your first game",
-                     message: "Drop a game folder, a zip or rar archive, or an installer here. G-Player copies it into a space and finds the program that starts it.",
+                     message: "Drop a game folder, a zip, rar or 7z archive, or an installer here. G-Player copies it into a space and finds the program that starts it. Bought it on Steam or Epic? Use “Get Steam or Another Store”.",
                      targeted: dropTargeted,
                      actions: AnyView(HStack {
-                         Button("Choose…") { model.addGameSource = nil; model.showAddGame = true }
+                         Button("Choose a File or Folder…") { model.addGameSource = nil; model.showAddGame = true }
                              .buttonStyle(.borderedProminent)
-                         Button("Get Steam or another store") { model.selection = .apps }
+                         Button("Get Steam or Another Store") { model.selection = .apps }
                      }))
+        }
+    }
+
+    /// One-time notes: what is new for someone who updated, what to do once a store is set up.
+    @ViewBuilder private var notes: some View {
+        let list = model.libraryNotes
+        if !list.isEmpty {
+            VStack(spacing: 10) { ForEach(list) { LibraryNoteBanner(note: $0) } }
         }
     }
 }
@@ -103,7 +115,9 @@ struct LibraryToolbar: ToolbarContent {
             Button { model.refreshStores() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 .help("Look for games Steam or Epic installed")
             Button { model.addGameSource = nil; model.showAddGame = true } label: { Label("Add Game", systemImage: "plus") }
-                .help("Add a game folder, archive or installer")
+                .disabled(model.isSettingUp)
+                .help(model.isSettingUp ? "G-Player is still setting up. You can add a game when that's done."
+                                        : "Add a game folder, archive or installer")
         }
     }
 }

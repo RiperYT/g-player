@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+- **A library that can't be read is never replaced.** If `library.json` is damaged, or the library folder isn't there
+  (a disk that isn't connected, a moved folder), G-Player copies the file to `library.json.broken-<date>`, writes
+  nothing, and asks: Try Again, Locate…, Use Previous Copy or Start Empty. Saving keeps the file it replaces as
+  `library.json.previous`. Choosing a moved library with Locate… points its spaces at the new folder.
+- Only one G-Player runs at a time; opening it again brings the first one forward. Quitting while engines download, a
+  space is made or something installs asks first; a Steam install that was cut short continues at the next start.
+- **Engine downloads can be stopped, show "N of M MB", and go on where they stopped** after a dropped connection, a Stop
+  or a quit. G-Player checks for about 2.7 GB of free space first and cleans up half-finished installs at start.
+- Installing a store app twice at once no longer makes "Steam" and "Steam 2". Add Game and Run Program wait for
+  Windows components being installed in the space; copying and unpacking a game show progress, can be cancelled and
+  check free space, and Cancel no longer pulls the files from under a running installer. Removing an engine asks first
+  and is refused while programs run on it.
+- **A clearer first run.** The empty library says what setup is doing, how much it downloads (about 485 MB for both
+  engines, about 2.7 GB on disk) and how far it is; adding a game waits until Main and the engines are ready. The
+  engine step says nothing needs choosing, Rosetta shows an Installing state and never opens a second password window,
+  and Apple's toolkit is marked optional.
+- **Spaces and existing bottles.** One plain sentence says why spaces exist. New Space has Add Existing Space…, and
+  bottles from CrossOver or Whisky come with a warning that G-Player Wine updates them on its first start.
+- **D3DMetal, step by step.** The D3DMetal button opens Settings › Engines at the toolkit, which has a numbered how-to
+  before the switch is on. Switching a space's engine names the engine, its download and whether it is newer or older
+  Wine, waits while programs run in the space, and asks first in another app's space.
+- One-time notes: spaces made before this version get a note that G-Player Wine is new; a finished Steam setup selects
+  its tile and says what to do next. Wording of Automatic graphics, profiles, DirectX 12 and MoltenVK advice, the
+  "didn't start" buttons (with Show Log), and "Allow changes" as a sheet with Details. An empty space no longer looks
+  like a drop target.
 - **A runaway Wine can no longer flood the Mac with processes.** G-Player won't create or add a space whose folder
   path is over 150 characters (the library folder is limited to 114), and long space names are shortened. If a space
   ever runs more than 12 Windows Explorer copies or 200 programs, G-Player stops everything in it and says why.

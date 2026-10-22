@@ -32,7 +32,8 @@ releases/               zipped builds, one folder per version
   to pick, what a .lnk points to) are pure functions with tests. Only `WineLauncher`, `SpaceManager` and
   `EngineManager` touch real processes.
 - **The UI holds no rules.** Views call `AppModel`, `AppModel` calls the core.
-- **Every download is pinned by SHA-256** (`EngineCatalog`). Store installers come from the stores' own URLs.
+- **Every engine and component download is pinned by SHA-256** (`EngineCatalog`, `RuntimeCatalog`). Store installers come
+  straight from the store's own HTTPS address.
 - **Never ship Apple's Game Porting Toolkit.** Use the user's own copy.
 
 ## The library folder
@@ -86,8 +87,10 @@ any. Two guards, both decided in the core:
 ## Reviewing the UI
 
 `GPlayer --render-onboarding <folder>` (or `GPLAYER_RENDER_ONBOARDING=<folder>`) draws every onboarding step and the
-main empty states (empty library, a new space, the New Space and Add Game sheets, Settings › Engines) into PNGs, light
-and dark at 2x, prints their paths and exits, in about ten seconds:
+main screens a newcomer meets (the empty library, the library while the first run sets up and with its one-time notes, a
+new space, the New Space, Add Existing Space, Add Game, "Allow changes" and "didn't start" sheets, a launcher's page,
+Settings › Engines also as the D3DMetal button opens it) into PNGs, light and dark at 2x, prints their paths and exits,
+in about ten seconds:
 
 ```bash
 make app

@@ -8,6 +8,8 @@ struct SpaceView: View {
     @State private var found: [Shortcut] = []
     @State private var confirmRemove = false
     @State private var pendingEngine: String?
+    /// A Windows program runs in the space, whether or not it is in the library: looked up when the engine is picked.
+    @State private var programsRunning = false
 
     var body: some View {
         let all = model.state.games(in: space), games = model.visibleGames(in: space)
@@ -26,9 +28,7 @@ struct SpaceView: View {
                     if hiddenCount > 0 {
                         HiddenOnlyNote(count: hiddenCount)
                     } else {
-                        DropZone(title: "Nothing here yet",
-                                 message: "Drop a game or an installer on the library, or run a program in this space.",
-                                 actions: AnyView(Button("Run a Program…") { runProgram() }))
+                        emptySpace
                     }
                 }
             }
@@ -52,12 +52,42 @@ struct SpaceView: View {
                  ? "Its games leave the library. Moving to Trash also removes everything installed in it."
                  : "Its files stay where they are (\(space.originNote ?? "on this Mac")).")
         }
-        .alert("Switch engine?", isPresented: Binding(get: { pendingEngine != nil }, set: { if !$0 { pendingEngine = nil } })) {
-            Button("Switch") { if let e = pendingEngine { var s = space; s.engineID = e; model.update(s) }; pendingEngine = nil }
+        .alert(switchTitle, isPresented: Binding(get: { pendingEngine != nil }, set: { if !$0 { pendingEngine = nil } })) {
+            Button("Switch") { if let target = pendingEngine.flatMap(EngineCatalog.info) { model.switchEngine(of: space, to: target) }; pendingEngine = nil }
+                .disabled(switchBlocked)
             Button("Cancel", role: .cancel) { pendingEngine = nil }
         } message: {
-            Text("A newer Wine updates the space the first time it starts, and an older Wine may not open it afterwards.")
+            Text(switchMessage)
         }
+    }
+
+    /// Nothing is switched under a program that runs in the space: a newer Wine updates its files on the first start.
+    private var switchBlocked: Bool { programsRunning || model.hasRunningGames(in: space) }
+
+    private var switchTitle: String {
+        pendingEngine.flatMap(EngineCatalog.info).map { EngineSwitch.title(space: space.name, to: $0) } ?? "Switch engine?"
+    }
+
+    private var switchMessage: String {
+        guard let target = pendingEngine.flatMap(EngineCatalog.info) else { return "" }
+        if switchBlocked { return EngineSwitch.busyMessage(space: space.name) }
+        return EngineSwitch.message(space: space.name, from: EngineCatalog.info(space.engineID), to: target,
+                                    downloadBytes: model.downloadSize(of: target))
+    }
+
+    /// The page of a space with nothing in it. Not a drop target (the library takes drops), so it isn't drawn as one.
+    private var emptySpace: some View {
+        ContentUnavailableView {
+            Label("Nothing here yet", systemImage: "tray")
+        } description: {
+            Text("Run a program in this space, or add a game and choose this space for it.")
+        } actions: {
+            HStack {
+                Button("Run a Program…") { runProgram() }.buttonStyle(.borderedProminent)
+                Button("Add a Game…") { model.addGameSource = nil; model.showAddGame = true }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 260)
     }
 
     /// The selected game, if it is one of this space's visible games.
@@ -80,7 +110,7 @@ struct SpaceView: View {
             }
             PathRow(url: space.url)
             HStack(spacing: 18) {
-                Picker("Engine", selection: Binding(get: { space.engineID }, set: { if $0 != space.engineID { pendingEngine = $0 } })) {
+                Picker("Engine", selection: Binding(get: { space.engineID }, set: { if $0 != space.engineID { askToSwitch(to: $0) } })) {
                     ForEach(model.engineChoices(for: space)) { info in
                         Text(info.kind == .gptk ? "\(info.name) (D3DMetal)" : info.displayName)
                             + Text(model.engineNote(info)).foregroundStyle(.secondary)
@@ -160,6 +190,14 @@ struct SpaceView: View {
         }
     }
 
+    private func askToSwitch(to engineID: String) {
+        let s = space
+        Task {
+            programsRunning = await AppModel.isBusy(s)
+            pendingEngine = engineID
+        }
+    }
+
     private func runProgram() {
         if let u = Panels.chooseFile(message: "Choose a Windows program to run in “\(space.name)”.", start: space.driveC,
                                      types: ["exe", "msi", "bat"]) { model.run(u, in: space) }
@@ -216,27 +254,41 @@ struct NewSpaceSheet: View {
     /// The user's pick; until then the engine a new space gets without a choice (G-Player Wine, or Wine Staging while
     /// that is the only one installed, so nothing downloads unasked).
     @State private var picked: String?
+    /// Showing the spaces already on this Mac (`ExistingSpacesView`) instead of the form.
+    @State private var showingExisting = false
 
     private var engine: EngineInfo {
         picked.flatMap(EngineCatalog.info) ?? model.newSpaceEngine
     }
 
     var body: some View {
+        if showingExisting {
+            ExistingSpacesView(back: { showingExisting = false }, done: { dismiss() })
+        } else {
+            form
+        }
+    }
+
+    private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("New Space").font(.headline)
-            Text("A space is a separate Windows: its own C: drive, settings and fonts. Give a game its own space when it needs special settings.")
+            Text(Copy.space)
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Form {
-                TextField("Name", text: $name, prompt: Text("e.g. Main or Witcher 3"))
+                TextField("Name", text: $name, prompt: Text("e.g. Main or Overcooked"))
+                // The short name and the note fit in the menu; the full name is in the text below.
                 Picker("Engine", selection: Binding(get: { engine.id }, set: { picked = $0 })) {
                     ForEach(model.availableEngines) { info in
-                        Text(info.displayName + model.engineNote(info, listsInstalled: true)).tag(info.id)
+                        Text(info.shortName + model.engineNote(info, listsInstalled: true)).tag(info.id)
                     }
                 }
             }
             .formStyle(.grouped).scrollDisabled(true).frame(height: 120)
-            Text(engine.summary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("\(engine.displayName). \(engine.summary)").font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
+                Button("Add Existing Space…") { showingExisting = true }
+                    .help("Use a CrossOver or Whisky bottle or a Wine prefix that is already on this Mac")
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Create") {
@@ -250,5 +302,63 @@ struct NewSpaceSheet: View {
             }
         }
         .padding(22).frame(width: 520)
+    }
+}
+
+/// "Add Existing Space": the CrossOver and Whisky bottles and Wine prefixes already on this Mac, used in place with their
+/// games. The same list as the first run's, for whoever skipped it or got a bottle later.
+struct ExistingSpacesView: View {
+    @Environment(AppModel.self) private var model
+    let back: () -> Void
+    let done: () -> Void
+    /// nil while the Mac is searched.
+    @State private var found: [FoundEnvironment]?
+    @State private var chosen = Set<String>()
+
+    /// - Parameter found: what to show instead of searching this Mac, for `SnapshotRenderer`.
+    init(found: [FoundEnvironment]? = nil, back: @escaping () -> Void, done: @escaping () -> Void) {
+        self.back = back; self.done = done
+        _found = State(initialValue: found)
+        _chosen = State(initialValue: Set((found ?? []).filter { $0.pathProblem == nil }.map(\.id)))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Add Existing Space").font(.headline)
+            Text("A space already on this Mac keeps its games and saves, and its files stay where they are.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            content
+            HStack {
+                Button("Back", action: back)
+                Spacer()
+                Button("Cancel") { done() }.keyboardShortcut(.cancelAction)
+                Button("Add") {
+                    for f in found ?? [] where chosen.contains(f.id) { model.adopt(f) }
+                    done()
+                }
+                .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                .disabled(chosen.isEmpty)
+            }
+        }
+        .padding(22).frame(width: 520)
+        .task {
+            guard found == nil else { return }
+            let list = await model.findExistingEnvironments()
+            found = list
+            chosen = Set(list.filter { $0.pathProblem == nil }.map(\.id))
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let found {
+            if found.isEmpty {
+                Text("No CrossOver bottles, Whisky bottles or Wine prefixes were found in the usual places, or they are spaces already.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                ScrollView { FoundEnvironmentList(found: found, chosen: $chosen) }.frame(maxHeight: 300)
+            }
+        } else {
+            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Looking…").foregroundStyle(.secondary) }
+        }
     }
 }

@@ -11,7 +11,8 @@ Native SwiftUI, Cupertino-minimal. Everything in this repository is English.
 - `Sources/GPlayerCore` has no SwiftUI. Decisions (environment, DLL overrides, launch arguments, which .exe,
   .lnk/.vdf parsing) are pure functions with tests in `Tests/GPlayerCoreTests` (Swift Testing).
 - Views hold no rules: view → `AppModel` → core.
-- Every download is pinned by SHA-256 (`EngineCatalog`). No telemetry. Never add Apple Game Porting Toolkit files.
+- Every engine and component download is pinned by SHA-256 (`EngineCatalog`, `RuntimeCatalog`); store installers come
+  straight from the store's own HTTPS address. No telemetry. Never add Apple Game Porting Toolkit files.
 - UI text: short, plain verbs, says what happens. Native controls and SF Symbols; tokens in `Views/Components/Theme.swift`.
 - Split big `@ViewBuilder` bodies into sub-views (Swift 6.3 crashed on a large one with `Task { await … }` in a tuple).
 

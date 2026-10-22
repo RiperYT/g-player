@@ -26,7 +26,7 @@ The app is signed with a Developer ID and notarized by Apple, so it opens like a
 goes over the old one the same way: your library, spaces and games stay where they are.
 
 **Needs:** a Mac with Apple Silicon (M1 or later), macOS 15 Sequoia or later, Rosetta 2 (G-Player offers to
-install it), about 1 GB for the engine plus room for games.
+install it), about 2.7 GB for the two engines (a download of about 485 MB) plus room for games.
 
 ## What runs
 

@@ -16,6 +16,8 @@ struct OnboardingView: View {
     @State private var makeMain = true
     @State private var installSteam = false
     @State private var working = false
+    /// The Rosetta install is running: its password window is up, and another must not open over it.
+    @State private var installingRosetta = false
 
     /// What to draw instead of what the checks would find, so `SnapshotRenderer` can show every step without anyone
     /// clicking through them.
@@ -23,6 +25,8 @@ struct OnboardingView: View {
         var step: Step
         var root: URL? = nil
         var rosetta: Bool? = true
+        /// The Rosetta install is under way (its password window is up).
+        var installingRosetta = false
         var found: [FoundEnvironment] = []
     }
     private let preview: Preview?
@@ -33,6 +37,7 @@ struct OnboardingView: View {
         _step = State(initialValue: preview.step)
         _root = State(initialValue: preview.root ?? LibraryPaths.defaultRoot)
         _rosetta = State(initialValue: preview.rosetta)
+        _installingRosetta = State(initialValue: preview.installingRosetta)
         _found = State(initialValue: preview.found)
         _chosenFound = State(initialValue: Set(preview.found.filter { $0.pathProblem == nil }.map(\.id)))
     }
@@ -71,7 +76,7 @@ struct OnboardingView: View {
             Text("G-Player keeps your Windows games in one library and runs them with Wine, the open-source layer that lets Windows programs run on macOS.")
                 .foregroundStyle(.secondary)
             facts([("square.grid.2x2", "One library", "Steam, Epic and games you add yourself, side by side."),
-                   ("shippingbox", "Spaces", "Each space is a separate Windows with its own C: drive."),
+                   ("shippingbox", "Spaces", Copy.space),
                    ("square.and.arrow.down", "Drop to add", "Drop a folder, an archive or an installer, and pick what starts the game.")])
     }
 
@@ -98,44 +103,46 @@ struct OnboardingView: View {
             if let free = freeSpace(at: root) {
                 Text("\(free.formattedBytes) free on this disk").font(.callout).foregroundStyle(.secondary)
             }
+            // Continue is what starts the downloads, so it says how much they take.
+            if !model.isInstallingFirstRun, let note = FirstRunSetup.continueNote(installed: model.installedEngines) {
+                Text(note).font(.callout)
+            }
     }
 
     @ViewBuilder private var engineStep: some View {
             title("Get the engines")
-            Text(engineIntro).foregroundStyle(.secondary)
-            checkRow(ok: rosetta == true, title: "Rosetta 2",
-                     detail: rosetta == nil ? "Checking…" : rosetta! ? "Installed" : "Needed to run Wine",
-                     actionTitle: rosetta == false ? "Install" : nil, action: installRosetta)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("G-Player downloads two versions of Wine. New spaces use G-Player Wine; Wine Staging is a spare. You don't need to choose.")
+                if let sizes = FirstRunSetup.engineSizes(installed: model.installedEngines) { Text(sizes) }
+            }
+            .foregroundStyle(.secondary)
+            rosettaRow
             ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { engineRow($0) }
-            checkRow(ok: false, title: "Apple's Game Porting Toolkit (optional)",
-                     detail: "For DirectX 12 games, if you install it yourself. Turn it on later in Settings › Engines.",
+            checkRow(ok: false, icon: "info.circle", title: "Apple's Game Porting Toolkit",
+                     detail: "Not needed to start. A few newer DirectX 12 games need it, and G-Player tells you when one does. You get it yourself from Apple; G-Player never downloads it.",
                      actionTitle: nil, action: {})
+    }
+
+    /// Rosetta runs Windows programs on Apple silicon. Installing it asks for the Mac's password, in one window at a time.
+    private var rosettaRow: some View {
+        let detail: String
+        switch (rosetta, installingRosetta) {
+        case (_, true): detail = "Installing… Enter your Mac's password if it asks."
+        case (nil, _): detail = "Checking…"
+        case (true?, _): detail = "Installed"
+        case (false?, _): detail = "Needed to run Windows programs. Install asks for your Mac's password."
+        }
+        return checkRow(ok: rosetta == true, title: "Rosetta 2", detail: detail, working: installingRosetta,
+                        actionTitle: rosetta == false && !installingRosetta ? "Install" : nil, action: installRosetta)
     }
 
     @ViewBuilder private var foundStep: some View {
             title(found.isEmpty ? "Nothing to bring over" : "Already on this Mac")
             Text(found.isEmpty
-                 ? "No CrossOver bottles or Wine prefixes were found. You can add them later from the library."
-                 : "These Windows environments already exist. Add them as spaces to keep their games and saves. Their files stay where they are.")
+                 ? "No CrossOver bottles, Whisky bottles or Wine prefixes were found. You can add one later with New Space › Add Existing Space."
+                 : "These Windows environments already exist. Add them as spaces to keep their games and saves. Their files stay where they are. You can add the rest later with New Space › Add Existing Space.")
                 .foregroundStyle(.secondary)
-            VStack(spacing: 0) {
-                ForEach(found) { f in
-                    Toggle(isOn: Binding(get: { chosenFound.contains(f.id) },
-                                         set: { if $0 { chosenFound.insert(f.id) } else { chosenFound.remove(f.id) } })) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(f.name).font(.body.weight(.medium))
-                                Text(f.originNote).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Text(describe(f)).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .toggleStyle(.checkbox).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(f.pathProblem != nil)
-                    if let problem = f.pathProblem { PathWarning(text: problem, font: .caption).padding(.bottom, 8) }
-                    if f.id != found.last?.id { Divider() }
-                }
-            }
+            FoundEnvironmentList(found: found, chosen: $chosenFound)
     }
 
     @ViewBuilder private var appsStep: some View {
@@ -143,7 +150,7 @@ struct OnboardingView: View {
             Toggle(isOn: $makeMain) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Create a space called Main").font(.body.weight(.medium))
-                    Text("For games you add yourself. Takes about a minute.").font(.caption).foregroundStyle(.secondary)
+                    Text("For games you add yourself. Most games share it. Takes about a minute.").font(.caption).foregroundStyle(.secondary)
                 }
             }.toggleStyle(.checkbox)
             if !hasSteamAlready {
@@ -156,6 +163,10 @@ struct OnboardingView: View {
                 }.toggleStyle(.checkbox)
             }
             Text("More stores are in Get Apps, in the sidebar.").font(.callout).foregroundStyle(.secondary)
+            if makeMain || (installSteam && !hasSteamAlready) || model.isInstallingFirstRun {
+                Text("Setup carries on in the library, which shows its progress. You can add a game when it's done.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
     }
 
     private var footer: some View {
@@ -172,7 +183,7 @@ struct OnboardingView: View {
             if step != .welcome { Button("Back") { go(-1) }.disabled(working) }
             Button(step == .apps ? "Open Library" : "Continue") { next() }
                 .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                .disabled(working || (step == .engine && rosetta == false)
+                .disabled(working || (step == .engine && (rosetta == false || installingRosetta))
                           || (step == .location && model.libraryRootProblem(root) != nil))
         }
         .padding(.horizontal, 28).padding(.vertical, 18)
@@ -200,17 +211,19 @@ struct OnboardingView: View {
         .padding(.top, 4)
     }
 
-    private func checkRow(ok: Bool, title: String, detail: String, progress: Activity? = nil, actionTitle: String?,
-                          action: @escaping () -> Void) -> some View {
+    private func checkRow(ok: Bool, icon: String? = nil, title: String, detail: String, progress: Activity? = nil,
+                          working: Bool = false, actionTitle: String?, action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: ok ? "checkmark.circle.fill" : "circle.dashed")
+            // A neutral icon says "nothing for you to do here"; the dashed circle is a to-do.
+            Image(systemName: icon ?? (ok ? "checkmark.circle.fill" : "circle.dashed"))
                 .font(.title3).foregroundStyle(ok ? .green : .secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.medium))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let progress { ProgressView(value: progress.progress ?? 0).controlSize(.small).padding(.top, 2) }
             }
             Spacer()
+            if working { ProgressView().controlSize(.small) }
             if let actionTitle { Button(actionTitle, action: action) }
         }
     }
@@ -230,27 +243,14 @@ struct OnboardingView: View {
         if model.isInstallingFirstRun {
             return info.isRecommended && !model.isInstalled(EngineCatalog.wineStaging) ? "Downloads after Wine Staging, reusing its libraries" : "Starting…"
         }
-        return info.isRecommended ? "Recommended. Runs Steam and DirectX 9–11 games, and DirectX 12 with Apple's D3DMetal if you add it"
-                                  : "Alternative. Runs Steam and most DirectX 9–11 games"
-    }
-
-    /// What the engine step says before the rows: what G-Player uses and how much is left to download.
-    private var engineIntro: String {
-        let intro = "Wine for macOS runs Windows programs through Rosetta 2. G-Player uses G-Player Wine and keeps Wine Staging as an alternative."
-        let mb = EngineCatalog.firstRunBytes(installed: model.installedEngines) / 1_000_000
-        return mb == 0 ? intro : intro + " That takes about \(mb) MB to download. G-Player checks every file before using it."
+        // The size is what the first run downloads: G-Player Wine reuses the libraries of the Wine Staging that comes first.
+        let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: true))
+        return info.isRecommended ? "New spaces use it. Runs Steam and DirectX 9–11 games. \(mb) MB."
+                                  : "A spare for spaces that need it. Runs Steam and most DirectX 9–11 games. \(mb) MB."
     }
 
     private var hasSteamAlready: Bool {
         found.contains { $0.presetID == "steam" && chosenFound.contains($0.id) } || model.isInstalled(AppPresets.steam)
-    }
-
-    private func describe(_ f: FoundEnvironment) -> String {
-        var parts: [String] = []
-        if f.presetID == "steam" { parts.append("Steam") }
-        parts += f.games.map(\.title)
-        let engine = EngineCatalog.info(f.suggestedEngineID)?.name ?? f.suggestedEngineID
-        return (parts.isEmpty ? "" : parts.joined(separator: ", ") + " · ") + "runs on \(engine)"
     }
 
     private func freeSpace(at url: URL) -> Int64? {
@@ -287,6 +287,7 @@ struct OnboardingView: View {
         case .apps:
             let wantMain = makeMain && !model.spaces.contains { $0.name == "Main" }
             let wantSteam = installSteam && !hasSteamAlready
+            model.engineNoteSeen = true                           // the note about G-Player Wine is for those who updated
             model.finishOnboarding(root: root)
             // Made once an engine is there, also after a quit before the downloads ended.
             model.createFirstRunSpaces(main: wantMain, steam: wantSteam)
@@ -300,10 +301,13 @@ struct OnboardingView: View {
     }
 
     private func installRosetta() {
+        guard !installingRosetta else { return }
+        installingRosetta = true
         let script = "do shell script \"/usr/sbin/softwareupdate --install-rosetta --agree-to-license\" with administrator privileges"
         Task {
             _ = try? await Shell.run(Shell.tool("osascript"), ["-e", script])
             rosetta = await Shell.isRosettaInstalled()
+            installingRosetta = false
         }
     }
 }

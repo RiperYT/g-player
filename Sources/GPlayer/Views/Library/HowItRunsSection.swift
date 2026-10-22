@@ -202,6 +202,7 @@ private struct DiagnosisBanner: View {
             Label(diagnosis.title, systemImage: "stethoscope").font(.callout.weight(.semibold))
             Text(diagnosis.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             RemedyButton(game: game, diagnosis: diagnosis, large: false)
+            RemedyNote(diagnosis: diagnosis)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -220,22 +221,29 @@ struct RemedyButton: View {
     var body: some View {
         switch diagnosis.remedy {
         case .installComponents(let ids):
-            VStack(alignment: .leading, spacing: 4) {
-                Button(model.isCommonSet(ids) ? "Install Common Windows Parts\(model.sizeLabel(ids)) and Play"
-                                              : "Install \(model.componentsLabel(ids)) and Play") {
-                    model.applyRemedy(diagnosis.remedy, for: game); then()
-                }
-                .buttonStyle(.borderedProminent).controlSize(large ? .large : .regular)
-                if model.isCommonSet(ids) {
-                    Text("DirectX 9 and 11 helpers, game audio, controller support, OpenAL and Windows fonts. Many older games need some of these.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
+            Button(model.isCommonSet(ids) ? "Install Common Windows Parts\(model.sizeLabel(ids)) and Play"
+                                          : "Install \(model.componentsLabel(ids)) and Play") {
+                model.applyRemedy(diagnosis.remedy, for: game); then()
             }
+            .buttonStyle(.borderedProminent).controlSize(large ? .large : .regular)
         case .useProfile(let p):
             Button("Try \(p.title) and Play") { model.applyRemedy(diagnosis.remedy, for: game); then() }
                 .buttonStyle(.borderedProminent).controlSize(large ? .large : .regular)
         case .none:
             EmptyView()
+        }
+    }
+}
+
+/// What the common set is, under the button that installs it (nothing for another remedy).
+struct RemedyNote: View {
+    @Environment(AppModel.self) private var model
+    let diagnosis: Diagnosis
+
+    var body: some View {
+        if case .installComponents(let ids) = diagnosis.remedy, model.isCommonSet(ids) {
+            Text("DirectX 9 and 11 helpers, game audio, controller support, OpenAL and Windows fonts. Many older games need some of these.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -263,6 +271,8 @@ struct FailedLaunchSheet: View {
 
     var body: some View {
         let found = (model.diagnoses[game.id] ?? []).filter { $0.title != AppModel.componentsLaterTitle }
+        let otherGraphics = model.graphicsOffer(for: game) != nil
+        let remedy = found.first(where: { $0.remedy != .none })
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundStyle(.orange)
@@ -274,19 +284,28 @@ struct FailedLaunchSheet: View {
             ForEach(found) { d in
                 Text(d.detail).font(.callout).fixedSize(horizontal: false, vertical: true)
             }
+            if let remedy { RemedyNote(diagnosis: remedy) }
+            // Both buttons try something else, and they aren't the same thing.
+            if otherGraphics, remedy?.remedy == .useProfile(.compatible) {
+                Text("Try Other Graphics plays the game again with the next graphics G-Player knows. Try Compatible and Play uses Wine's own graphics, which are slower but start more games.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Button("Show in Library") { model.selectedGameID = game.id; dismiss() }
                 Spacer()
                 Button("Close", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 TryOtherGraphicsButton(game: game) { dismiss() }
-                if let first = found.first(where: { $0.remedy != .none }) {
+                if let first = remedy {
                     RemedyButton(game: game, diagnosis: first, large: false) { dismiss() }
                         .keyboardShortcut(.defaultAction)
+                } else if !otherGraphics {
+                    // Nothing else to try: the log is what is left to read.
+                    Button("Show Log") { model.showLog(for: game) }.buttonStyle(.borderedProminent)
                 }
             }
         }
         .padding(22)
-        .frame(width: 460)
+        .frame(width: 580)
     }
 }
 
@@ -302,10 +321,11 @@ private struct AdvancedGraphics: View {
             // A choice the space's engine doesn't have (it was switched) shows as Automatic.
             Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },
                                                   set: { model.setGraphics($0, for: game) })) {
-                Text("Automatic (\(info.defaultBackend.displayName))").tag(GraphicsBackend.auto)
+                Text(GraphicsBackend.auto.displayName).tag(GraphicsBackend.auto)
                 ForEach(info.backends) { Text($0.displayName).tag($0) }
             }
-            Text(info.resolve(game.graphics).summary).font(.caption).foregroundStyle(.secondary)
+            Text(info.graphicsHint(for: game.graphics, profile: game.launchOptions.profile))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text("Choosing graphics here switches the profile to Custom.").font(.caption).foregroundStyle(.tertiary)
         }
     }
