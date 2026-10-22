@@ -52,8 +52,9 @@ public enum Shell {
     }
 
     /// Like `run`, for work that can be stopped: when the calling task is cancelled the process is stopped and
-    /// `CancellationError` is thrown (unpacking a big archive, say, which `run` would let finish).
-    public static func runStoppable(_ executable: URL, _ arguments: [String]) async throws -> ProcessResult {
+    /// `CancellationError` is thrown (unpacking a big archive, say, which `run` would let finish). With a `timeout`
+    /// (seconds) a process that runs longer is stopped too, and `Supervised.TimedOut` is thrown.
+    public static func runStoppable(_ executable: URL, _ arguments: [String], timeout: TimeInterval? = nil) async throws -> ProcessResult {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -64,7 +65,7 @@ public enum Shell {
         let outBox = DataBox(), errBox = DataBox()
         out.fileHandleForReading.readabilityHandler = { h in outBox.append(h.availableData) }
         err.fileHandleForReading.readabilityHandler = { h in errBox.append(h.availableData) }
-        let status = try await Supervised.run(timeout: nil, stop: { Supervised.terminate(process) }) { finish in
+        let status = try await Supervised.run(timeout: timeout, stop: { Supervised.terminate(process) }) { finish in
             process.terminationHandler = { p in
                 out.fileHandleForReading.readabilityHandler = nil
                 err.fileHandleForReading.readabilityHandler = nil
@@ -76,6 +77,17 @@ public enum Shell {
         }
         return ProcessResult(status: status, stdout: String(decoding: outBox.data, as: UTF8.self),
                              stderr: String(decoding: errBox.data, as: UTF8.self))
+    }
+
+    /// Installs Rosetta 2 with Apple's own tool; macOS asks for the Mac's password in a window of its own. Stops waiting after
+    /// `timeout` seconds (a password window nobody answers, an install that hangs) and when the calling task is cancelled
+    /// (`CancellationError`); the window closes with it. Whether it worked is `isRosettaInstalled`.
+    public static func installRosetta(timeout: TimeInterval = 600) async throws {
+        let script = "do shell script \"/usr/sbin/softwareupdate --install-rosetta --agree-to-license\" with administrator privileges"
+        do { _ = try await runStoppable(tool("osascript"), ["-e", script], timeout: timeout) }
+        catch is Supervised.TimedOut {
+            throw ShellError.failed("The Rosetta 2 install took longer than \(Int(timeout / 60)) minutes, so G-Player stopped waiting. Choose Install to try again.")
+        }
     }
 
     /// `/usr/bin/<tool>` or `/bin/<tool>`.

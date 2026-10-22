@@ -8,15 +8,17 @@ public struct LibraryProblem: Equatable, Sendable {
         case folderMissing
         /// The folder is there, library.json isn't, but a previous copy of it is: this was a library.
         case fileMissing
-        /// library.json is there and can't be read.
+        /// library.json is there and the system won't let it be read (a permission, a disk error). Nothing is wrong with the file.
         case unreadable
+        /// library.json was read and isn't a library this version understands (cut off, edited, written by something else).
+        case damaged
     }
 
     public let kind: Kind
     public let root: URL
     /// What failed, in a few words; empty when the folder is missing.
     public let reason: String
-    /// Where an unreadable library.json was copied before anything else happened. Nil when it couldn't be copied.
+    /// Where a damaged library.json was copied before anything else happened. Nil when it couldn't be copied (or was never read).
     public let brokenCopy: URL?
     /// `library.json.previous` is there and reads fine, so it can take the place of the missing or unreadable file.
     public let previousIsUsable: Bool
@@ -40,6 +42,8 @@ public struct LibraryStore: Sendable {
     public init(paths: LibraryPaths) { self.paths = paths }
 
     static let brokenPrefix = "library.json.broken-"
+    /// A copy that the next saves never rotate away (they only ever write `library.json` and `library.json.previous`).
+    static let beforeEmptyPrefix = "library.json.before-empty-"
 
     /// Opens the library. A read that fails is a problem to show, never an empty library: the caller must not save
     /// anything until the user has decided what to do.
@@ -54,10 +58,13 @@ public struct LibraryStore: Sendable {
             // Nothing there. With a previous copy next to it this was a library, so the user decides; without, it is new.
             return fm.fileExists(atPath: paths.previousFile.path) ? .blocked(problem(.fileMissing)) : .ready(LibraryState())
         }
+        let data: Data
+        do { data = try Data(contentsOf: paths.libraryFile) }
+        catch { return .blocked(problem(.unreadable, reason: Self.describe(error))) }     // not damaged: it can't be opened
         do {
-            return .ready(try Self.decoder.decode(LibraryState.self, from: try Data(contentsOf: paths.libraryFile)))
+            return .ready(try Self.decoder.decode(LibraryState.self, from: data))
         } catch {
-            return .blocked(problem(.unreadable, reason: Self.describe(error), brokenCopy: keepBrokenCopy(now: now)))
+            return .blocked(problem(.damaged, reason: Self.describe(error), brokenCopy: keepBrokenCopy(now: now)))
         }
     }
 
@@ -93,6 +100,24 @@ public struct LibraryStore: Sendable {
         return state
     }
 
+    /// Before an empty library takes the place of one that couldn't be opened: keeps `library.json.previous` as
+    /// `library.json.before-empty-<date>`. The empty library is the first file the next saves rotate into `.previous`,
+    /// so without this copy the last good library would be gone after the first change. Returns the copy, or nil when there
+    /// is no previous copy. Throws when it can't be made: nothing may be written then. A copy with the same content from an
+    /// earlier try is reused.
+    @discardableResult
+    public func keepPreviousBeforeStartingEmpty(now: Date = Date()) throws -> URL? {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: paths.previousFile.path) else { return nil }
+        for name in (try? fm.contentsOfDirectory(atPath: paths.root.path)) ?? [] where name.hasPrefix(Self.beforeEmptyPrefix) {
+            let earlier = paths.root.appendingPathComponent(name)
+            if fm.contentsEqual(atPath: earlier.path, andPath: paths.previousFile.path) { return earlier }
+        }
+        let copy = Files.uniqueURL(in: paths.root, name: Self.dated(Self.beforeEmptyPrefix, at: now))
+        try fm.copyItem(at: paths.previousFile, to: copy)
+        return copy
+    }
+
     /// The library folder `chosen` stands for: the folder itself when library.json (or its previous copy) is in it, or
     /// its `G-Player` folder, for someone who chose the folder that holds the library. Nil when neither is.
     public static func libraryFolder(in chosen: URL) -> URL? {
@@ -113,12 +138,14 @@ public struct LibraryStore: Sendable {
     }
 
     /// `library.json.broken-2026-10-23-142530`
-    static func brokenName(at date: Date, in zone: TimeZone = .current) -> String {
+    static func brokenName(at date: Date, in zone: TimeZone = .current) -> String { dated(brokenPrefix, at: date, in: zone) }
+
+    static func dated(_ prefix: String, at date: Date, in zone: TimeZone = .current) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = zone
         f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return brokenPrefix + f.string(from: date)
+        return prefix + f.string(from: date)
     }
 
     /// Copies library.json next to itself and returns the copy, or nil when that failed. A copy with the same content is
@@ -135,7 +162,12 @@ public struct LibraryStore: Sendable {
 
     /// The decoder's complaint in a few words: what is wrong and where ("games[2].title: no value").
     static func describe(_ error: Error) -> String {
-        guard let error = error as? DecodingError else { return error.localizedDescription }
+        guard let error = error as? DecodingError else {
+            // "you don't have permission", not "The file “library.json” couldn't be opened because…": the screen names the file.
+            guard var reason = (error as NSError).localizedFailureReason, !reason.isEmpty else { return error.localizedDescription }
+            if reason.hasSuffix(".") { reason.removeLast() }
+            return reason.prefix(1).lowercased() + reason.dropFirst()
+        }
         func place(_ path: [CodingKey]) -> String {
             path.enumerated().map { i, key in key.intValue.map { "[\($0)]" } ?? (i == 0 ? key.stringValue : "." + key.stringValue) }.joined()
         }

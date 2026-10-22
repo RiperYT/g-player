@@ -21,9 +21,14 @@ struct AddGameSheet: View {
     /// The work of the working step, and the installer in it: Cancel stops them.
     @State private var workTask: Task<Void, Never>?
     @State private var installer: InstallerRun?
-    /// Cancel works only where stopping is possible (not while Windows is set up in a new space or an engine downloads).
-    @State private var canStop = false
+    /// The work can be stopped where it is: Cancel then stops it and closes. While Windows is set up in a new space or an
+    /// engine downloads it can't be: Cancel closes the sheet at once, and that work carries on in the sidebar.
+    @State private var stoppable = false
     @State private var stopping = false
+    /// A space this sheet made for the game, so a retry uses it and not a second one, and whether anything of the game went
+    /// into it. One made and left empty is removed again when the sheet closes (`discardNewSpaceIfUnused`).
+    @State private var createdSpaceID: UUID?
+    @State private var createdSpaceUsed = false
     @State private var candidates: [ExecutableCandidate] = []
     @State private var chosen: URL?
     @State private var targetSpace: Space?
@@ -52,7 +57,7 @@ struct AddGameSheet: View {
             if let initialSource { pick(initialSource) }
         }
         // Stops the work. What an archive unpacked for its installer is removed by the work itself, once the installer has quit.
-        .onDisappear { installer?.cancel(); workTask?.cancel() }
+        .onDisappear { installer?.cancel(); workTask?.cancel(); discardNewSpaceIfUnused() }
     }
 
     // MARK: Steps
@@ -126,14 +131,17 @@ struct AddGameSheet: View {
             } else if !workDetail.isEmpty {
                 Text(workDetail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            if let installer { InstallerNote(run: installer) }
+            if let installer { InstallerNote(run: installer, holder: targetSpace.flatMap { model.queueHolder(in: $0.id) }) }
+            if !stoppable && !stopping {
+                Text("Cancel closes this window. The work carries on in the sidebar.").font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
     /// What the step says: where the installer is, or the work's own message.
     private var message: String {
         switch installer?.phase {
-        case .queued: "Waiting for Windows components…"
+        case .queued: "Waiting for \(targetSpace.flatMap { model.queueHolder(in: $0.id) } ?? "other work in this space")…"
         case .finishing: "Looking for what it installed…"
         default: workMessage
         }
@@ -182,7 +190,7 @@ struct AddGameSheet: View {
     private var footer: some View {
         HStack {
             Button(stopping ? "Stopping…" : "Cancel") { cancel() }.keyboardShortcut(.cancelAction)
-                .disabled(step == .working && (!canStop || stopping))
+                .disabled(stopping)
             Spacer()
             switch step {
             case .choose: EmptyView()
@@ -225,48 +233,67 @@ struct AddGameSheet: View {
         let name = title.trimmingCharacters(in: .whitespaces)
         step = .working
         stopping = false
+        stoppable = true
         workProgress = nil
         workDetail = ""
         workTask = Task { await work(source, name: name) }
     }
 
-    /// Stops what the working step does (copying, unpacking, the installer), then closes. Anywhere else it just closes.
+    /// Stops what the working step does (copying, unpacking, the installer) and closes when it has stopped. Where the work
+    /// can't be stopped (a new space being made, an engine downloading) it closes at once: the work carries on in the sidebar,
+    /// the download with its own Stop, and a space made for this and left empty is removed again. Anywhere else it just closes.
     private func cancel() {
         guard step == .working else { dismiss(); return }
-        stopping = true
-        installer?.cancel()
         workTask?.cancel()
+        if stoppable {
+            stopping = true
+            installer?.cancel()
+        } else {
+            dismiss()
+        }
     }
 
     private func work(_ source: ImportSource, name: String) async {
         // What an archive unpacked for its installer to run from: removed once the installer has quit, never while it runs.
         var unpacked: URL?
-        defer { if let unpacked { try? FileManager.default.removeItem(at: unpacked) }; installer = nil; canStop = false }
+        defer { if let unpacked { try? FileManager.default.removeItem(at: unpacked) }; installer = nil; stoppable = false }
         do {
-            var space = model.space(spaceChoice)
+            guard let paths = model.paths else { throw CancellationError() }
+            stoppable = true
+            // What it takes, looked at before anything is made: a space isn't created for a game the disk can't hold.
+            let existing = model.space(spaceChoice)
+            var plan = GameImporter.ImportPlan(totalBytes: 0, neededBytes: 0)
+            if mode == .portable {
+                let drive = existing?.driveC ?? paths.spaces.appendingPathComponent(Files.safeName(name), isDirectory: true)
+                    .appendingPathComponent("drive_c", isDirectory: true)
+                plan = try await checkedPlan(source, move: move, destination: drive.appendingPathComponent("Games", isDirectory: true), name: name)
+            } else if case .archive = source {
+                plan = try await checkedPlan(source, move: false, destination: paths.downloads, name: name)
+            }
+            // The space: made once. A try that fails or is stopped afterwards uses it again, and doesn't make "Title 2".
+            stoppable = false
+            var space = existing
             if space == nil {
                 workMessage = "Creating the space “\(name)”…"
                 space = await model.createSpace(name: name)
+                if let made = space { spaceChoice = made.id; createdSpaceID = made.id; createdSpaceUsed = false }
             }
+            try Task.checkCancellation()                                    // Cancel was pressed while it was made or downloaded
             guard let space else { step = .details; return }                // the reason is shown
             if model.engine(for: space) == nil { workMessage = "Downloading \(EngineCatalog.info(space.engineID)?.name ?? "the engine")…" }
             guard let engine = await model.engineReady(for: space) else { step = .details; return }
-            targetSpace = space
-            canStop = true
             try Task.checkCancellation()
+            targetSpace = space
+            stoppable = true
             if mode == .portable {
-                let games = space.driveC.appendingPathComponent("Games", isDirectory: true)
-                let plan = try await checkedPlan(source, move: move, destination: games, name: name)
                 workMessage = source.url.hasDirectoryPath || Files.isDirectory(source.url) ? "Copying the game…" : "Unpacking the archive…"
+                createdSpaceUsed = createdSpaceUsed || space.id == createdSpaceID
                 let folder = try await GameImporter.copyIntoSpace(source, space: space, title: name, move: move,
                                                                   totalBytes: plan.totalBytes, progress: showProgress)
                 candidates = await Task.detached { ExecutableScanner.scan(folder, title: name) }.value
             } else {
-                guard let paths = model.paths else { throw CancellationError() }
                 workMessage = "Preparing the installer…"
                 let folder = paths.downloads.appendingPathComponent("install-\(UUID().uuidString.prefix(8))")
-                var plan = GameImporter.ImportPlan(totalBytes: 0, neededBytes: 0)
-                if case .archive = source { plan = try await checkedPlan(source, move: false, destination: paths.downloads, name: name) }
                 unpacked = folder
                 let setup = try await GameImporter.installer(for: source, workFolder: folder, title: name,
                                                              totalBytes: plan.totalBytes, progress: showProgress)
@@ -274,17 +301,35 @@ struct AddGameSheet: View {
                 workMessage = "Running \(setup.lastPathComponent)…"
                 let run = InstallerRun()
                 installer = run
+                createdSpaceUsed = createdSpaceUsed || space.id == createdSpaceID
                 candidates = try await model.runInstaller(setup, in: space, engine: engine, title: name, run: run)
             }
             chosen = candidates.first?.url
             workProgress = nil; workDetail = ""
             step = .pick
         } catch is CancellationError {
+            noteNothingWasPut()
+            discardNewSpaceIfUnused()
             dismiss()
         } catch {
+            noteNothingWasPut()
             model.errorMessage = error.localizedDescription
             step = .details
         }
+    }
+
+    /// A copy that failed or was stopped removed what it had copied, and an installer stopped before its turn never started:
+    /// nothing of the game is in the space then.
+    private func noteNothingWasPut() {
+        if mode == .portable || installer?.phase == .queued { createdSpaceUsed = false }
+    }
+
+    /// A space this sheet made for a game that wasn't added is removed again when the sheet is closed; one anything went into,
+    /// or that the game was added to, stays.
+    private func discardNewSpaceIfUnused() {
+        guard let id = createdSpaceID, !createdSpaceUsed else { return }
+        createdSpaceID = nil
+        model.discardEmptySpace(id)
     }
 
     /// Looks at what the work will take and refuses it when the disk can't hold it, before anything is written.
@@ -313,6 +358,7 @@ struct AddGameSheet: View {
                         arguments: ExecutableCandidate.chromiumArguments(for: exe))
         model.addGame(game)
         model.selection = .allGames
+        if createdSpaceID == space.id { createdSpaceID = nil }              // the game is in it now: it stays
         dismiss()
     }
 
@@ -325,11 +371,13 @@ struct AddGameSheet: View {
 /// What the working step says while an installer waits for its turn and while it runs.
 private struct InstallerNote: View {
     let run: InstallerRun
+    /// What the space's queue is busy with, while the installer waits for it.
+    let holder: String?
 
     var body: some View {
         switch run.phase {
         case .queued:
-            Text("Windows components are installing in this space first. The installer starts when they are done.")
+            Text("The installer starts when \(holder ?? "the other work in this space") is done. Two installers at once would fail.")
                 .font(.callout).foregroundStyle(.secondary)
         case .running:
             Text("Finish the installer in its own window. You can uncheck “Launch game” at the end. G-Player continues when the installer closes.")

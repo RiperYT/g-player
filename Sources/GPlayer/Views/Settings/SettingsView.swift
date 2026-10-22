@@ -114,9 +114,9 @@ struct EngineSection: View {
 
     /// What a space downloads to use the engine again: its archives, and Wine Staging's too when G-Player Wine is
     /// the one removed and Staging isn't there.
-    private var redownloadMB: Int64 {
+    private var redownloadMB: Int {
         let stagingStays = info.id != EngineCatalog.wineStaging.id && model.isInstalled(EngineCatalog.wineStaging)
-        return info.downloadBytes(wineStagingInstalled: stagingStays) / 1_000_000
+        return EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: stagingStays))
     }
 
     /// Looks first, so a refusal comes before the question.

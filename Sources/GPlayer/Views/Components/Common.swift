@@ -49,7 +49,7 @@ struct ActivityPanel: View {
                         }
                         if let p = a.progress { ProgressView(value: p).controlSize(.small) }
                         else { ProgressView().progressViewStyle(.linear).controlSize(.small) }
-                        Text(a.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        Text(model.message(of: a)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                 }
             }

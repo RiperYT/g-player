@@ -55,10 +55,12 @@ and game paths inside a space are stored relative to it, so a moved library keep
 
 `library.json` is saved atomically, and the file it replaces stays as `library.json.previous`. When the library can't
 be read (a disk that isn't connected yet, a folder that was moved or renamed, a file this version can't decode) G-Player
-writes nothing: `LibraryStore.open` returns a `LibraryProblem`, an unreadable file is first copied to
+writes nothing: `LibraryStore.open` returns a `LibraryProblem`, a damaged file is first copied to
 `library.json.broken-<date>`, `AppModel.paths` is nil, and the window asks (Try Again, Locate…, Use Previous Copy, Start
-Empty). Locate… is also how a library is moved: quit, move the folder, start G-Player, choose it; the paths of the
-spaces inside it are pointed at the new place (`LibraryState.movingLibrary`).
+Empty). Start Empty first keeps the previous copy as `library.json.before-empty-<date>`, since the new library's first
+saves would rotate it away; neither dated copy is ever deleted. Locate… is also how a library is moved: quit, move the
+folder, start G-Player, choose it. The spaces G-Player made in it (not those found elsewhere on the Mac) are pointed at
+the new place (`LibraryState.movingLibrary`).
 
 ## A launch
 

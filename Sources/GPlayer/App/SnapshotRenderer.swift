@@ -58,6 +58,11 @@ enum SnapshotRenderer {
         func onboarding(_ name: String, _ preview: @escaping (Sandbox) -> OnboardingView.Preview) -> Shot {
             Shot(name: name, size: windowSize) { box in AnyView(OnboardingView(preview: preview(box)).environment(box.model)) }
         }
+        func problem(_ name: String, _ problem: LibraryProblem) -> Shot {
+            Shot(name: name, size: windowSize) { box in
+                AnyView(LibraryProblemView(problem: problem).frame(width: windowSize.width, height: windowSize.height).environment(box.model))
+            }
+        }
         return [
             onboarding("onboarding-1-welcome") { _ in .init(step: .welcome) },
             onboarding("onboarding-2-location") { _ in .init(step: .location) },
@@ -101,6 +106,14 @@ enum SnapshotRenderer {
                 let space = box.newSpace()
                 return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
             },
+            // The screen over the window when the library can't be opened, in each of its four cases.
+            problem("library-problem-folder-missing", LibraryProblem(kind: .folderMissing, root: URL(fileURLWithPath: "/Volumes/Games/G-Player"))),
+            problem("library-problem-file-missing", LibraryProblem(kind: .fileMissing, root: LibraryPaths.defaultRoot, previousIsUsable: true)),
+            problem("library-problem-damaged", LibraryProblem(kind: .damaged, root: LibraryPaths.defaultRoot, reason: "spaces[2].engineID: missing",
+                                                              brokenCopy: LibraryPaths.defaultRoot.appendingPathComponent("library.json.broken-2026-10-23-142530"),
+                                                              previousIsUsable: true)),
+            problem("library-problem-unreadable", LibraryProblem(kind: .unreadable, root: LibraryPaths.defaultRoot,
+                                                                 reason: "you don’t have permission to view it")),
             Shot(name: "sheet-new-space") { box in AnyView(NewSpaceSheet().environment(box.model)) },
             Shot(name: "sheet-new-space-staging-only") { box in
                 box.finishedOnboarding()

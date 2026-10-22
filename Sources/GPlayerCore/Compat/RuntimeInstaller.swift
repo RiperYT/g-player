@@ -288,8 +288,9 @@ public struct RuntimeInstaller: Sendable {
             if (try? Files.sha256(of: file)) == item.sha256 { return file }
             try? fm.removeItem(at: file)
         }
-        // Its own name while it downloads, so two installs sharing the cache never write the same file.
-        let part = folder.appendingPathComponent("\(item.fileName).\(UUID().uuidString.prefix(8)).part")
+        // Its own name while it downloads, so two installs sharing the cache never write the same file. The downloader keeps
+        // the bytes in `<name>.part` meanwhile; `Leftovers` knows both names, for what a quit or a crash leaves.
+        let part = folder.appendingPathComponent("\(item.fileName).\(UUID().uuidString.prefix(8))")
         try await FileDownloader.download(item.url, to: part, progress: progress)
         guard try Files.sha256(of: part) == item.sha256 else {
             try? fm.removeItem(at: part)

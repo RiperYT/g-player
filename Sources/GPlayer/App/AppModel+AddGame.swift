@@ -37,10 +37,10 @@ extension AppModel {
     /// `CancellationError`. Whatever the installer was started from is deleted only after that, by the caller.
     func runInstaller(_ installer: URL, in space: Space, engine: Engine, title: String, run: InstallerRun) async throws -> [ExecutableCandidate] {
         guard let paths else { throw CancellationError() }
-        let activity = begin("Installing “\(title)”", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting")
+        let activity = begin("Installing “\(title)”", "Starting", waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
         defer { cancellers[activity] = nil; end(activity) }
         setStop(activity, help: "Stop the installer. What it already installed stays.") { run.cancel() }
-        let queued = enqueue(in: space.id) { () -> Result<[ExecutableCandidate], Error> in
+        let queued = enqueue(in: space.id, holds: "the installer of “\(title)”") { () -> Result<[ExecutableCandidate], Error> in
             await self.runInstallerNow(installer, in: space, engine: engine, title: title, run: run, activity: activity, paths: paths)
         }
         // The queue's task isn't a child of this one, so cancelling this call has to reach it by the run.
@@ -60,6 +60,7 @@ extension AppModel {
                                  activity: UUID, paths: LibraryPaths) async -> Result<[ExecutableCandidate], Error> {
         if run.cancelled { return .failure(CancellationError()) }
         run.start()
+        startedWaiting(activity)
         progress(activity, nil, "Running \(installer.lastPathComponent)")
         // Programs open in the space before the installer started aren't the installer's to stop.
         let wasBusy = await Self.isBusy(space)
@@ -92,5 +93,22 @@ extension AppModel {
         progress(activity, nil, "Looking for what it installed…")
         let found = await Task.detached(priority: .userInitiated) { ProgramSnapshot.newPrograms(in: space, since: before) }.value
         return .success(found)
+    }
+}
+
+/// Spaces G-Player makes for an Add Game that may come to nothing.
+extension AppModel {
+    /// Removes a space G-Player made for a game that wasn't added, for good (it has only Windows in it), once what is queued
+    /// in it (the Windows components every new space gets) has run. Only if it is still empty then: no game in the library
+    /// and no game files in it, so nothing the user put there meanwhile is lost.
+    func discardEmptySpace(_ id: UUID) {
+        guard let space = space(id), space.origin == .managed else { return }
+        enqueue(in: id, isInstall: false, holds: "“\(space.name)” to be removed") {
+            guard let space = self.space(id), self.state.games(in: space).isEmpty, SpaceManager.holdsNoGames(space) else { return }
+            self.pendingComponents[id] = nil
+            // Its Wine server may still be winding down after the components' installers: it goes first.
+            if let engine = self.engineManager?.engine(id: space.engineID) { await WineLauncher.killAll(engine: engine, space: space) }
+            self.removeSpace(space, deleteFiles: true, permanently: true)
+        }
     }
 }

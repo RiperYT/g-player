@@ -32,6 +32,8 @@ struct Activity: Identifiable, Equatable {
     var stopping = false
     /// Setting something up (an engine, a space, Windows components, a store app): quitting asks first (`quitQuestion`).
     var isSetup = false
+    /// The space whose queue this waits in, until its turn comes: the sidebar then says what the queue is busy with.
+    var waitsIn: UUID?
 }
 
 @MainActor @Observable
@@ -127,9 +129,9 @@ final class AppModel {
     @ObservationIgnored private var engineFailures: [String: Error] = [:]
     /// Engines whose download the user stopped (Stop in the sidebar), so the first run doesn't go on to the next one.
     @ObservationIgnored private var stoppedEngines: Set<String> = []
-    /// The clean-up of what an earlier engine install left (`cleanEngineLeftovers`); an install waits for it, so it never
-    /// removes the folder of the one that has just begun.
-    @ObservationIgnored private var leftoversCleaning: Task<Void, Never>?
+    /// The clean-up of what an earlier run left (`cleanEngineLeftovers`); an engine or component install waits for it, so it
+    /// never removes the file or folder of the one that has just begun.
+    @ObservationIgnored var leftoversCleaning: Task<Void, Never>?
     /// Store apps being set up (`installPreset`), by preset id: a second request for the same one is ignored, so
     /// "Steam" never becomes "Steam" and "Steam 2".
     private(set) var installingPresets: Set<String> = []
@@ -139,6 +141,11 @@ final class AppModel {
         didSet { defaults.set(firstRunSpaces, forKey: "firstRunSpaces") }
     }
     @ObservationIgnored private var makingFirstRunSpaces = false
+    /// The user stopped the first run's download, so the first spaces wait for the engines (`resumeFirstRunSpaces`) and aren't
+    /// made on whatever engine happens to be there. They go on once an engine is installed, or at the next start.
+    private(set) var firstRunPaused = false
+    /// The note about that was closed.
+    var pausedNoteClosed = false
     /// The first run's engine installs while they run (`installFirstRunEngines`); onboarding shows them.
     private var firstRunInstall: Task<Void, Never>?
     var isInstallingFirstRun: Bool { firstRunInstall != nil }
@@ -170,9 +177,8 @@ final class AppModel {
         guard watching else { return }
         NotificationCenter.default.addObserver(forName: .gplayerOpenFile, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
-                guard let self, self.onboardingDone, let url = note.object as? URL, let source = ImportSource(url) else { return }
-                self.addGameSource = source
-                self.showAddGame = true
+                guard let self, let url = note.object as? URL, let source = ImportSource(url) else { return }
+                self.openAddGame(source, explains: true)
             }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -262,13 +268,19 @@ final class AppModel {
         if load() { libraryOpened() }
     }
 
-    /// Start Empty on the library screen: an empty library in its place. The unreadable library.json stays next to it as
-    /// `library.json.broken-…`.
+    /// Start Empty on the library screen: an empty library in its place. The damaged library.json stays next to it as
+    /// `library.json.broken-…`, and the previous copy as `library.json.before-empty-…`: the first changes to the new library
+    /// would rotate it into `library.json.previous` and the last good library would be gone.
     func startEmptyLibrary() {
         guard let problem = libraryProblem, let root = libraryRoot else { return }
-        // Without that copy the file would be lost: leave it alone.
-        if problem.kind == .unreadable, problem.brokenCopy == nil {
-            errorMessage = "G-Player couldn't keep a copy of library.json, so it won't replace it. Move the file away yourself, then try again."
+        guard problem.canStartEmpty else {
+            errorMessage = "G-Player has no copy of library.json, so it won't replace the file. Move it away yourself, then try again."
+            return
+        }
+        // Before anything is written: if the previous copy can't be kept, the empty library isn't started.
+        do { try LibraryStore(paths: LibraryPaths(root: root)).keepPreviousBeforeStartingEmpty() }
+        catch {
+            errorMessage = "G-Player couldn't keep the previous copy of the library, so it won't start an empty one. \(error.localizedDescription)"
             return
         }
         do { try LibraryPaths(root: root).createFolders() }
@@ -443,6 +455,7 @@ final class AppModel {
             }
             engineVersion += 1
             if info.kind == .crossover { await prepareD3DMetal() }     // D3DMetal only while Apple's toolkit is on
+            if onboardingDone, !firstRunSpaces.isEmpty { resumeFirstRunSpaces() }     // spaces that waited for an engine
             return engine
         } catch is CancellationError {
             return nil
@@ -473,11 +486,15 @@ final class AppModel {
         return []
     }
 
-    /// Clears what an engine install that never ended left behind (hidden folders in Engines, stale downloads), once per
-    /// start and never while an engine is downloading.
+    /// Clears what work that never ended left behind, once per start and never while an engine is downloading: the hidden
+    /// folders of engine installs, stale downloads, component downloads with their temporary names, and the unpacked folders
+    /// of Add Game installers that no program runs from any more (`Leftovers`).
     private func cleanEngineLeftovers() {
         guard let manager = engineManager, engineInstalls.isEmpty, firstRunInstall == nil else { return }
-        leftoversCleaning = Task.detached(priority: .utility) { manager.cleanLeftovers() }
+        leftoversCleaning = Task.detached(priority: .utility) {
+            manager.cleanLeftovers()
+            Leftovers.clean(manager.paths, processes: WineProcesses.snapshot())
+        }
     }
 
     /// The first run's engines: Wine Staging, then G-Player Wine, which reuses Staging's libraries (no second download).
@@ -489,10 +506,15 @@ final class AppModel {
         // Both engines take about 2.7 GB: said before anything is downloaded, not when the disk fills up.
         let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
         if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
+        firstRunPaused = false
         firstRunInstall = Task {
             var failures: [String] = []
             for info in EngineCatalog.firstRunInstalls where await ensureEngine(info) == nil {
-                if stoppedEngines.contains(info.id) { break }                           // Stop means stop: not the next one either
+                if stoppedEngines.contains(info.id) {                                   // Stop means stop: not the next one either,
+                    firstRunPaused = true                                               // and the first spaces wait for the engine
+                    pausedNoteClosed = false
+                    break
+                }
                 failures.append(errorMessage ?? "\(info.name) wasn't installed.")
                 errorMessage = nil                                  // shown together below, not one over the other
                 if let error = engineFailures[info.id], EngineManager.isConnectionFailure(error) { break }
@@ -529,8 +551,12 @@ final class AppModel {
         makingFirstRunSpaces = true
         Task {
             defer { makingFirstRunSpaces = false }
+            firstRunPaused = false
             if !EngineCatalog.firstRunInstalls.allSatisfy({ isInstalled($0) }) { installFirstRunEngines() }
             guard let engine = await firstRunEngine() else { return }
+            // Stopped by the user: the spaces wait for G-Player Wine, on the saved list, and not on Wine Staging by the way.
+            // (An engine that failed to download is another matter: its message says the spaces use the other one.)
+            if firstRunPaused { return }
             for key in firstRunSpaces {
                 switch key {
                 case "main":
@@ -547,19 +573,34 @@ final class AppModel {
 
     // MARK: Activities
 
-    func begin(_ title: String, _ message: String, progress: Double? = nil, setup: Bool = false) -> UUID {
+    func begin(_ title: String, _ message: String, progress: Double? = nil, setup: Bool = false, waitsIn: UUID? = nil) -> UUID {
         var a = Activity(title: title, message: message, progress: progress)
         a.isSetup = setup
+        a.waitsIn = waitsIn
         activities.append(a)
         return a.id
     }
 
+    /// What the sidebar says under an activity: its message, or while it waits for its turn in a space, what the space is busy
+    /// with ("Waiting for the installer of “Game”…").
+    func message(of activity: Activity) -> String {
+        guard let space = activity.waitsIn, !activity.stopping else { return activity.message }
+        return "Waiting for \(queueHolder(in: space) ?? "other work in this space")…"
+    }
+
+    /// The queue's turn has come for an activity that waited.
+    func startedWaiting(_ id: UUID) {
+        if let i = activities.firstIndex(where: { $0.id == id }) { activities[i].waitsIn = nil }
+    }
+
     /// The question to ask before quitting while something is being set up, or nil when nothing is. Setup goes on by itself
-    /// at the next start only for the first run (its engines and spaces); the rest is started again by hand.
+    /// at the next start only while the first spaces are on the saved list (`SetupQuit.outcome`); the rest is started again
+    /// by hand, and it says so.
     var quitQuestion: (title: String, detail: String)? {
         let titles = activities.filter { $0.isSetup && !$0.stopping }.map(\.title)
         guard !titles.isEmpty else { return nil }
-        return SetupQuit.question(titles: titles, resumes: !onboardingDone || !firstRunSpaces.isEmpty || isInstallingFirstRun)
+        return SetupQuit.question(titles: titles, outcome: SetupQuit.outcome(onboardingDone: onboardingDone,
+                                                                              pendingFirstRunSpaces: !firstRunSpaces.isEmpty))
     }
 
     func progress(_ id: UUID, _ fraction: Double?, _ message: String) {
@@ -592,20 +633,33 @@ final class AppModel {
 
     /// Spaces with installs or store setup queued or running.
     var installingSpaces: Set<UUID> { Set(queuedInstalls.keys).union(activeInstalls.keys) }
+    /// What is queued or running in each space, oldest first, by what it is called to those who wait for it.
+    private var queueEntries: [UUID: [QueueEntry]] = [:]
+    private struct QueueEntry { let id = UUID(); let holds: String }
+    /// What the space's queue is busy with now ("the installer of “Game”"), or nil when it is empty.
+    func queueHolder(in spaceID: UUID) -> String? { queueEntries[spaceID]?.first?.holds }
     /// Component installs running right now, per space (also those a launch started).
     var activeInstalls: [UUID: Int] = [:]
 
     /// Runs `work` after everything queued for the space before it. Queuing happens at once, so the order of calls
     /// is the order of work. Queued work must never wait for the queue of its own space (that would wait forever).
-    /// - Parameter isInstall: counts towards `installingSpaces`. Launches pass false.
+    /// - Parameters:
+    ///   - isInstall: counts towards `installingSpaces`. Launches pass false.
+    ///   - holds: what the work is called to the ones that wait behind it, after "Waiting for" ("Windows components for
+    ///     “Main”", "the installer of “Game”").
     @discardableResult
-    func enqueue<T: Sendable>(in spaceID: UUID, isInstall: Bool = true, _ work: @escaping @MainActor () async -> T) -> Task<T, Never> {
+    func enqueue<T: Sendable>(in spaceID: UUID, isInstall: Bool = true, holds: String,
+                              _ work: @escaping @MainActor () async -> T) -> Task<T, Never> {
         let previous = spaceQueues[spaceID]
         queuedWork[spaceID, default: 0] += 1
         if isInstall { queuedInstalls[spaceID, default: 0] += 1 }
+        let entry = QueueEntry(holds: holds)
+        queueEntries[spaceID, default: []].append(entry)
         let task = Task { @MainActor () -> T in
             await previous?.value
             let result = await work()
+            queueEntries[spaceID]?.removeAll { $0.id == entry.id }
+            if queueEntries[spaceID]?.isEmpty == true { queueEntries[spaceID] = nil }
             if isInstall { Self.decrement(&self.queuedInstalls, spaceID) }
             if Self.decrement(&self.queuedWork, spaceID) == 0 { self.spaceQueues[spaceID] = nil }
             return result
@@ -641,6 +695,8 @@ final class AppModel {
             chosen = staging
         }
         guard let engine = chosen else { return nil }
+        // A caller that was stopped while the engine downloaded (Cancel in Add Game) doesn't want the space any more.
+        if Task.isCancelled { return nil }
         let activity = begin("Creating “\(name)”", "Setting up Windows. This takes about a minute the first time.", setup: true)
         defer { end(activity) }
         do {
@@ -649,7 +705,7 @@ final class AppModel {
             mutate { $0.spaces.append(space) }
             // Queued now, so a store setup that follows waits for these installers.
             let base = CompatResolver.baseComponents
-            enqueue(in: space.id) {
+            enqueue(in: space.id, holds: "Windows components for “\(name)”") {
                 await self.installNow(base, in: space, engine: engine, reason: "for “\(name)”", retryFailed: false)
             }
             return space
@@ -678,9 +734,9 @@ final class AppModel {
         return true
     }
 
-    func removeSpace(_ space: Space, deleteFiles: Bool) {
+    func removeSpace(_ space: Space, deleteFiles: Bool, permanently: Bool = false) {
         if deleteFiles, let paths {
-            do { try SpaceManager(paths: paths).delete(space) }
+            do { try SpaceManager(paths: paths).delete(space, permanently: permanently) }
             catch { errorMessage = "Couldn't delete the space: \(error.localizedDescription)"; return }
         }
         let icons = state.games(in: space).compactMap(\.iconFile)
@@ -728,13 +784,13 @@ final class AppModel {
         var ready = engine(for: space)
         if ready == nil { ready = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
         guard let engine = ready else { return }
-        let activity = begin("Setting up \(preset.name)", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting",
-                             setup: true)
+        let activity = begin("Setting up \(preset.name)", "Starting", setup: true, waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
         defer { end(activity); cancellers[activity] = nil }
         let help = "Stop setting up \(preset.name). You can set it up again later."
         setStop(activity, help: help) { [weak self] in self?.end(activity) }    // while waiting, Stop drops the setup
         // After the space's base components: Steam's first start stops every program in the space.
-        await enqueue(in: space.id) {
+        await enqueue(in: space.id, holds: "\(preset.name) to finish setting up") {
+            self.startedWaiting(activity)
             // Stopped while waiting (the activity is gone), or set up by an earlier press of the same button.
             guard self.activities.contains(where: { $0.id == activity && !$0.stopping }),
                   !preset.isInstalled(in: space) else { return }
@@ -1257,7 +1313,7 @@ final class AppModel {
             failedAutoLaunches[game.id] = nil
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
-            let started = await enqueue(in: space.id, isInstall: false) {
+            let started = await enqueue(in: space.id, isInstall: false, holds: "“\(current.title)” to start") {
                 await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry)
             }.value
             let program = try started.get()
@@ -1430,7 +1486,7 @@ final class AppModel {
             // Starts after the installs queued in the space, as a launch does: an installer started next to Windows components
             // being installed fails (error 1618, another installation is in progress).
             let verbose = verboseLogs
-            let started = await enqueue(in: space.id, isInstall: false) { () -> Result<RunningProgram, Error> in
+            let started = await enqueue(in: space.id, isInstall: false, holds: "\(file.lastPathComponent) to start") { () -> Result<RunningProgram, Error> in
                 Result {
                     try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: file),
                                            workingDirectory: file.deletingLastPathComponent(), backend: .auto,

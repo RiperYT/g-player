@@ -53,9 +53,8 @@ struct LibraryView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             // Adding a game needs the engine and Main, which the first run is still making.
-            guard !model.isSettingUp, let url = urls.first, let source = ImportSource(url) else { return false }
-            model.addGameSource = source
-            model.showAddGame = true
+            guard model.addGameBlock == nil, let url = urls.first, let source = ImportSource(url) else { return false }
+            model.openAddGame(source)
             return true
         } isTargeted: { dropTargeted = $0 }
         .overlay {
@@ -92,7 +91,7 @@ struct LibraryView: View {
                      message: "Drop a game folder, a zip, rar or 7z archive, or an installer here. G-Player copies it into a space and finds the program that starts it. Bought it on Steam or Epic? Use “Get Steam or Another Store”.",
                      targeted: dropTargeted,
                      actions: AnyView(HStack {
-                         Button("Choose a File or Folder…") { model.addGameSource = nil; model.showAddGame = true }
+                         Button("Choose a File or Folder…") { model.openAddGame() }
                              .buttonStyle(.borderedProminent)
                          Button("Get Steam or Another Store") { model.selection = .apps }
                      }))
@@ -114,10 +113,9 @@ struct LibraryToolbar: ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button { model.refreshStores() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 .help("Look for games Steam or Epic installed")
-            Button { model.addGameSource = nil; model.showAddGame = true } label: { Label("Add Game", systemImage: "plus") }
-                .disabled(model.isSettingUp)
-                .help(model.isSettingUp ? "G-Player is still setting up. You can add a game when that's done."
-                                        : "Add a game folder, archive or installer")
+            Button { model.openAddGame() } label: { Label("Add Game", systemImage: "plus") }
+                .disabled(model.addGameBlock != nil)
+                .help(model.addGameBlock?.message ?? "Add a game folder, archive or installer")
         }
     }
 }

@@ -9,7 +9,10 @@ public enum DownloadResume {
         case append(total: Int64)
         /// The whole file, from its start: what is there is replaced. (The server doesn't do ranges, or nothing was asked.)
         case restart(total: Int64)
-        /// The server won't give that range (the partial file is as long as the file, or longer): ask for all of it.
+        /// The part on disk is the whole file already (the server says so with a 416 and the file's size): nothing is left to
+        /// download. The checksum says whether it is the right file.
+        case complete
+        /// The server won't give that range (the partial file is longer than the file, or the server doesn't say): ask for all of it.
         case rangeRefused
         /// The server said no.
         case failed(status: Int)
@@ -26,6 +29,10 @@ public enum DownloadResume {
     ///   - contentRange: the `Content-Range` header, "bytes 100-999/1000".
     ///   - contentLength: the length of this answer's body, nil or 0 or less when unknown.
     public static func answer(partialSize: Int64, status: Int, contentRange: String?, contentLength: Int64?) -> Answer {
+        if status == 416 {
+            // "bytes */1000": the file is 1000 bytes long.
+            return partialSize > 0 && unsatisfiedRangeTotal(contentRange) == partialSize ? .complete : .rangeRefused
+        }
         let length = max(contentLength ?? 0, 0)
         switch status {
         case 200:
@@ -33,11 +40,15 @@ public enum DownloadResume {
         case 206:
             guard let range = parse(contentRange: contentRange), range.start == partialSize else { return .rangeRefused }
             return .append(total: range.total ?? (length > 0 ? partialSize + length : 0))
-        case 416:
-            return .rangeRefused
         default:
             return .failed(status: status)
         }
+    }
+
+    /// "bytes */1000" (what a 416 says) is 1000.
+    static func unsatisfiedRangeTotal(_ contentRange: String?) -> Int64? {
+        guard let text = contentRange?.trimmingCharacters(in: .whitespaces), text.lowercased().hasPrefix("bytes */") else { return nil }
+        return Int64(text.dropFirst(8).trimmingCharacters(in: .whitespaces))
     }
 
     /// "bytes 100-999/1000" is (100, 999, 1000); the total is nil for "/*".
@@ -62,9 +73,10 @@ public enum DownloadResume {
         return delays[failures]
     }
 
-    /// "Downloading 41 of 98 MB". The part never shows more than the whole: the sizes in the catalogue are approximate.
+    /// "Downloading 41 of 98 MB". Rounded, like every size G-Player shows (`EngineCatalog.megabytes`): "288 of 288 MB" at the
+    /// end, not 287. The part never shows more than the whole: the sizes in the catalogue are approximate.
     public static func message(received: Int64, total: Int64) -> String {
-        guard total > 0 else { return "Downloading \(received / 1_000_000) MB" }
-        return "Downloading \(min(received, total) / 1_000_000) of \(total / 1_000_000) MB"
+        guard total > 0 else { return "Downloading \(EngineCatalog.megabytes(received)) MB" }
+        return "Downloading \(EngineCatalog.megabytes(min(received, total))) of \(EngineCatalog.megabytes(total)) MB"
     }
 }

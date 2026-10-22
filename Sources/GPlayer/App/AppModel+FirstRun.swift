@@ -8,11 +8,14 @@ enum LibraryNote: Identifiable, Equatable {
     case gplayerWine
     /// A store app was just set up (its name): what to do next.
     case storeReady(String)
+    /// The first run waits because the user stopped a download (the first spaces still to make, as `FirstRunSetup` names them).
+    case setupOnHold([String])
 
     var id: String {
         switch self {
         case .gplayerWine: "gplayer-wine"
         case .storeReady(let name): "ready-\(name)"
+        case .setupOnHold: "setup-on-hold"
         }
     }
 }
@@ -25,6 +28,7 @@ extension AppModel {
     /// What the first run is doing while the library waits for it (`FirstRunSetup.libraryStatus`), or nil when it isn't
     /// working. An engine download counts as the first run's when it is, or when the first spaces wait for it.
     var firstRunStatus: String? {
+        guard !firstRunPaused else { return nil }                    // on hold: the library says so in a note, not "getting ready"
         let downloading = EngineCatalog.firstRunInstalls.contains { download(of: $0) != nil }
         return FirstRunSetup.libraryStatus(installed: installedEngines,
                                            downloading: isInstallingFirstRun || (downloading && !firstRunSpaces.isEmpty),
@@ -34,6 +38,38 @@ extension AppModel {
     /// Adding a game waits for the first run: it needs the engine and Main to be there.
     var isSettingUp: Bool { firstRunStatus != nil }
 
+    /// Why Add Game can't open now.
+    enum AddGameBlock {
+        /// No library to add to: onboarding isn't done, or the library can't be read (its screen is up).
+        case noLibrary
+        /// The first run is still working.
+        case settingUp
+
+        var message: String? {
+            self == .settingUp ? "G-Player is still setting up. You can add a game when that's done." : nil
+        }
+    }
+
+    var addGameBlock: AddGameBlock? {
+        if !onboardingDone || libraryRoot == nil || libraryProblem != nil { return .noLibrary }
+        return isSettingUp ? .settingUp : nil
+    }
+
+    /// Opens Add Game, with `source` when something was dropped or opened. Every way to add a game comes here: the buttons, ⌘N,
+    /// drops on the library, the Dock icon and Open With. Nothing opens while the first run works or the library can't be
+    /// read. `explains`: the user didn't press one of the buttons, which are dimmed and say why, so say it.
+    func openAddGame(_ source: ImportSource? = nil, explains: Bool = false) {
+        switch addGameBlock {
+        case nil:
+            addGameSource = source
+            showAddGame = true
+        case .settingUp?:
+            if explains { errorMessage = AddGameBlock.settingUp.message }
+        case .noLibrary?:
+            break
+        }
+    }
+
     /// The work to show a progress bar for while the first run goes on: the engine download, then the first space.
     var firstRunActivity: Activity? { activities.first }
 
@@ -42,6 +78,7 @@ extension AppModel {
     /// The notes to show at the top of All Games, in order.
     var libraryNotes: [LibraryNote] {
         var notes: [LibraryNote] = []
+        if firstRunPaused, !firstRunSpaces.isEmpty, !pausedNoteClosed { notes.append(.setupOnHold(firstRunSpaces)) }
         if FirstRunSetup.upgradeNoteApplies(spaces: spaces, seen: engineNoteSeen) { notes.append(.gplayerWine) }
         // Until the store has been opened once: after that its games are in the library and the note has done its job.
         if let id = storeReadyID, let preset = AppPresets.preset(id), let launcher = launcherTile(of: preset),
@@ -55,6 +92,7 @@ extension AppModel {
         switch note {
         case .gplayerWine: engineNoteSeen = true
         case .storeReady: storeReadyID = nil
+        case .setupOnHold: pausedNoteClosed = true
         }
     }
 

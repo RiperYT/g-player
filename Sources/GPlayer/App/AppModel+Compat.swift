@@ -258,7 +258,7 @@ extension AppModel {
     func installComponents(_ ids: [String], in space: Space, engine: Engine? = nil, reason: String,
                            retryFailed: Bool = false) async -> ComponentInstall {
         guard self.space(space.id)?.mayChange ?? space.mayChange else { return .notAllowed }
-        return await enqueue(in: space.id) {
+        return await enqueue(in: space.id, holds: "Windows components \(reason)") {
             await self.installNow(ids, in: space, engine: engine, reason: reason, retryFailed: retryFailed)
         }.value
     }
@@ -266,6 +266,7 @@ extension AppModel {
     /// The install itself; only ever runs from the space's queue.
     func installNow(_ ids: [String], in space: Space, engine: Engine?, reason: String, retryFailed: Bool) async -> ComponentInstall {
         guard let paths else { return .done }
+        await leftoversCleaning?.value                  // the start's clean-up of temporary downloads is over before one begins
         // Read now: the user may have said no while this waited in the queue.
         guard self.space(space.id)?.mayChange == true else { return .notAllowed }
         let installer = RuntimeInstaller(paths: paths)

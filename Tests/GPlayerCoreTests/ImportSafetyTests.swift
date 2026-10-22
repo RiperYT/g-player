@@ -188,3 +188,42 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: games.path) == before)
     }
 }
+
+@Suite struct StoppableShellTimeoutTests {
+    @Test func aProcessThatRunsPastItsTimeIsStopped() async throws {
+        let started = Date()
+        await #expect(throws: Supervised.TimedOut.self) {
+            _ = try await Shell.runStoppable(URL(fileURLWithPath: "/bin/sleep"), ["60"], timeout: 0.3)
+        }
+        #expect(Date().timeIntervalSince(started) < 10)
+        // One that finishes in time is unaffected.
+        let quick = try await Shell.runStoppable(URL(fileURLWithPath: "/bin/echo"), ["ok"], timeout: 30)
+        #expect(quick.succeeded && quick.stdout == "ok\n")
+    }
+}
+
+@Suite struct DiscardEmptySpaceTests {
+    @Test func aSpaceWithNoGameFilesHoldsNoGames() throws {
+        let tmp = TempFolder()
+        let s = space(at: tmp.prefix("S"))
+        #expect(SpaceManager.holdsNoGames(s))                                           // no Games folder at all
+        try FileManager.default.createDirectory(at: s.driveC.appendingPathComponent("Games"), withIntermediateDirectories: true)
+        #expect(SpaceManager.holdsNoGames(s))
+        tmp.file("S/drive_c/Games/.DS_Store")
+        #expect(SpaceManager.holdsNoGames(s))
+        tmp.file("S/drive_c/Games/Some Game/Game.exe")
+        #expect(!SpaceManager.holdsNoGames(s))
+    }
+
+    @Test func aSpaceThatIsDiscardedIsGoneForGoodAndAnExternalOneIsNeverTouched() throws {
+        let tmp = TempFolder()
+        let manager = SpaceManager(paths: LibraryPaths(root: tmp.url))
+        let made = space(at: tmp.prefix("Library/Spaces/Made"))
+        try manager.delete(made, permanently: true)
+        #expect(!FileManager.default.fileExists(atPath: made.url.path))
+        var found = space(at: tmp.prefix("Bottles/Mine"))
+        found.origin = .external
+        try manager.delete(found, permanently: true)
+        #expect(FileManager.default.fileExists(atPath: found.url.path))
+    }
+}

@@ -14,18 +14,22 @@ public struct LibraryState: Codable, Sendable, Equatable {
     public func space(_ id: UUID) -> Space? { spaces.first { $0.id == id } }
     public func games(in space: Space) -> [Game] { games.filter { $0.spaceID == space.id } }
 
-    /// The library after its folder moved from `old` to `new`: the spaces that were inside the old folder are inside the
-    /// new one now. `library.json` keeps each space's absolute path, so without this a moved library finds none of them.
-    /// Games keep their paths: those inside a space are relative to it.
+    /// The library after its folder moved from `old` to `new`: the spaces G-Player made (in `old/Spaces`) are in `new/Spaces`
+    /// now. `library.json` keeps each space's absolute path, so without this a moved library finds none of them. Only those
+    /// spaces move: one found elsewhere on the Mac (a bottle, a prefix) stays where it was, also when it lies inside the old
+    /// folder (a library in ~/Games next to a prefix of the user's own). Games keep their paths: those inside a space are
+    /// relative to it.
     public func movingLibrary(from old: URL, to new: URL) -> LibraryState {
         // The folder as it was written into library.json (the user's own spelling) and as G-Player standardizes it.
-        let prefixes = Set([old.path, old.standardizedFileURL.path].map { $0.count > 1 && $0.hasSuffix("/") ? String($0.dropLast()) : $0 })
-        let newRoot = LibraryPaths(root: new).root.path
+        let prefixes = Set([old.path, old.standardizedFileURL.path].map { path in
+            (path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path) + "/Spaces/"
+        })
+        let newSpaces = LibraryPaths(root: new).spaces.path
         var moved = self
-        for i in moved.spaces.indices {
+        for i in moved.spaces.indices where moved.spaces[i].origin == .managed {
             let path = moved.spaces[i].path
-            guard let prefix = prefixes.first(where: { path.hasPrefix($0 + "/") }) else { continue }
-            moved.spaces[i].path = newRoot + path.dropFirst(prefix.count)
+            guard let prefix = prefixes.first(where: { path.hasPrefix($0) }) else { continue }
+            moved.spaces[i].path = newSpaces + "/" + path.dropFirst(prefix.count)
         }
         return moved
     }

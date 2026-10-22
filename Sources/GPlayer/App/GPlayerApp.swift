@@ -52,9 +52,9 @@ struct GPlayerApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Add Game…") { model.addGameSource = nil; model.showAddGame = true }
+                Button("Add Game…") { model.openAddGame() }
                     .keyboardShortcut("n")
-                    .disabled(!model.onboardingDone || model.libraryProblem != nil)
+                    .disabled(model.addGameBlock != nil)
                 Button("New Space…") { model.showNewSpace = true }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                     .disabled(!model.onboardingDone || model.libraryProblem != nil)
@@ -74,20 +74,43 @@ struct GPlayerApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The app's model, set when the app is made; the delegate asks it whether quitting would cut setup short.
     static var model: AppModel?
+    /// Opens the main window again; the window's own view sets it (`RootView`), since only a view can ask SwiftUI for a window.
+    static var reopenMainWindow: (@MainActor () -> Void)?
+    /// The Mac is powering off (shut down, restart, log out): set by the system's notice, before it asks the app to quit.
+    private var systemIsGoingDown = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.systemIsGoingDown = true }
+        }
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Why the quit that is being handled was asked for: the reason in its Apple event, when the system sent it.
+    private static var quitReason: UInt32? {
+        NSAppleEventManager.shared().currentAppleEvent?.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
+    }
+
     /// Quitting while engines download, a space is made, components or a store app install: ask first. Pressing Quit
-    /// leaves what came on disk, so most of it goes on from there.
+    /// leaves what came on disk, so most of it goes on from there. Never when the system asks (shut down, restart, log out):
+    /// a question that can stop it would keep the Mac from going down.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let question = Self.model?.quitQuestion else { return .terminateNow }
+        guard !systemIsGoingDown, !SetupQuit.isSystemQuit(reason: Self.quitReason), let question = Self.model?.quitQuestion else {
+            return .terminateNow
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = question.title
         alert.informativeText = question.detail
         alert.addButton(withTitle: "Keep Setting Up")
         alert.addButton(withTitle: "Quit")
-        return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
+        if alert.runModal() == .alertSecondButtonReturn { return .terminateNow }
+        // Closing the last window asked to quit; staying means the window comes back, not an app with none.
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+            DispatchQueue.main.async { Self.reopenMainWindow?(); NSApp.activate() }
+        }
+        return .terminateCancel
     }
 
     /// Files dropped on the Dock icon or opened with "Open With › G-Player" start Add Game.
@@ -103,6 +126,7 @@ extension Notification.Name {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var model = model
@@ -113,6 +137,7 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        .onAppear { AppDelegate.reopenMainWindow = { openWindow(id: "main") } }
         // Over the window, not instead of it, so onboarding keeps its place while the library question is open.
         .disabled(model.libraryProblem != nil)
         .overlay {

@@ -18,6 +18,8 @@ struct OnboardingView: View {
     @State private var working = false
     /// The Rosetta install is running: its password window is up, and another must not open over it.
     @State private var installingRosetta = false
+    /// The install, so Cancel can stop it (`Shell.installRosetta` also gives up after ten minutes).
+    @State private var rosettaTask: Task<Void, Never>?
 
     /// What to draw instead of what the checks would find, so `SnapshotRenderer` can show every step without anyone
     /// clicking through them.
@@ -127,13 +129,14 @@ struct OnboardingView: View {
     private var rosettaRow: some View {
         let detail: String
         switch (rosetta, installingRosetta) {
-        case (_, true): detail = "Installing… Enter your Mac's password if it asks."
+        case (_, true): detail = "Installing… Enter your Mac's password if it asks. Cancel stops waiting."
         case (nil, _): detail = "Checking…"
         case (true?, _): detail = "Installed"
         case (false?, _): detail = "Needed to run Windows programs. Install asks for your Mac's password."
         }
         return checkRow(ok: rosetta == true, title: "Rosetta 2", detail: detail, working: installingRosetta,
-                        actionTitle: rosetta == false && !installingRosetta ? "Install" : nil, action: installRosetta)
+                        actionTitle: installingRosetta ? "Cancel" : rosetta == false ? "Install" : nil,
+                        action: installingRosetta ? cancelRosetta : installRosetta)
     }
 
     @ViewBuilder private var foundStep: some View {
@@ -303,11 +306,16 @@ struct OnboardingView: View {
     private func installRosetta() {
         guard !installingRosetta else { return }
         installingRosetta = true
-        let script = "do shell script \"/usr/sbin/softwareupdate --install-rosetta --agree-to-license\" with administrator privileges"
-        Task {
-            _ = try? await Shell.run(Shell.tool("osascript"), ["-e", script])
+        rosettaTask = Task {
+            // Stops waiting after ten minutes, or at Cancel, which closes the password window: Continue never stays dimmed.
+            do { try await Shell.installRosetta() }
+            catch is CancellationError {}
+            catch { model.errorMessage = error.localizedDescription }
             rosetta = await Shell.isRosettaInstalled()
             installingRosetta = false
+            rosettaTask = nil
         }
     }
+
+    private func cancelRosetta() { rosettaTask?.cancel() }
 }

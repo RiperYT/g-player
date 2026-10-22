@@ -84,7 +84,9 @@ struct SpaceView: View {
         } actions: {
             HStack {
                 Button("Run a Program…") { runProgram() }.buttonStyle(.borderedProminent)
-                Button("Add a Game…") { model.addGameSource = nil; model.showAddGame = true }
+                Button("Add a Game…") { model.openAddGame() }
+                    .disabled(model.addGameBlock != nil)
+                    .help(model.addGameBlock?.message ?? "")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 260)

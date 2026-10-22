@@ -60,6 +60,15 @@ public enum FirstRunSetup {
         return "G-Player is getting Windows ready for Main. This takes about a minute."
     }
 
+    /// The note for a first run that waits because the user stopped a download: what is on hold and how it goes on. Nothing is
+    /// made on an engine the user didn't want.
+    public static func pausedNote(pendingSpaces: [String]) -> (title: String, text: String) {
+        let names = spaceNames(pendingSpaces)
+        return ("Setup is on hold",
+                "You stopped the download, so setting up \(names.isEmpty ? "the first spaces" : names) is on hold. It goes on once the engine is "
+                + "installed: download it in Settings › Engines, or it starts again the next time G-Player opens.")
+    }
+
     /// "Main and Steam", for the spaces the first run still has to make.
     private static func spaceNames(_ keys: [String]) -> String {
         let names = keys.compactMap { ["main": "Main", "steam": "Steam"][$0] }

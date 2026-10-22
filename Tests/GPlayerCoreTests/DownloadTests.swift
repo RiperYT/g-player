@@ -66,7 +66,7 @@ final class StubServer: URLProtocol {
         var headers: [String: String] = [:]
         if behavior.honorsRange, let range, range.hasPrefix("bytes="), let from = Int(range.dropFirst(6).dropLast()) {
             guard from < behavior.data.count else {
-                respond(416, [:])
+                respond(416, ["Content-Range": "bytes */\(behavior.data.count)"])
                 client?.urlProtocolDidFinishLoading(self)
                 return
             }
@@ -114,7 +114,11 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         // A server that doesn't do ranges sends all of it.
         #expect(DownloadResume.answer(partialSize: 100, status: 200, contentRange: nil, contentLength: 1000) == .restart(total: 1000))
         #expect(DownloadResume.answer(partialSize: 0, status: 200, contentRange: nil, contentLength: nil) == .restart(total: 0))
+        // A 416 that says the file is as long as the part: the part is all of it. Anything else: ask for the whole file.
+        #expect(DownloadResume.answer(partialSize: 5000, status: 416, contentRange: "bytes */5000", contentLength: 0) == .complete)
+        #expect(DownloadResume.answer(partialSize: 6000, status: 416, contentRange: "bytes */5000", contentLength: 0) == .rangeRefused)
         #expect(DownloadResume.answer(partialSize: 5000, status: 416, contentRange: nil, contentLength: 0) == .rangeRefused)
+        #expect(DownloadResume.answer(partialSize: 0, status: 416, contentRange: "bytes */0", contentLength: 0) == .rangeRefused)
         #expect(DownloadResume.answer(partialSize: 0, status: 404, contentRange: nil, contentLength: 0) == .failed(status: 404))
         #expect(DownloadResume.answer(partialSize: 0, status: 503, contentRange: nil, contentLength: 0) == .failed(status: 503))
     }
@@ -138,6 +142,10 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         // The catalogue's sizes are approximate: never more than the whole.
         #expect(DownloadResume.message(received: 99_500_000, total: 98_000_000) == "Downloading 98 of 98 MB")
         #expect(DownloadResume.message(received: 5_000_000, total: 0) == "Downloading 5 MB")
+        // Rounded as everywhere: G-Player Wine and its extras are 287,881,528 bytes, which is 288 MB and ends as "288 of 288".
+        #expect(DownloadResume.message(received: 287_881_528, total: 287_881_528) == "Downloading 288 of 288 MB")
+        #expect(DownloadResume.message(received: 143_990_000, total: 287_881_528) == "Downloading 144 of 288 MB")
+        #expect(DownloadResume.message(received: 600_000, total: 98_000_000) == "Downloading 1 of 98 MB")
     }
 }
 
@@ -196,6 +204,33 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         try await FileDownloader.download(url, to: file, resume: true, configuration: StubServer.configuration) { _, _ in }
         #expect(try Data(contentsOf: file) == data)
         #expect(StubServer.ranges(of: url) == ["bytes=6000-", nil])
+    }
+
+    @Test func aPartThatIsAllOfTheFileIsKeptWithoutDownloadingAgain() async throws {
+        let tmp = TempFolder()
+        let data = bytes(5000)
+        let url = StubServer.serve(.init(data: data))
+        let file = tmp.url.appendingPathComponent("f.bin")
+        try data.write(to: FileDownloader.partialFile(for: file))
+        try await FileDownloader.download(url, to: file, resume: true, configuration: StubServer.configuration) { _, _ in }
+        #expect(try Data(contentsOf: file) == data)
+        #expect(!FileManager.default.fileExists(atPath: FileDownloader.partialFile(for: file).path))
+        #expect(StubServer.ranges(of: url) == ["bytes=5000-"])                        // asked once, nothing was sent
+    }
+
+    @Test func aDownloadThatCantGoOnLeavesNoPartBehind() async throws {
+        let tmp = TempFolder()
+        let file = tmp.url.appendingPathComponent("f.bin")
+        let dropped = StubServer.serve(.init(data: bytes(5000), drops: 1, dropAfter: 1500))
+        await #expect(throws: (any Error).self) {
+            try await FileDownloader.download(dropped, to: file, configuration: StubServer.configuration) { _, _ in }
+        }
+        let gone = StubServer.serve(.init(data: Data(), status: 404))
+        await #expect(throws: ShellError.self) {
+            try await FileDownloader.download(gone, to: file, configuration: StubServer.configuration) { _, _ in }
+        }
+        // Not a download that goes on (an installer): its part would be a file nobody ever picks up.
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tmp.url.path).isEmpty)
     }
 
     @Test func anErrorStatusIsAnErrorAndLeavesNoFile() async throws {
@@ -262,6 +297,28 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         let ranges = StubServer.ranges(of: url)
         #expect(ranges.count == 3 && ranges[0] == nil && ranges[1] == "bytes=7000-" && ranges[2] == "bytes=14000-")
         #expect(notes.get().contains("The connection dropped. Trying again…"))
+    }
+
+    @Test func aWholePartIsCheckedAgainstItsChecksumNotDownloadedAgain() async throws {
+        let tmp = TempFolder()
+        let data = bytes(10_000)
+        let url = StubServer.serve(.init(data: data))
+        let file = tmp.url.appendingPathComponent("engine.tar.xz")
+        try data.write(to: FileDownloader.partialFile(for: file))
+        try await manager(tmp).fetch(item(data, url: url), to: file, configuration: StubServer.configuration) { _, _ in }
+        #expect(try Data(contentsOf: file) == data)
+        #expect(StubServer.ranges(of: url) == ["bytes=10000-"])
+    }
+
+    @Test func aWholePartThatIsTheWrongFileIsDownloadedFromTheStart() async throws {
+        let tmp = TempFolder()
+        let data = bytes(10_000)
+        let url = StubServer.serve(.init(data: data))
+        let file = tmp.url.appendingPathComponent("engine.tar.xz")
+        try bytes(10_000, seed: 9).write(to: FileDownloader.partialFile(for: file))      // as long as the file, but not it
+        try await manager(tmp).fetch(item(data, url: url), to: file, configuration: StubServer.configuration) { _, _ in }
+        #expect(try Data(contentsOf: file) == data)
+        #expect(StubServer.ranges(of: url) == ["bytes=10000-", nil])
     }
 
     @Test func nothingCameAtAllIsAnErrorAtOnce() async throws {

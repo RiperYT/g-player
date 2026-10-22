@@ -21,6 +21,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
     private var written: Int64 = 0
     private var total: Int64 = 0
     private var failure: Error?
+    private var alreadyComplete = false
     private var lastReport = Date.distantPast
 
     /// The server wouldn't give the rest of the file (`DownloadResume.Answer.rangeRefused`).
@@ -48,14 +49,20 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         let partial = partialFile(for: destination)
         if !resume { try? FileManager.default.removeItem(at: partial) }
         var skip = resume ? Files.size(of: partial) : 0
-        while true {
-            do {
-                try await attempt(url, to: destination, skip: skip, configuration: configuration, progress: progress)
-                return
-            } catch is RangeRefused where skip > 0 {
-                try? FileManager.default.removeItem(at: partial)        // what is there doesn't fit the server's file
-                skip = 0
+        do {
+            while true {
+                do {
+                    try await attempt(url, to: destination, skip: skip, configuration: configuration, progress: progress)
+                    return
+                } catch is RangeRefused where skip > 0 {
+                    try? FileManager.default.removeItem(at: partial)    // what is there doesn't fit the server's file
+                    skip = 0
+                }
             }
+        } catch {
+            // Only a download that can go on keeps its part: one that can't would leave the file for ever.
+            if !resume { try? FileManager.default.removeItem(at: partial) }
+            throw error
         }
     }
 
@@ -122,6 +129,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
                 FileManager.default.createFile(atPath: partial.path, contents: nil)       // empties what was there
                 handle = try FileHandle(forWritingTo: partial)
             } catch { failure = error; return completionHandler(.cancel) }
+        case .complete:
+            alreadyComplete = true                                       // all of it is there: nothing to download
+            return completionHandler(.cancel)
         case .rangeRefused:
             failure = RangeRefused()
             return completionHandler(.cancel)
@@ -151,6 +161,15 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         try? handle?.close()
         handle = nil
         if let failure { return finish(failure) }
+        if alreadyComplete {
+            do {
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.moveItem(at: partial, to: destination)
+                progress(skip, skip)
+                finish(nil)
+            } catch { finish(error) }
+            return
+        }
         if let error { return finish((error as? URLError)?.code == .cancelled ? CancellationError() : error) }
         guard written >= total else {
             return finish(URLError(.networkConnectionLost))              // the server stopped short: the rest is asked for again

@@ -55,12 +55,27 @@ private func library(_ names: [String]) -> LibraryState {
         let garbage = Data(#"{"version": 1, "spaces": [{"name": "Main""#.utf8)             // cut off in the middle
         try garbage.write(to: store.paths.libraryFile)
         guard case .blocked(let problem) = store.open(expectingLibrary: true) else { Issue.record("not blocked"); return }
-        #expect(problem.kind == .unreadable)
+        #expect(problem.kind == .damaged)
         let copy = try #require(problem.brokenCopy)
         #expect(copy.lastPathComponent.hasPrefix("library.json.broken-") && copy.deletingLastPathComponent() == store.paths.root)
         #expect(try Data(contentsOf: copy) == garbage)
         #expect(try Data(contentsOf: store.paths.libraryFile) == garbage)
         #expect(!problem.reason.isEmpty)
+    }
+
+    @Test func aFileTheSystemWontLetBeReadIsNotCalledDamaged() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.save(state(named: "Main"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: store.paths.libraryFile.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: store.paths.libraryFile.path) }
+        guard case .blocked(let problem) = store.open(expectingLibrary: true) else { Issue.record("not blocked"); return }
+        // The system's short reason, without "The file “library.json” couldn’t be opened because" (the screen names the file).
+        #expect(problem.kind == .unreadable && !problem.reason.isEmpty && !problem.reason.contains("library.json"))
+        // Nothing to copy: the file can't be opened. No copy is made, and the file is as it was.
+        #expect(problem.brokenCopy == nil)
+        let names = try FileManager.default.contentsOfDirectory(atPath: store.paths.root.path)
+        #expect(!names.contains { $0.hasPrefix("library.json.broken-") })
     }
 
     @Test func tryingAgainOnTheSameFileKeepsOneCopy() throws {
@@ -228,5 +243,148 @@ private func library(_ names: [String]) -> LibraryState {
         #expect(moved.spaces[0].id == main.id && moved.spaces[0].name == "Main")
         #expect(moved.games == library.games)
         #expect(library.movingLibrary(from: old, to: old) == library)
+    }
+
+    @Test func aSpaceFoundElsewhereStaysWhereItIsAlsoInsideTheOldFolder() {
+        // A library in ~/Games with a prefix of the user's own next to it: moving the library doesn't take the prefix along.
+        let old = URL(fileURLWithPath: "/Users/me/Games")
+        let new = URL(fileURLWithPath: "/Volumes/Big/Games")
+        let own = Space(name: "Own", path: "/Users/me/Games/MyPrefix", engineID: "e", origin: .external)
+        let deeper = Space(name: "Deeper", path: "/Users/me/Games/Spaces/Found", engineID: "e", origin: .external)
+        let made = Space(name: "Main", path: "/Users/me/Games/Spaces/Main", engineID: "e", origin: .managed)
+        // A managed space that isn't under Spaces isn't one G-Player made there.
+        let odd = Space(name: "Odd", path: "/Users/me/Games/Elsewhere/Odd", engineID: "e", origin: .managed)
+        var library = LibraryState()
+        library.spaces = [own, deeper, made, odd]
+        let moved = library.movingLibrary(from: old, to: new)
+        #expect(moved.spaces[0] == own && moved.spaces[1] == deeper && moved.spaces[3] == odd)
+        #expect(moved.spaces[2].path == "/Volumes/Big/Games/Spaces/Main")
+    }
+}
+
+
+/// Start Empty must not cost the last good library: the empty one is the first thing the saves rotate into `.previous`.
+@Suite struct LibraryStartEmptyTests {
+    private func store(_ tmp: TempFolder) -> LibraryStore {
+        LibraryStore(paths: LibraryPaths(root: tmp.url.appendingPathComponent("Library", isDirectory: true)))
+    }
+
+    private func names(_ store: LibraryStore) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: store.paths.root.path).filter { $0.hasPrefix("library.json") }.sorted()
+    }
+
+    @Test func theOldLibraryIsStillOnDiskAfterAnEmptyOneWasStartedAndChanged() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        let old = library(["One", "Two"])
+        try store.save(library(["One"]))
+        try store.save(old)                                        // library.json = old, previous = the one before
+        try FileManager.default.removeItem(at: store.paths.libraryFile)            // the file is lost
+        guard case .blocked(let problem) = store.open(expectingLibrary: true) else { Issue.record("not blocked"); return }
+        #expect(problem.kind == .fileMissing && problem.previousIsUsable)
+        // Start Empty: the previous copy is kept first, then the empty library is written, then it changes.
+        let kept = try #require(try store.keepPreviousBeforeStartingEmpty())
+        try store.save(LibraryState())
+        try store.save(library(["New"]))
+        try store.save(library(["New", "Newer"]))
+        #expect(kept.lastPathComponent.hasPrefix("library.json.before-empty-"))
+        // Rotation has moved on, and the copy is still the library from before.
+        let previous = try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: store.paths.previousFile))
+        #expect(previous == library(["New"]))
+        #expect(try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: kept)) == library(["One"]))
+    }
+
+    @Test func aDamagedFilesLibraryIsKeptTwice() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.save(library(["One"]))
+        try store.save(library(["One", "Two"]))                    // previous = One
+        try Data("garbage".utf8).write(to: store.paths.libraryFile)
+        guard case .blocked(let problem) = store.open(expectingLibrary: true) else { Issue.record("not blocked"); return }
+        let broken = try #require(problem.brokenCopy)
+        let kept = try #require(try store.keepPreviousBeforeStartingEmpty())
+        try store.save(LibraryState())
+        try store.save(library(["New"]))
+        // Both the damaged file and the previous copy are still there, under names no save writes.
+        #expect(try Data(contentsOf: broken) == Data("garbage".utf8))
+        #expect(try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: kept)) == library(["One"]))
+        #expect(try names(store).filter { $0 != "library.json" && $0 != "library.json.previous" }.count == 2)
+    }
+
+    @Test func tryingAgainOrStartingTwiceKeepsOneCopy() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.save(library(["One"]))
+        try store.save(library(["One", "Two"]))
+        let first = try store.keepPreviousBeforeStartingEmpty()
+        let second = try store.keepPreviousBeforeStartingEmpty(now: Date().addingTimeInterval(60))
+        #expect(first == second)
+        #expect(try names(store).filter { $0.hasPrefix("library.json.before-empty-") }.count == 1)
+    }
+
+    @Test func withNoPreviousCopyThereIsNothingToKeepAndNothingIsWritten() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.paths.createFolders()
+        #expect(try store.keepPreviousBeforeStartingEmpty() == nil)
+        #expect(try names(store).isEmpty)
+    }
+
+    @Test func theCopyIsNamedByTheSecond() {
+        let name = LibraryStore.dated(LibraryStore.beforeEmptyPrefix, at: Date(timeIntervalSince1970: 1_792_000_000), in: TimeZone(identifier: "UTC")!)
+        #expect(name == "library.json.before-empty-2026-10-14-174640")
+    }
+}
+
+/// The library screen's words make promises; these hold them.
+@Suite struct LibraryProblemWordsTests {
+    private let root = URL(fileURLWithPath: NSHomeDirectory() + "/Games/G-Player")
+    private let copy = URL(fileURLWithPath: NSHomeDirectory() + "/Games/G-Player/library.json.broken-2026-10-23-142530")
+
+    @Test func theTitleNamesTheLibraryWithTheHomeFolderAbbreviated() {
+        #expect(LibraryProblem(kind: .folderMissing, root: root).title == "G-Player can't read your library at ~/Games/G-Player")
+    }
+
+    @Test func aFileTheSystemWontOpenIsNotCalledDamagedAndADamagedOneIs() {
+        let denied = LibraryProblem(kind: .unreadable, root: root, reason: "you don’t have permission")
+        #expect(denied.explanation.contains("can't be opened") && denied.explanation.contains("permission"))
+        #expect(!denied.explanation.contains("is damaged"))
+        let damaged = LibraryProblem(kind: .damaged, root: root, reason: "spaces[0].engineID: missing", brokenCopy: copy)
+        #expect(damaged.explanation.contains("is damaged") && damaged.explanation.contains("spaces[0].engineID: missing"))
+        #expect(damaged.explanation.contains("library.json.broken-2026-10-23-142530"))
+    }
+
+    @Test func eachButtonThatIsThereIsExplained() {
+        let missing = LibraryProblem(kind: .folderMissing, root: root)
+        let help = missing.buttonHelp.joined(separator: "\n")
+        #expect(help.contains("Try Again") && help.contains("Locate…") && help.contains("choose the folder your library is in now"))
+        #expect(help.contains("Start Empty") && help.contains("files stay on your disk"))
+        #expect(!help.contains("Use Previous Copy"))
+        let withPrevious = LibraryProblem(kind: .fileMissing, root: root, previousIsUsable: true)
+        let previousHelp = withPrevious.buttonHelp.joined(separator: "\n")
+        #expect(previousHelp.contains("Use Previous Copy") && previousHelp.contains("before its last change"))
+        // No Start Empty line where the button isn't offered.
+        let denied = LibraryProblem(kind: .unreadable, root: root, reason: "x")
+        #expect(!denied.buttonHelp.joined().contains("Start Empty"))
+    }
+
+    @Test func startEmptyIsOfferedOnlyWhereNothingWouldBeLost() {
+        #expect(LibraryProblem(kind: .folderMissing, root: root).canStartEmpty)
+        #expect(LibraryProblem(kind: .fileMissing, root: root, previousIsUsable: true).canStartEmpty)
+        #expect(LibraryProblem(kind: .damaged, root: root, reason: "x", brokenCopy: copy).canStartEmpty)
+        #expect(!LibraryProblem(kind: .damaged, root: root, reason: "x", brokenCopy: nil).canStartEmpty)    // the file couldn't be kept
+        #expect(!LibraryProblem(kind: .unreadable, root: root, reason: "x").canStartEmpty)
+    }
+
+    @Test func startEmptyKeepsItsPromises() {
+        // The spaces' files stay on disk, and the old library is kept under the names the code really uses.
+        let damaged = LibraryProblem(kind: .damaged, root: root, reason: "x", brokenCopy: copy).startEmptyConsequence
+        #expect(damaged.contains("files stay on your disk") && damaged.contains("library.json.broken-2026-10-23-142530"))
+        #expect(damaged.contains("library.json.before-empty-"))
+        let fileMissing = LibraryProblem(kind: .fileMissing, root: root, previousIsUsable: true).startEmptyConsequence
+        #expect(fileMissing.contains("files stay on your disk") && fileMissing.contains("library.json.before-empty-"))
+        let folder = LibraryProblem(kind: .folderMissing, root: root).startEmptyConsequence
+        #expect(folder.contains("~/Games/G-Player") && folder.contains("aren't deleted") && folder.contains("Try Again"))
+        #expect(LibraryStore.beforeEmptyPrefix == "library.json.before-empty-")
     }
 }

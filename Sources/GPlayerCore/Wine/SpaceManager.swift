@@ -116,10 +116,20 @@ public struct SpaceManager: Sendable {
         return copy
     }
 
-    /// Deletes a managed space and everything in it.
-    public func delete(_ space: Space) throws {
+    /// Deletes a managed space and everything in it: into the Trash, or for good with `permanently` (a space G-Player made a
+    /// moment ago for something that came to nothing, which has only Windows in it and isn't worth a Trash full of Wine).
+    public func delete(_ space: Space, permanently: Bool = false) throws {
         guard space.origin == .managed else { return }
-        try FileManager.default.trashItem(at: space.url, resultingItemURL: nil)
+        if permanently { try FileManager.default.removeItem(at: space.url) }
+        else { try FileManager.default.trashItem(at: space.url, resultingItemURL: nil) }
+    }
+
+    /// True when no game files are in the space: `C:\Games` is empty or isn't there. A space made for an Add Game that was
+    /// stopped or failed has only Windows in it.
+    public static func holdsNoGames(_ space: Space) -> Bool {
+        let games = space.driveC.appendingPathComponent("Games", isDirectory: true)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: games.path)) ?? []
+        return names.allSatisfy { $0 == ".DS_Store" }
     }
 
     /// True when `url` looks like a Wine prefix.

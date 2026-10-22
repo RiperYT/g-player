@@ -162,3 +162,16 @@ import Testing
         #expect(!CompatResolver.oldMoltenVK.contains("Wine Staging 11.18 it downloads"))
     }
 }
+
+
+/// A first run whose download the user stopped waits for the engine; it says so, and doesn't make the spaces on another one.
+@Suite struct FirstRunOnHoldTests {
+    @Test func theNoteSaysWhatIsOnHoldAndHowItGoesOn() {
+        let both = FirstRunSetup.pausedNote(pendingSpaces: ["main", "steam"])
+        #expect(both.title == "Setup is on hold")
+        #expect(both.text.contains("setting up Main and Steam is on hold"))
+        #expect(both.text.contains("Settings › Engines") && both.text.contains("next time G-Player opens"))
+        #expect(FirstRunSetup.pausedNote(pendingSpaces: ["main"]).text.contains("setting up Main is on hold"))
+        #expect(FirstRunSetup.pausedNote(pendingSpaces: []).text.contains("the first spaces"))
+    }
+}
