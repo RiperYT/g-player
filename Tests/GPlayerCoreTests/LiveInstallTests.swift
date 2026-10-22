@@ -8,6 +8,20 @@ import Testing
 ///     GPLAYER_LIVE=1 swift test --filter LiveInstallTests
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["GPLAYER_LIVE"] == "1"), .serialized, .timeLimit(.minutes(20)))
 struct LiveInstallTests {
+    /// What the app does at start: the installed Wine Staging gets G-Player's fixed files, and keeps Gcenx's.
+    @Test func theInstalledEngineGetsItsFixes() throws {
+        let paths = LibraryPaths(root: LibraryPaths.defaultRoot)
+        let engine = try #require(EngineManager(paths: paths).engine(EngineCatalog.wineStaging))
+        let outcomes = EngineFixes.apply(to: engine)
+        #expect(outcomes.count == EngineFixes.all.count)
+        #expect(outcomes.allSatisfy { $0 == .applied || $0 == .alreadyApplied }, "\(outcomes)")
+        for fix in EngineFixes.all {
+            let file = engine.wineRoot.appendingPathComponent(fix.path)
+            #expect(try Files.sha256(of: file) == fix.fixedSHA256, "\(fix.path)")
+            #expect(try Files.sha256(of: file.appendingPathExtension("gcenx")) == fix.originalSHA256, "\(fix.path)")
+        }
+    }
+
     @Test func baseComponentsInstallIntoANewSpace() async throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("gplayer-live-\(UUID().uuidString)", isDirectory: true)

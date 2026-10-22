@@ -117,8 +117,12 @@ public enum CompatResolver {
         }
     }
 
-    /// Why 32-bit DirectX 10/11 games don't start, for notes and diagnoses.
-    public static let no32BitDirectX11 = "They need DirectX 11 in 32 bits. On macOS, DXVK can't get 32-bit Vulkan memory from MoltenVK, and WineD3D can't give DirectX 11 on Apple's OpenGL 4.1, so Windows components won't help."
+    /// Why a 32-bit DirectX 10/11 game fails when the engine's MoltenVK is older than 1.4.1 (G-Player updates it in
+    /// the Wine Staging it downloads, see `EngineFixes.moltenVK`).
+    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. G-Player updates it only in the Wine Staging 11.18 it downloads, over the exact file it knows. Windows components won't help; a space on that engine will."
+
+    /// Why an Unreal game built for DirectX 12 alone doesn't start on an engine without D3DMetal.
+    public static let onlyDirect3D12 = "The game is built for DirectX 12 alone, which Wine Staging can't give on a Mac, and it stops at start when asked for DirectX 11. Apple's D3DMetal can run it: add its program to a space on Apple's toolkit (Settings › Engines) and start it there. A Steam game then runs without Steam, if it allows that (offline play)."
 
     public static func resolve(_ input: Input) -> CompatPlan {
         let a = input.analysis ?? GameAnalysis()
@@ -185,8 +189,12 @@ public enum CompatResolver {
             }
         case .unreal:
             if newest == .d3d12 && plan.backend != .d3dmetal {
-                plan.arguments.append("-dx11")
-                plan.notes.append(CompatNote(.applied, "Starts with DirectX 11", "Unreal Engine can fall back from DirectX 12."))
+                if a.onlyDirect3D12 {
+                    plan.notes.append(CompatNote(.blocker, "Needs DirectX 12", Self.onlyDirect3D12))
+                } else {
+                    plan.arguments.append("-dx11")
+                    plan.notes.append(CompatNote(.applied, "Starts with DirectX 11", "Unreal Engine can fall back from DirectX 12."))
+                }
             }
             if window == .windowed { plan.arguments.append("-windowed") }
             if window == .fullscreen { plan.arguments.append("-fullscreen") }
@@ -208,13 +216,11 @@ public enum CompatResolver {
             plan.notes.append(CompatNote(.warning, "Needs DirectX 12",
                 "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in its settings."))
         }
-        if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, input.engine.kind == .wineStaging {
-            if a.engine == .unity {
-                plan.notes.append(CompatNote(.blocker, "32-bit Unity games don't run on a Mac yet", Self.no32BitDirectX11))
-            } else {
-                plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : d3d == .d3d11 ? "11" : "12") game",
-                    "Most of these don't start with Wine on macOS yet. Games that can also use an older DirectX may work in Compatible mode."))
-            }
+        // 32-bit DirectX 10/11 runs through DXVK only: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1.
+        if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, d3d < .d3d12,
+           input.engine.kind == .wineStaging, plan.backend == .wined3d {
+            plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : "11") needs DXVK",
+                "Wine's own renderer can't give it on Apple's OpenGL, so the game most likely won't start this way. The Recommended profile uses DXVK."))
         }
         // A store starts and updates its own launchers, so only games added by hand need them in the space.
         if !input.isStoreGame {

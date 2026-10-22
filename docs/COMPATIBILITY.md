@@ -130,12 +130,34 @@ title you chose) is left out of the reading, so a game folder called "BattlEye" 
 
 ## Fixes in the engine itself
 
-Some problems sit in Wine, not in the game. G-Player keeps a small set of fixes built from Wine's source
-(`tools/wine-patches`) and puts them into the Wine it downloaded, only over the exact file they were made for:
+Some problems sit in Wine, not in the game. G-Player keeps a small set of fixed files and puts them into the Wine
+it downloaded, only over the exact file they were made for, keeping the original as `<file>.gcenx`:
 
-- `wow64cpu.dll` (Wine Staging 11.18): under Rosetta 2, Wine's far jumps between 32- and 64-bit code sometimes
-  don't switch the CPU mode, and 32-bit programs die in a cascade of access violations (WineHQ 60494). The fixed
-  file uses a far call and `lretq` instead, as CrossOver does. The original is kept as `wow64cpu.dll.gcenx`.
+- `wow64cpu.dll` (Wine Staging 11.18), built from Wine's source (`tools/wine-patches`): under Rosetta 2, Wine's far
+  jumps between 32- and 64-bit code sometimes don't switch the CPU mode, and 32-bit programs die in a cascade of
+  access violations (WineHQ 60494). The fixed file uses a far call and `lretq` instead, as CrossOver does.
+- `libMoltenVK.dylib` (Wine Staging 11.18): MoltenVK 1.4.2 from the Khronos release, unchanged
+  (`scripts/fetch-moltenvk.sh`), in place of 1.4.0. A 32-bit program's Vulkan memory has to sit below 4 GB, so
+  Wine allocates it itself and hands it to Vulkan as host memory (`VK_EXT_external_memory_host`). MoltenVK 1.4.0
+  refused buffers and images made for such memory, so DXVK couldn't create a device and every 32-bit
+  DirectX 10/11 game failed at start. 1.4.1 and later accept them.
+
+Unreal games with DirectX 12 start with `-dx11` on an engine without D3DMetal, since most can fall back. A game cooked
+for DirectX 12 alone can't (it stops with "Unable to launch with RHI 'D3D11' since the project is not configured to
+support it"). G-Player tells them apart by the shader files the game ships: names like
+`ShaderArchive-<Project>-PCD3D_SM6-PCD3D_SM6.ushaderbytecode` in the `.utoc` table of contents or
+`GlobalShaderCache-PCD3D_SM6.bin` in the `.pak` index, with no `PCD3D_SM5` ones. Such a game gets no `-dx11` and a
+"Needs DirectX 12" note: it runs on Apple's D3DMetal, in a space on Apple's toolkit. An encrypted pak index names
+nothing, and then the game keeps the fallback.
+
+32-bit DirectX 10/11 needs DXVK: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1, so the Compatible
+profile warns about it.
+
+A Unity game whose earlier start failed can save a screen size of 0×0 and crash on every start after
+("Failed to create RenderTexture (0 x 0 …)"). When the game's settings in the space hold 0×0, G-Player passes the
+main display's size (`-screen-width`, `-screen-height`; 80% of it when the game runs in a window, and pixels rather
+than points in Retina mode), which Unity then saves. The space isn't changed. Wine writes the registry to disk every
+30 seconds, so a start right after the failed one can still see the old file.
 
 ## Spaces from other apps
 

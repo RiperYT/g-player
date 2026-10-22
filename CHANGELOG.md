@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.5] - 2026-10-22
+
+- **32-bit DirectX 10/11 games can start.** 32-bit Unity games such as Overcooked and other 32-bit DirectX 10/11
+  games used to fail at start: MoltenVK 1.4.0, which Wine Staging 11.18 ships, refused the memory Wine sets up for
+  32-bit programs. G-Player now puts the unchanged MoltenVK 1.4.2 from the Khronos release into the engine
+  (1.4.1 fixed it), keeping the original as `libMoltenVK.dylib.gcenx`. The "32-bit Unity games don't run on a Mac
+  yet" stop is gone; the Compatible profile warns instead, since WineD3D can't give DirectX 10/11 on Apple's OpenGL.
+  Checked so far: test programs (32- and 64-bit, shaders and presenting) and two 32-bit Unity games, which showed
+  their first screens.
+- **Unity games that saved a 0×0 screen start again.** A failed start can leave a Unity game's settings at 0×0, and
+  it then crashed on every start. G-Player passes the display's size when it finds that (80% of it for a window).
+- **Unreal games built for DirectX 12 alone aren't broken by `-dx11` any more.** G-Player added `-dx11` to every
+  Unreal game with DirectX 12, and one cooked without DirectX 11 shaders stops at start with "Unable to launch with
+  RHI 'D3D11'". G-Player now reads the shader file names in the game's paks (`PCD3D_SM6` only) and, on an engine
+  without D3DMetal, says the game needs DirectX 12 and how to run it on Apple's D3DMetal instead.
+- Launch options G-Player adds no longer lose their values when you set some of your own (`-screen-fullscreen 0`
+  stayed whole only if you had no `0` among your options).
+- The 32-bit note in the inspector no longer says these games don't start.
+- Files G-Player puts into the engine no longer carry the downloaded app's quarantine mark.
+
 ## [0.3.4] - 2026-10-22
 
 - **A launch that fails says so in the middle of the window**, with what happened and the one thing to try, and

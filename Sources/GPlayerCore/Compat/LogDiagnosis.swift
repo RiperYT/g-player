@@ -37,9 +37,8 @@ public enum LogDiagnosis {
     ///   - seconds: how long the game ran.
     ///   - profile: the profile it ran with, so the advice moves on to the next one.
     ///   - installed: the components already in the space, so the common set is offered only while some are missing.
-    ///   - is32Bit: a 32-bit program, for which a DirectX 11 failure has no remedy on macOS yet.
     public static func diagnose(log: String, exitStatus: Int32, seconds: Double, profile: LaunchProfile,
-                                installed: Set<String> = [], is32Bit: Bool = false) -> [Diagnosis] {
+                                installed: Set<String> = []) -> [Diagnosis] {
         let lower = withoutHeader(log).lowercased()
         var results: [Diagnosis] = []
 
@@ -72,9 +71,12 @@ public enum LogDiagnosis {
         }
 
         if graphicsFailures.contains(where: lower.contains) {
-            if is32Bit && (lower.contains("d3d11") || lower.contains("dx11") || lower.contains("directx 11")) {
-                results.append(Diagnosis(kind: .graphics, title: "32-bit DirectX 11 doesn't run on a Mac yet",
-                                         detail: CompatResolver.no32BitDirectX11, remedy: .none))
+            // MoltenVK before 1.4.1 refuses the host-memory buffers and images Wine makes for 32-bit programs. (Newer
+            // ones still have a similar vkAllocateMemory message, "handle types", which means something else.)
+            if lower.contains("vkcreatebuffer(): only external memory handle type ")
+                || lower.contains("vkcreateimage(): only external memory handle type ") {
+                results.append(Diagnosis(kind: .graphics, title: "This engine can't run 32-bit DirectX 11",
+                                         detail: CompatResolver.oldMoltenVK, remedy: .none))
             } else {
                 results.append(Diagnosis(kind: .graphics, title: "Graphics didn't start",
                                          detail: "The game couldn't create its graphics device.",

@@ -26,7 +26,7 @@ import Testing
         let overcooked = try #require(matches.first)
         #expect(matches.count == 1)
         #expect(overcooked.id == "gplayer-overcooked")
-        #expect(overcooked.macStatus == .broken)
+        #expect(overcooked.macStatus == .issues)          // reaches its menu; gameplay not checked
         #expect(overcooked.verifiedOnMac)
         #expect(overcooked.source == "g-player")
         #expect(overcooked.notes?.contains("32-bit Unity 5.5") == true)

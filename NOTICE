@@ -28,6 +28,22 @@ of CodeWeavers' CrossOver (CW HACK 20760, also LGPL). Wine's license is in
 Sources/GPlayerCore/Resources/licenses/Wine-COPYING.LIB.txt. That tarball, the patch and the build script are the
 complete corresponding source for the file.
 
+G-Player includes MoltenVK 1.4.2 unchanged, Sources/GPlayerCore/Resources/engine-fixes/libMoltenVK.dylib, from the
+Khronos Group's release (https://github.com/KhronosGroup/MoltenVK/releases/tag/v1.4.2, MoltenVK-macos.tar, SHA-256
+f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e), fetched by scripts/fetch-moltenvk.sh:
+  MoltenVK, Copyright (c) 2015-2026 The Brenwill Workshop Ltd., Apache License 2.0.
+It contains, built in:
+  - SPIRV-Cross, Copyright 2015-2021 Arm Limited and contributors, Apache License 2.0 (offered as Apache-2.0 OR MIT;
+    used under Apache-2.0).
+  - SPIRV-Tools, Copyright its authors (The Khronos Group Inc., Google LLC and others), Apache License 2.0.
+  - SPIRV-Headers, Copyright (c) 2015-2024 The Khronos Group Inc., under the MIT-style license in
+    SPIRV-Headers-LICENSE.txt.
+  - Vulkan-Headers, Copyright The Khronos Group Inc., Apache License 2.0 (offered as Apache-2.0 OR MIT).
+  - cereal, Copyright (c) 2013-2022, Randolph Voorhies, Shane Grant, BSD 3-Clause License.
+The licenses are in Sources/GPlayerCore/Resources/licenses (MoltenVK-LICENSE.txt is the Apache License 2.0 text that
+covers MoltenVK, SPIRV-Cross, SPIRV-Tools and Vulkan-Headers; SPIRV-Headers-LICENSE.txt; cereal-LICENSE.txt), and in
+the app's Resources/licenses folder. scripts/fetch-moltenvk.sh fetches each of them, checked against a pinned SHA-256.
+
 Apple's Game Porting Toolkit and D3DMetal are never part of G-Player and are never downloaded by it.
 G-Player can use a copy the user installed themselves, only when they turn it on in Settings.
 

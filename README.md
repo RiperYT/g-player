@@ -39,8 +39,8 @@ install it), about 1 GB for the engine plus room for games.
 |---|---|
 | Steam client and most DirectX 9–11 games through DXVK | Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) |
 | Portable games, Unity, Unreal, Electron and RPG Maker games | Games that need a GPU driver Wine can't fake |
-| DirectX 12 through Apple's D3DMetal, if you installed it (see below) | 32-bit DirectX 10/11 games, often |
-| 32-bit games (with G-Player's Rosetta fix for Wine) | OpenGL games that need more than OpenGL 4.1 (macOS's limit) |
+| DirectX 12 through Apple's D3DMetal, if you installed it (see below) | DirectX 12 without Apple's D3DMetal |
+| 32-bit games, with G-Player's fixes for Wine; 32-bit DirectX 10/11 through DXVK since 0.3.5 (checked on a few Unity games so far) | OpenGL games that need more than OpenGL 4.1 (macOS's limit) |
 
 The first minutes of a game can stutter while shaders compile. That settles once the cache is built.
 

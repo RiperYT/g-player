@@ -23,6 +23,17 @@ import Testing
         #expect(plan.backend == .dxvk)
     }
 
+    @Test func anUnrealGameBuiltForDX12AloneIsNotForcedToDX11() {
+        let only12 = GameAnalysis(engine: .unreal, graphics: [.d3d11, .d3d12], architecture: .x64, onlyDirect3D12: true)
+        let staging = resolve(only12)
+        #expect(!staging.arguments.contains("-dx11"))
+        #expect(staging.blockers.contains { $0.title == "Needs DirectX 12" })
+        let metal = resolve(only12, engine: gptk)
+        #expect(metal.backend == .d3dmetal && metal.blockers.isEmpty && !metal.arguments.contains("-dx11"))
+        // One that has DirectX 11 shaders too still falls back.
+        #expect(resolve(GameAnalysis(engine: .unreal, graphics: [.d3d12], architecture: .x64)).arguments.contains("-dx11"))
+    }
+
     @Test func dx12UsesD3DMetalWhereAvailable() {
         let plan = resolve(GameAnalysis(engine: .unreal, graphics: [.d3d12], architecture: .x64), engine: gptk)
         #expect(plan.backend == .d3dmetal)
@@ -66,28 +77,41 @@ import Testing
         #expect(plan.blockers.count == 2)
     }
 
-    @Test func thirtyTwoBitDirectX11IsAWarningOnStaging() {
+    @Test func thirtyTwoBitDirectX11RunsThroughDXVK() {
+        // MoltenVK 1.4.2 (EngineFixes.moltenVK) gives 32-bit programs their Vulkan memory, so DXVK runs them.
         let plan = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86))
-        #expect(plan.warnings.contains { $0.title.contains("32-bit") })
-        let dotnet = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86, isDotNet: true))
+        #expect(plan.backend == .dxvk)
+        #expect(plan.blockers.isEmpty && !plan.warnings.contains { $0.title.contains("32-bit") })
+        // Unity, 32-bit, only opengl32 in its imports (Overcooked and others): DirectX 11 in 32 bits.
+        let unity = resolve(GameAnalysis(engineName: "Unity", engine: .unity, graphics: [.opengl], architecture: .x86))
+        #expect(unity.blockers.isEmpty && unity.backend == .dxvk)
+        #expect(!unity.arguments.contains("-force-d3d11"))
+    }
+
+    @Test func thirtyTwoBitDirectX11NeedsDXVKNotWineD3D() {
+        let compatible = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86), options: LaunchOptions(profile: .compatible))
+        #expect(compatible.warnings.contains { $0.title == "32-bit DirectX 11 needs DXVK" })
+        let custom = resolve(GameAnalysis(engine: .unity, graphics: [.d3d10], architecture: .x86),
+                             options: LaunchOptions(profile: .custom), user: .wined3d)
+        #expect(custom.warnings.contains { $0.title == "32-bit DirectX 10 needs DXVK" })
+        let dotnet = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x86, isDotNet: true), options: LaunchOptions(profile: .compatible))
         #expect(!dotnet.warnings.contains { $0.title.contains("32-bit") })
+        let modern = resolve(GameAnalysis(graphics: [.d3d11], architecture: .x64), options: LaunchOptions(profile: .compatible))
+        #expect(!modern.warnings.contains { $0.title.contains("32-bit") })
     }
 
-    @Test func thirtyTwoBitUnityIsABlocker() {
-        // Unity, 32-bit, only opengl32 in its imports (Overcooked and others): DirectX 11 in 32 bits, which macOS can't give.
-        let plan = resolve(GameAnalysis(engineName: "Unity", engine: .unity, graphics: [.opengl], architecture: .x86))
-        #expect(plan.blockers.contains { $0.title.contains("32-bit Unity") })
-        #expect(!plan.arguments.contains("-force-d3d11"))
-        let modern = resolve(GameAnalysis(engineName: "Unity", engine: .unity, graphics: [.d3d11], architecture: .x64))
-        #expect(!modern.blockers.contains { $0.title.contains("32-bit") })
-    }
-
-    @Test func a32BitDirectX11FailureSaysItWontHelpToInstallAnything() {
+    @Test func anOldMoltenVKSaysItWontHelpToInstallAnything() {
+        let dxvkLog = "[mvk-error] VK_ERROR_FEATURE_NOT_PRESENT: vkCreateBuffer(): Only external memory handle type VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLBUFFER_BIT_EXT and VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLHEAP_BIT_EXT are supported.\nerr:   D3D11CoreCreateDevice: Failed to create D3D11 device"
+        let found = LogDiagnosis.diagnose(log: dxvkLog, exitStatus: 1, seconds: 4, profile: .recommended)
+        #expect(found.first?.title == "This engine can't run 32-bit DirectX 11" && found.first?.remedy == Diagnosis.Remedy.none)
         let unityLog = "d3d11: failed to create device and context (80004005).\nFailed to initialize graphics.\nInitializeEngineGraphics failed"
-        let found = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: 4, profile: .recommended, is32Bit: true)
-        #expect(found.first?.title == "32-bit DirectX 11 doesn't run on a Mac yet" && found.first?.remedy == Diagnosis.Remedy.none)
-        let modern = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: 4, profile: .recommended)
-        #expect(modern.first?.remedy == .useProfile(.compatible))
+        let other = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: 4, profile: .recommended)
+        #expect(other.first?.title == "Graphics didn't start" && other.first?.remedy == .useProfile(.compatible))
+        // MoltenVK 1.4.2 still has a vkAllocateMemory message much like it ("handle types"), about something else.
+        let newer = "[mvk-error] VK_ERROR_INITIALIZATION_FAILED: vkAllocateMemory(): Only external memory handle types VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLBUFFER_BIT_EXT, VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLTEXTURE_BIT_EXT or VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLHEAP_BIT_EXT are supported.\nerr:   D3D11CoreCreateDevice: Failed to create D3D11 device"
+        #expect(LogDiagnosis.diagnose(log: newer, exitStatus: 1, seconds: 4, profile: .recommended).first?.title == "Graphics didn't start")
+        let image = "vkCreateImage(): Only external memory handle type VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLTEXTURE_BIT_EXT and VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLHEAP_BIT_EXT are supported.\nFailed to create D3D11 device"
+        #expect(LogDiagnosis.diagnose(log: image, exitStatus: 1, seconds: 4, profile: .recommended).first?.title == "This engine can't run 32-bit DirectX 11")
     }
 
     @Test func togglesBecomeRegistryAndEnvironment() {

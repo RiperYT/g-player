@@ -208,7 +208,7 @@ private func patched(_ data: Data, _ edit: (inout Data) -> Void) -> Data {
     // MARK: Note
 
     @Test func onlyThirtyTwoBitProgramsGetANote() {
-        let note = "This is a 32-bit Windows program. Many 32-bit games that use DirectX 10 or 11 don't start with Wine on macOS yet."
+        let note = "This is a 32-bit Windows program. If it uses DirectX 10 or 11, keep a profile with DXVK (Recommended): Wine's own renderer can't give those on a Mac."
         #expect(PEInfo.compatibilityNote(for: PEDetails(architecture: .x86, isDotNet: false, runsAs32Bit: true)) == note)
         #expect(PEInfo.compatibilityNote(for: PEDetails(architecture: .x86, isDotNet: true, runsAs32Bit: true)) == note)
         #expect(PEInfo.compatibilityNote(for: PEDetails(architecture: .x86, isDotNet: true, runsAs32Bit: false)) == nil)

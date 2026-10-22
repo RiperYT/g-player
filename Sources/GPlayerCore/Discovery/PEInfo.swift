@@ -73,7 +73,7 @@ public enum PEInfo {
     /// The warning for a program that starts as 32-bit, or nil.
     public static func compatibilityNote(for details: PEDetails) -> String? {
         details.runsAs32Bit
-            ? "This is a 32-bit Windows program. Many 32-bit games that use DirectX 10 or 11 don't start with Wine on macOS yet."
+            ? "This is a 32-bit Windows program. If it uses DirectX 10 or 11, keep a profile with DXVK (Recommended): Wine's own renderer can't give those on a Mac."
             : nil
     }
 

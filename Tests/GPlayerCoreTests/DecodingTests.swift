@@ -74,7 +74,7 @@ import Testing
     }
 
     @Test func theAnalyzerSaysWhichProgramItReadAndWhichVersionItIs() throws {
-        #expect(GameAnalysis.currentVersion == 3)          // 3: components from imports
+        #expect(GameAnalysis.currentVersion == 4)          // 3: components from imports; 4: Unreal games built for DirectX 12 alone
         let tmp = TempFolder()
         let exe = tmp.file("Game/Game.exe", contents: try Data(contentsOf: fixture("D3D11Fixture.exe")))
         let analysis = GameAnalyzer.analyze(executable: exe)

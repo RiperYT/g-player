@@ -120,7 +120,7 @@ public enum KnownEngine: String, Codable, Sendable, Hashable, CaseIterable {
 /// What a game is, worked out from its files. Cached on the game; recomputed when its program changes.
 public struct GameAnalysis: Codable, Sendable, Hashable {
     /// Bumped when the analyzer learns something new, so older cached results are worked out again.
-    public static let currentVersion = 3
+    public static let currentVersion = 4
 
     /// Engine name as the detection rules call it ("Unity", "Unreal", "Godot"…), if any.
     public var engineName: String?
@@ -138,13 +138,17 @@ public struct GameAnalysis: Codable, Sendable, Hashable {
     public var version: Int?
     /// Runtime components the game's files use (from their import tables) and don't bring along themselves.
     public var neededComponents: [String]
+    /// An Unreal game cooked for DirectX 12 alone (every shader archive is `PCD3D_SM6`), so `-dx11` stops it at start.
+    public var onlyDirect3D12: Bool
 
     public init(engineName: String? = nil, engine: KnownEngine? = nil, antiCheat: [String] = [], launchers: [String] = [],
                 graphics: [GraphicsAPI] = [], architecture: PEArchitecture? = nil, isDotNet: Bool = false,
-                programPath: String? = nil, version: Int? = nil, neededComponents: [String] = []) {
+                programPath: String? = nil, version: Int? = nil, neededComponents: [String] = [],
+                onlyDirect3D12: Bool = false) {
         self.engineName = engineName; self.engine = engine; self.antiCheat = antiCheat; self.launchers = launchers
         self.graphics = graphics; self.architecture = architecture; self.isDotNet = isDotNet
         self.programPath = programPath; self.version = version; self.neededComponents = neededComponents
+        self.onlyDirect3D12 = onlyDirect3D12
     }
 
     /// Every field is optional on disk, so a library written by an older or newer G-Player still opens.
@@ -160,6 +164,7 @@ public struct GameAnalysis: Codable, Sendable, Hashable {
         programPath = c.value(.programPath, default: nil)
         version = c.value(.version, default: nil)
         neededComponents = c.value(.neededComponents, default: [])
+        onlyDirect3D12 = c.value(.onlyDirect3D12, default: false)
     }
 
     /// The newest Direct3D the program imports, if any.

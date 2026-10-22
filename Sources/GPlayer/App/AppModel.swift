@@ -716,7 +716,6 @@ final class AppModel {
     private func diagnoseStoreGame(_ id: UUID, seconds: Double, opened: Bool, launched: Date) {
         guard let game = game(id), let space = space(game.spaceID), let paths else { return }
         let profile = game.launchOptions.profile
-        let is32Bit = game.analysis?.architecture == .x86
         Task {
             let (installed, unityLog) = await Task.detached { () -> (Set<String>, String?) in
                 let log = LogDiagnosis.unityLog(in: space, since: launched.addingTimeInterval(-5)).map { LogDiagnosis.tail(of: $0) }
@@ -725,7 +724,7 @@ final class AppModel {
             var found: [Diagnosis] = []
             if let unityLog {
                 found = LogDiagnosis.diagnose(log: unityLog, exitStatus: 1, seconds: max(seconds, 1), profile: profile,
-                                              installed: installed, is32Bit: is32Bit)
+                                              installed: installed)
             }
             if found.isEmpty {
                 var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
@@ -899,12 +898,11 @@ final class AppModel {
             let profile = record.profile
             let paths = self.paths
             let gameSpace = game(gameID).flatMap { self.space($0.spaceID) }
-            let is32Bit = game(gameID)?.analysis?.architecture == .x86
             Task.detached(priority: .utility) {
                 var installed: Set<String> = []
                 if let paths, let gameSpace { installed = RuntimeInstaller(paths: paths).installed(in: gameSpace) }
                 let found = LogDiagnosis.diagnose(log: LogDiagnosis.tail(of: log), exitStatus: status,
-                                                  seconds: seconds, profile: profile, installed: installed, is32Bit: is32Bit)
+                                                  seconds: seconds, profile: profile, installed: installed)
                 await MainActor.run { self.report(found, for: gameID) }
             }
         }

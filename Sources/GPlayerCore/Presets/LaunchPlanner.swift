@@ -45,8 +45,9 @@ public enum LaunchPlanner {
     ///   - fixes: known fixes that match the game (from `GameFixDatabase`).
     ///   - programNames: the file names of the programs the game starts, when the caller has them (the app keeps them
     ///     for Steam games). Nil: a Steam game's are looked for in its folder, a program the user added is its own .exe.
+    ///   - screen: the screen size for a Unity game that saved 0×0 (see `UnityScreen`); the main display's when nil.
     public static func plan(for game: Game, in space: Space, fixes: [GameFix] = [], verboseLogs: Bool = false,
-                            programNames: [String]? = nil) throws -> LaunchPlan {
+                            programNames: [String]? = nil, screen: CGSize? = nil) throws -> LaunchPlan {
         let preset = AppPresets.preset(space.presetID)
         let engine = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
         let isLauncher = game.kind == .app
@@ -68,10 +69,24 @@ public enum LaunchPlanner {
         let backend = compat?.backend ?? game.graphics
         var registry = compat?.registry ?? []
 
-        /// Engine/fix arguments first, then the user's, without repeating ones the user already has.
+        /// Engine/fix arguments first, then the user's, without the options the user sets themselves.
         func gameArguments() -> [String] {
-            let extra = (compat?.arguments ?? []).filter { !game.arguments.contains($0) }
-            return extra + game.arguments
+            let ours = (compat?.arguments ?? []) + unityScreenArguments()
+            return Self.dropping(ours, setIn: game.arguments) + game.arguments
+        }
+        /// A screen size for a Unity game that saved 0×0.
+        func unityScreenArguments() -> [String] {
+            guard !isLauncher, game.analysis?.engine == .unity else { return [] }
+            // A program the user added is found from the space (the library may have moved since the analysis).
+            let program: URL? = switch game.source {
+            case .executable: game.executableURL(in: space)
+            case .steam, .epic: game.analysis?.programPath.map { URL(fileURLWithPath: $0) }
+            }
+            guard let program else { return [] }
+            let all = (compat?.arguments ?? []) + game.arguments
+            let fullscreen = all.lastIndex(of: "-screen-fullscreen").flatMap { all.indices.contains($0 + 1) ? all[$0 + 1] : nil }
+            return UnityScreen.repairArguments(program: program, space: space, windowed: fullscreen.map { $0 == "0" },
+                                               retina: game.launchOptions.retina, screen: screen)
         }
 
         switch game.source {
@@ -120,6 +135,17 @@ public enum LaunchPlanner {
                               tweaks: tweaks, chromiumHelpers: epic.chromiumHelpers, components: compat?.components ?? [],
                               registry: registry, compat: compat)
         }
+    }
+
+    /// `arguments` without the options `user` already has. An option is a `-flag` or `+command` with the values that
+    /// follow it (`-screen-fullscreen 0`), so a value is never left behind without its flag.
+    static func dropping(_ arguments: [String], setIn user: [String]) -> [String] {
+        var groups: [[String]] = []
+        for arg in arguments {
+            if arg.hasPrefix("-") || arg.hasPrefix("+") || groups.isEmpty { groups.append([arg]) }
+            else { groups[groups.count - 1].append(arg) }
+        }
+        return groups.filter { !user.contains($0[0]) }.flatMap { $0 }
     }
 
     /// The programs a game starts, for settings Wine keeps per program. Searching a Steam game's folder is slow, so it only

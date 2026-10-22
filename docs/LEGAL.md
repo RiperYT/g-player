@@ -10,6 +10,7 @@ so it can be published, forked or sold without surprises. It is a summary, not l
 | G-Player's own code, icon, shims | Apache-2.0 | |
 | `chromium-helper-wrapper.exe` (`tools/chromium-helper-wrapper/wrapper.c`) | Apache-2.0 | From MaPC's MacadeKit, Steale LLC. Credited in `NOTICE`. |
 | `engine-fixes/wow64cpu.dll` | LGPL-2.1+ (Wine) | Built from the Wine 11.18 source with `tools/wine-patches/wow64cpu-rosetta.patch` by `scripts/build-wow64cpu.sh`, which is its complete corresponding source. Wine's license text is in `Resources/licenses/`. Replaced in the user's engine only over the exact Gcenx file, which is kept. |
+| `engine-fixes/libMoltenVK.dylib` | Apache-2.0 (MoltenVK, SPIRV-Cross, SPIRV-Tools, Vulkan-Headers), MIT-style (SPIRV-Headers), BSD-3-Clause (cereal) | MoltenVK 1.4.2 from the Khronos release, unchanged; `scripts/fetch-moltenvk.sh` fetches it and the license texts, each checked against a pinned SHA-256. License texts in `Resources/licenses/`. Replaced in the user's engine only over the exact Gcenx file, which is kept. |
 | `GameFixes.json` | Data derived from umu-protonfixes, BSD-2-Clause; G-Player's own entries Apache-2.0 | License text in `Resources/licenses/`. |
 | `steamdb-rules.ini` | MIT, SteamDB FileDetectionRuleSets | Unchanged copy. License text in `Resources/licenses/`. |
 

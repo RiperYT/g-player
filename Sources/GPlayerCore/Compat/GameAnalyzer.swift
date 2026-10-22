@@ -29,6 +29,10 @@ public enum GameAnalyzer {
         analysis.launchers = names(found.matches["Launcher"])
         analysis.graphics = graphics(of: exe, root: root, files: files)
         analysis.neededComponents = neededComponents(of: exe, files: files)
+        if analysis.engine == .unreal {
+            let formats = unrealShaderFormats(root: root, files: files)
+            analysis.onlyDirect3D12 = formats.contains("PCD3D_SM6") && !formats.contains("PCD3D_SM5")
+        }
         if let details = PEInfo.details(ofExecutableAt: exe) {
             analysis.architecture = details.architecture
             analysis.isDotNet = details.isDotNet
@@ -66,6 +70,37 @@ public enum GameAnalyzer {
 
     private static func names(_ rules: Set<String>?) -> [String] {
         (rules ?? []).map(displayName).sorted()
+    }
+
+    // MARK: Unreal shader formats
+
+    /// The Direct3D shader formats an Unreal game was cooked for (`PCD3D_SM5` for DirectX 11, `PCD3D_SM6` for
+    /// DirectX 12), from the names of its shader files: `ShaderArchive-<Project>-PCD3D_SM6-PCD3D_SM6.ushaderbytecode`
+    /// in the IoStore table of contents (`.utoc`), `GlobalShaderCache-PCD3D_SM5.bin` in a `.pak` index, which sits at
+    /// the end of the file. Encrypted indexes show nothing, and then the game keeps the DirectX 11 fallback.
+    static func unrealShaderFormats(root: URL, files: [String]) -> Set<String> {
+        let containers = files.filter { path in
+            let lower = path.lowercased()
+            return lower.contains("content/paks/") && (lower.hasSuffix(".utoc") || lower.hasSuffix(".pak"))
+        }.prefix(32)
+        var found = Set<String>()
+        for path in containers {
+            guard let data = tail(of: root.appendingPathComponent(path), bytes: 64 << 20) else { continue }
+            for format in ["PCD3D_SM5", "PCD3D_SM6"] where !found.contains(format) {
+                let names = ["GlobalShaderCache-\(format).bin", "-\(format).ushaderbytecode", "\(format).stable.upipelinecache"]
+                if names.contains(where: { data.range(of: Data($0.utf8)) != nil }) { found.insert(format) }
+            }
+        }
+        return found
+    }
+
+    /// The last `bytes` of a file (all of a smaller one).
+    private static func tail(of url: URL, bytes: Int) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        try? handle.seek(toOffset: size > UInt64(bytes) ? size - UInt64(bytes) : 0)
+        return try? handle.readToEnd()
     }
 
     // MARK: Runtime components

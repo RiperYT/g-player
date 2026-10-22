@@ -440,6 +440,30 @@ private struct Rng {
         #expect(a.architecture == .x86)                                                              // of the program that was asked about
     }
 
+    @Test func anUnrealGameCookedForDirectX12AloneIsFound() {
+        /// An Unreal game whose IoStore table of contents and pak index name these shader files (among other bytes).
+        func game(_ tmp: TempFolder, toc: [String], pak: [String]) -> GameAnalysis {
+            tmp.file("Root/Engine/Binaries/ThirdParty/DbgHelp/dbghelp.dll")
+            let junk = Data((0..<4096).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+            tmp.file("Root/Game/Content/Paks/Game-Windows.utoc", contents: junk + Data(toc.joined(separator: "\0").utf8) + junk)
+            tmp.file("Root/Game/Content/Paks/Game-Windows.pak", contents: junk + junk + Data(pak.joined(separator: "\0").utf8))
+            tmp.file("Root/Game/Binaries/Win64/Game.exe", contents: realFixture("D3D11Fixture.exe"))
+            return GameAnalyzer.analyze(executable: tmp.url.appendingPathComponent("Root/Game/Binaries/Win64/Game.exe"))
+        }
+        let ue5 = game(TempFolder(), toc: ["ShaderArchive-Game-PCD3D_SM6-PCD3D_SM6.ushaderbytecode", "ShaderArchive-Global-PCD3D_SM6-PCD3D_SM6.ushaderbytecode"],
+                       pak: ["Engine/GlobalShaderCache-PCD3D_SM6.bin", "Game/Content/PipelineCaches/Windows/Game_PCD3D_SM6.stable.upipelinecache"])
+        #expect(ue5.engine == .unreal && ue5.onlyDirect3D12)
+        let both = game(TempFolder(), toc: ["ShaderArchive-Game-PCD3D_SM5-PCD3D_SM5.ushaderbytecode", "ShaderArchive-Game-PCD3D_SM6-PCD3D_SM6.ushaderbytecode"],
+                        pak: ["Engine/GlobalShaderCache-PCD3D_SM6.bin"])
+        #expect(!both.onlyDirect3D12)
+        let ue4 = game(TempFolder(), toc: [], pak: ["Engine/GlobalShaderCache-PCD3D_SM5.bin", "ShaderArchive-Game-PCD3D_SM5.ushaderbytecode"])
+        #expect(!ue4.onlyDirect3D12)
+        // A stray "PCD3D_SM5" among compressed bytes isn't a file name, and an encrypted index names nothing.
+        let stray = game(TempFolder(), toc: ["ShaderArchive-Game-PCD3D_SM6-PCD3D_SM6.ushaderbytecode"], pak: ["x\u{1}PCD3D_SM5N\u{2}"])
+        #expect(stray.onlyDirect3D12)
+        #expect(!game(TempFolder(), toc: [], pak: []).onlyDirect3D12)
+    }
+
     @Test func rpgMakerMZ() {
         let a = analyze(["Game/Game.exe", "Game/js/rmmz_core.js", "Game/package.json", "Game/nw.dll"], exe: "Game/Game.exe")
         #expect(a.engineName == "RPGMaker")
