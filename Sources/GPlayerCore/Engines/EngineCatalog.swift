@@ -47,6 +47,14 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     }
     /// The engine G-Player recommends for new spaces (`EngineCatalog.defaultForNewSpaces`), which Settings and the pickers mark.
     public var isRecommended: Bool { id == EngineCatalog.defaultForNewSpaces.id }
+    /// The name for a picker or a line with little room: "G-Player Wine", "Wine Staging 11.18", "Game Porting Toolkit (D3DMetal)".
+    public var shortName: String {
+        switch kind {
+        case .crossover: name
+        case .wineStaging: "\(name) \(version)"
+        case .gptk: "\(name) (D3DMetal)"
+        }
+    }
 }
 
 public enum EngineCatalog {
@@ -158,6 +166,10 @@ public enum EngineCatalog {
         }
         return total
     }
+
+    /// A download size in whole megabytes, rounded: both first-run engines are 484,886,864 bytes, which is "485". Cutting
+    /// the fraction off said 484 for both, and 287 for G-Player Wine alone.
+    public static func megabytes(_ bytes: Int64) -> Int { Int((Double(bytes) / 1_000_000).rounded()) }
 
     /// Apple's page about the toolkit and its license.
     public static let gptkInfoURL = URL(string: "https://developer.apple.com/games/game-porting-toolkit/")!

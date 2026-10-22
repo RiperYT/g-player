@@ -232,7 +232,7 @@ import Testing
     }
 
     @Test func profileSummariesSayWhatTheyDo() {
-        #expect(LaunchProfile.custom.summary == "Graphics you choose under Advanced.")
+        #expect(LaunchProfile.custom.summary == "Graphics you choose under Advanced. G-Player never switches them.")
         for profile in LaunchProfile.allCases { #expect(!profile.summary.isEmpty && !profile.title.isEmpty) }
     }
 }

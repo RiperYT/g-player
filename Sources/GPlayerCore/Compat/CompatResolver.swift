@@ -123,7 +123,7 @@ public enum CompatResolver {
 
     /// Why a 32-bit DirectX 10/11 game fails when the engine's MoltenVK is older than 1.4.1 (G-Player updates it in
     /// the Wine Staging it downloads, see `EngineFixes.moltenVK`).
-    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. G-Player updates it only in the Wine Staging 11.18 it downloads, over the exact file it knows. Windows components won't help; a space on that engine will."
+    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. Windows components won't help. Switch this space to G-Player Wine, which has a newer one."
 
     /// The blocker for a game that only Apple's D3DMetal can run here, which the app offers to fix.
     public static let needsDirectX12 = "Needs DirectX 12"
@@ -224,8 +224,11 @@ public enum CompatResolver {
 
         // DirectX 12 with no D3DMetal and no engine fallback.
         if newest == .d3d12 && plan.backend != .d3dmetal && a.engine != .unity && a.engine != .unreal {
-            plan.notes.append(CompatNote(.warning, "Needs DirectX 12",
-                "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in its settings."))
+            // G-Player Wine has DirectX 12 once D3DMetal is turned on; the other engines have none.
+            let detail = input.engine.kind == .crossover
+                ? "DirectX 12 needs Apple's D3DMetal. Turn it on in Settings › Engines, or choose DirectX 11 in the game's own settings."
+                : "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in the game's own settings."
+            plan.notes.append(CompatNote(.warning, "Needs DirectX 12", detail))
         }
         // 32-bit DirectX 10/11 runs through DXVK only: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1.
         if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, d3d < .d3d12,

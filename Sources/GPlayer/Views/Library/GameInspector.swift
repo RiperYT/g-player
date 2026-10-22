@@ -170,11 +170,12 @@ struct GameInspector: View {
             Text("Graphics").sectionTitle()
             Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },
                                                   set: { model.setGraphics($0, for: game) })) {
-                Text("Automatic (\(info.defaultBackend.displayName))").tag(GraphicsBackend.auto)
+                Text(GraphicsBackend.auto.displayName).tag(GraphicsBackend.auto)
                 ForEach(info.backends) { Text($0.displayName).tag($0) }
             }
             .labelsHidden()
-            Text(info.resolve(game.graphics).summary).font(.caption).foregroundStyle(.secondary)
+            Text(info.graphicsHint(for: game.graphics, profile: game.launchOptions.profile))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
