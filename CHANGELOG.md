@@ -8,9 +8,10 @@
   and its build script are in `tools/wine-patches` and `scripts/build-wow64cpu.sh`. The original file is kept as
   `wow64cpu.dll.gcenx`.
 - **Running programs are seen even when G-Player didn't start them.** Steam opened by a game launch, a game Steam
-  started, or anything still open after G-Player restarts now shows as Running with a Stop button. Stopping a
-  Steam game leaves Steam open. The check that keeps installers out of busy spaces uses the same list, so it now
-  also sees games started by Steam.
+  started, or anything still open after G-Player restarts now shows as Running with a Stop button. Games are told
+  apart by their folder, so two games with the same .exe name don't mix, and a store game shows Starting until it
+  opens. Stopping a Steam game leaves Steam open. The check that keeps installers out of busy spaces uses the same
+  list, so it now also sees games started by Steam.
 - Cossacks 3 is marked as not running on a Mac (it needs OpenGL 4.4 with the compatibility profile; macOS has 4.1
   core at most). The Overcooked note is updated.
 
