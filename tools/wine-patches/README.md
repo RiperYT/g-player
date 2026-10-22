@@ -50,3 +50,19 @@ page costs Rosetta a round trip on first touch). `WINE_DISABLE_NX_COMPAT=0` give
 - The bundled files are `Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll*`. Built in the engine's own build tree
   (the same tree and toolchain give byte-identical unpatched files), so the source is the engine's published source
   tarball plus this patch.
+
+## cx-coreaudio-stream-volume.patch
+
+For G-Player Wine. Wine's CoreAudio driver applied the volume a program sets for its stream or session
+(`ISimpleAudioVolume`, `IAudioStreamVolume`) by writing the Mac's output device volume
+(`kAudioDevicePropertyVolumeScalar`, global scope). AirPods and the MacBook speakers only have that control on the
+output scope, so the write failed and a game's own volume setting did nothing; on outputs where it worked, a game
+changed the Mac's volume. The patch keeps a volume per channel in the stream and scales the samples in the render
+callback, as Wine's ALSA driver does (`adjust_buffer_volume` in `dlls/winealsa.drv/alsa.c`), for 8/16/24/32-bit PCM
+and 32/64-bit float. The Mac's volume is never touched. The same code is in Wine 11.18, so Wine Staging has the same
+issue (not fixed there yet).
+
+- `EngineFixes.coreAudioVolume` puts the rebuilt `x86_64-unix/winecoreaudio.so` into G-Player Wine 26.3.0-1, only over
+  the exact file its release ships. Built with `make dlls/winecoreaudio.drv/winecoreaudio.so` in the engine's build tree;
+  a rebuild differs from the bundled file only in debug-info time stamps.
+

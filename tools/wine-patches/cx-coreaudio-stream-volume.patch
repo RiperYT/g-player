@@ -1,0 +1,188 @@
+--- a/dlls/winecoreaudio.drv/coreaudio.c
++++ b/dlls/winecoreaudio.drv/coreaudio.c
+@@ -102,6 +102,7 @@
+     INT32 getbuf_last;
+     WAVEFORMATEX *fmt;
+     BYTE *local_buffer, *cap_buffer, *wrap_buffer, *resamp_buffer, *tmp_buffer;
++    float *vols; /* the program's volume per channel, applied to its samples */
+ };
+ 
+ static const REFERENCE_TIME def_period = 100000;
+@@ -388,6 +389,91 @@
+         memset(buffer, 128, frames * stream->fmt->nBlockAlign);
+     else
+         memset(buffer, 0, frames * stream->fmt->nBlockAlign);
++}
++
++/* Scales the samples by the program's volume, as winealsa does: the volume a program sets for its stream or
++ * session must not change the device's volume, which is the Mac's own setting. */
++static void adjust_buffer_volume(struct coreaudio_stream *stream, BYTE *buf, UINT32 frames)
++{
++    const WAVEFORMATEXTENSIBLE *fmtex = (const WAVEFORMATEXTENSIBLE *)stream->fmt;
++    UINT32 i, channels = stream->fmt->nChannels, mute = 0;
++    BOOL adjust = FALSE, is_float, is_pcm;
++    BYTE *end = buf + frames * stream->fmt->nBlockAlign;
++
++    if (!frames || !stream->vols) return;
++    for (i = 0; i < channels; i++)
++    {
++        adjust |= stream->vols[i] != 1.0f;
++        if (stream->vols[i] == 0.0f) mute++;
++    }
++    if (mute == channels)
++    {
++        silence_buffer(stream, buf, frames);
++        return;
++    }
++    if (!adjust) return;
++
++    is_float = stream->fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT ||
++               (stream->fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
++                IsEqualGUID(&fmtex->SubFormat, &KSDATAFORMAT_SUBTYPE_IEEE_FLOAT));
++    is_pcm = stream->fmt->wFormatTag == WAVE_FORMAT_PCM ||
++             (stream->fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
++              IsEqualGUID(&fmtex->SubFormat, &KSDATAFORMAT_SUBTYPE_PCM));
++
++#define PROCESS_BUFFER(type) do         \
++{                                       \
++    type *p = (type *)buf;              \
++    while ((BYTE *)p < end)             \
++    {                                   \
++        for (i = 0; i < channels; i++)  \
++            p[i] = p[i] * stream->vols[i]; \
++        p += channels;                  \
++    }                                   \
++} while (0)
++    if (is_float && stream->fmt->wBitsPerSample == 32) PROCESS_BUFFER(float);
++    else if (is_float && stream->fmt->wBitsPerSample == 64) PROCESS_BUFFER(double);
++    else if (is_pcm && stream->fmt->wBitsPerSample == 16) PROCESS_BUFFER(INT16);
++#undef PROCESS_BUFFER
++    else if (is_pcm && stream->fmt->wBitsPerSample == 32)
++    {
++        /* A float can't hold every 32-bit sample, and a peak rounded up past INT32_MAX would wrap around: work in
++         * double and clamp. */
++        INT32 *p = (INT32 *)buf;
++        while ((BYTE *)p < end)
++        {
++            for (i = 0; i < channels; i++)
++            {
++                double v = p[i] * (double)stream->vols[i];
++                p[i] = v >= 2147483647.0 ? 2147483647 : v <= -2147483648.0 ? (INT32)0x80000000 : (INT32)v;
++            }
++            p += channels;
++        }
++    }
++    else if (is_pcm && stream->fmt->wBitsPerSample == 24)
++    {
++        BYTE *p = buf;
++        i = 0;
++        while (p < end)
++        {
++            INT32 v = (INT32)((UINT32)p[0] << 8 | (UINT32)p[1] << 16 | (UINT32)p[2] << 24);
++            v = (INT32)(v * stream->vols[i]);
++            p[0] = v >> 8; p[1] = v >> 16; p[2] = v >> 24;
++            p += 3;
++            if (++i == channels) i = 0;
++        }
++    }
++    else if (is_pcm && stream->fmt->wBitsPerSample == 8)
++    {
++        UINT8 *p = buf;
++        while ((BYTE *)p < end)
++        {
++            for (i = 0; i < channels; i++)
++                p[i] = (int)((p[i] - 128) * stream->vols[i]) + 128;
++            p += channels;
++        }
++    }
++    /* Other formats are left as they are; mmdevapi doesn't let them through. No logging here: this runs on
++     * CoreAudio's own thread, which isn't a Wine thread. */
+ }
+ 
+ /* CA is pulling data from us */
+@@ -413,6 +499,8 @@
+         }else
+             memcpy(data->mBuffers[0].mData, stream->local_buffer + lcl_offs_bytes, to_copy_bytes);
+ 
++        adjust_buffer_volume(stream, data->mBuffers[0].mData, to_copy_frames);
++
+         stream->lcl_offs_frames += to_copy_frames;
+         stream->lcl_offs_frames %= stream->bufsize_frames;
+         stream->held_frames -= to_copy_frames;
+@@ -480,6 +568,9 @@
+         return sc;
+     }
+ 
++    /* The program's capture volume and mute apply to what it records, as they do on Windows. */
++    adjust_buffer_volume(stream, list.mBuffers[0].mData, list.mBuffers[0].mDataByteSize / stream->fmt->nBlockAlign);
++
+     if(stream->playing){
+         if(list.mBuffers[0].mData == stream->wrap_buffer){
+             ca_wrap_buffer(stream->cap_buffer,
+@@ -742,6 +833,12 @@
+         goto end;
+     }
+ 
++    if(!(stream->vols = malloc(stream->fmt->nChannels * sizeof(*stream->vols)))){
++        params->result = E_OUTOFMEMORY;
++        goto end;
++    }
++    for(UINT32 i = 0; i < stream->fmt->nChannels; i++) stream->vols[i] = 1.0f;
++
+     stream->period = params->period;
+     stream->period_frames = muldiv(params->period, stream->fmt->nSamplesPerSec, 10000000);
+     stream->dev_id = dev_id_from_device(params->device);
+@@ -827,6 +924,7 @@
+     if(FAILED(params->result)){
+         if(stream->converter) AudioConverterDispose(stream->converter);
+         if(stream->unit) AudioComponentInstanceDispose(stream->unit);
++        free(stream->vols);
+         free(stream->fmt);
+         free(stream);
+     } else {
+@@ -868,6 +966,7 @@
+         NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->tmp_buffer,
+                             &size, MEM_RELEASE);
+     }
++    free(stream->vols);
+     free(stream->fmt);
+     free(stream);
+     params->result = S_OK;
+@@ -1746,31 +1845,14 @@
+ {
+     struct set_volumes_params *params = args;
+     struct coreaudio_stream *stream = handle_get_stream(params->stream);
+-    Float32 level = params->master_volume;
+-    OSStatus sc;
+     UINT32 i;
+-    AudioObjectPropertyAddress prop_addr = {
+-        kAudioDevicePropertyVolumeScalar,
+-        kAudioObjectPropertyScopeGlobal,
+-        kAudioObjectPropertyElementMain
+-    };
+ 
+-    sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
+-    if (sc == noErr)
+-        level = 1.0f;
+-    else
+-        WARN("Couldn't set master volume, applying it directly to the channels: %x\n", (int)sc);
+-
+-    for (i = 1; i <= stream->fmt->nChannels; ++i) {
+-        const float vol = level * params->session_volumes[i - 1] * params->volumes[i - 1];
+-
+-        prop_addr.mElement = i;
+-
+-        sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
+-        if (sc != noErr) {
+-            WARN("Couldn't set channel #%u volume: %x\n", i, (int)sc);
+-        }
+-    }
++    /* Applied to the stream's samples in ca_render_cb, not to the device: writing the device's volume changed (or,
++     * on most Macs' outputs, failed to change) the system volume the user set. */
++    os_unfair_lock_lock(&stream->lock);
++    for (i = 0; i < stream->fmt->nChannels; i++)
++        stream->vols[i] = params->master_volume * params->session_volumes[i] * params->volumes[i];
++    os_unfair_lock_unlock(&stream->lock);
+ 
+     return STATUS_SUCCESS;
+ }

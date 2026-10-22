@@ -43,8 +43,13 @@ public enum EnvironmentFinder {
                 let scripts = LegacyScripts.games(forPrefix: url, scriptsFolder: url.deletingLastPathComponent(), home: home)
                 let hasSteam = fm.fileExists(atPath: url.appendingPathComponent("drive_c/Program Files (x86)/Steam/steam.exe").path)
                 let engine: String = {
-                    if note == "CrossOver" || note == "Whisky" || hasSteam { return EngineCatalog.wineStaging.id }
-                    if let e = scripts.engineID { return e }
+                    // What the prefix's own launcher script names wins: moving a prefix to an older Wine than it was
+                    // opened with could break it. Steam doesn't start on Apple's wine 7.7, so a script naming it
+                    // doesn't count for a Steam prefix.
+                    if let e = scripts.engineID, !(hasSteam && e == EngineCatalog.gptk.id) { return e }
+                    // Bottles were made by CrossOver's or Whisky's Wine; G-Player Wine comes from CrossOver's source.
+                    if note == "CrossOver" || note == "Whisky" { return EngineCatalog.defaultForNewSpaces.id }
+                    if hasSteam { return EngineCatalog.wineStaging.id }
                     return gptkInstalled ? EngineCatalog.gptk.id : EngineCatalog.wineStaging.id
                 }()
                 found.append(FoundEnvironment(name: url.lastPathComponent, url: url, originNote: note,

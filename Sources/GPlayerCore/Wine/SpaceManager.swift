@@ -8,13 +8,23 @@ public struct SpaceManager: Sendable {
 
     /// Makes a new prefix in the library's Spaces folder. Takes about half a minute the first time.
     public func create(name: String, engine: Engine, colorIndex: Int, presetID: String? = nil) async throws -> Space {
+        let folder = try self.folder(forNew: name)                      // before anything is written or Wine runs
         try paths.createFolders()
-        let folder = Files.uniqueURL(in: paths.spaces, name: Files.safeName(name))
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let space = Space(name: name, path: folder.path, engineID: engine.info.id, origin: .managed,
                           presetID: presetID, colorIndex: colorIndex)
         try await initialize(space, engine: engine)
         return space
+    }
+
+    /// Where a new space named `name` goes: a folder in Spaces, its name cut so the path stays within `PrefixPath`.
+    /// Throws, with nothing written, when the library folder's path is too long for any space to work.
+    public func folder(forNew name: String) throws -> URL {
+        if let problem = PrefixPath.libraryRootProblem(paths.root) { throw ShellError.failed(problem) }
+        let limit = PrefixPath.folderNameLimit(in: paths.spaces)
+        let folder = Files.uniqueURL(in: paths.spaces, name: Files.safeName(name, maxLength: limit))
+        if let problem = PrefixPath.problem(forPrefix: folder) { throw ShellError.failed(problem) }
+        return folder
     }
 
     /// `wineboot --init` plus the settings Mac users expect. Safe to run again.

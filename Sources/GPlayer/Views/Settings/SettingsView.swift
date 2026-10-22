@@ -19,6 +19,7 @@ struct GeneralSettings: View {
         Form {
             Section("Library") {
                 if let root = model.libraryRoot { LabeledContent("Location") { PathRow(url: root) } }
+                if let root = model.libraryRoot, let problem = model.libraryRootProblem(root) { PathWarning(text: problem) }
                 LabeledContent("Spaces", value: "\(model.spaces.count)")
                 LabeledContent("Games", value: "\(model.visibleGames.filter { $0.kind == .game }.count)")
             }
@@ -36,22 +37,21 @@ struct EngineSettings: View {
     @Environment(AppModel.self) private var model
     var body: some View {
         Form {
-            EngineSection(info: EngineCatalog.wineStaging)
-            EngineSection(info: EngineCatalog.crossover)
+            ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { EngineSection(info: $0) }
             AppleToolkitSection()
         }
         .formStyle(.grouped)
     }
 }
 
-/// An engine G-Player downloads: what it is, and install or remove.
+/// An engine G-Player downloads: what it is, and install or remove. The catalogue lists the recommended one first.
 struct EngineSection: View {
     @Environment(AppModel.self) private var model
     let info: EngineInfo
     var body: some View {
-        Section(info.name) {
+        Section {
             Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            LabeledContent("Version", value: info.version)
+            LabeledContent("Version", value: info.basedOn ?? info.version)
             LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
             if model.isInstalled(info) {
                 LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -60,6 +60,14 @@ struct EngineSection: View {
                 let mb = info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)) / 1_000_000
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
                     .disabled(model.isEngineBusy)
+            }
+        } header: {
+            HStack(spacing: 8) {
+                Text(info.name)
+                Text(info.isRecommended ? "Recommended" : "Alternative").font(.caption2.weight(.semibold))
+                    .foregroundStyle(info.isRecommended ? Color.accentColor : .secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background((info.isRecommended ? Color.accentColor : .secondary).opacity(0.12), in: Capsule())
             }
         }
     }

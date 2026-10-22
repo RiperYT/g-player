@@ -17,6 +17,26 @@ struct OnboardingView: View {
     @State private var installSteam = false
     @State private var working = false
 
+    /// What to draw instead of what the checks would find, so `SnapshotRenderer` can show every step without anyone
+    /// clicking through them.
+    struct Preview {
+        var step: Step
+        var root: URL? = nil
+        var rosetta: Bool? = true
+        var found: [FoundEnvironment] = []
+    }
+    private let preview: Preview?
+
+    init(preview: Preview? = nil) {
+        self.preview = preview
+        guard let preview else { return }
+        _step = State(initialValue: preview.step)
+        _root = State(initialValue: preview.root ?? LibraryPaths.defaultRoot)
+        _rosetta = State(initialValue: preview.rosetta)
+        _found = State(initialValue: preview.found)
+        _chosenFound = State(initialValue: Set(preview.found.filter { $0.pathProblem == nil }.map(\.id)))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 20)
@@ -29,7 +49,7 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
-        .task { rosetta = await Shell.isRosettaInstalled() }
+        .task { if preview == nil { rosetta = await Shell.isRosettaInstalled() } }
         .onAppear { if let existing = model.libraryRoot { root = existing } }
     }
 
@@ -67,27 +87,29 @@ struct OnboardingView: View {
                         root = u.lastPathComponent == "G-Player" ? u : u.appendingPathComponent("G-Player")
                     }
                 }
+                // The engines download into the folder chosen here; another folder would need them again.
+                .disabled(model.isInstallingFirstRun)
             }
+            if model.isInstallingFirstRun {
+                Text("The engines are downloading into this folder. Change it once they are done.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            if let problem = model.libraryRootProblem(root) { PathWarning(text: problem) }
             if let free = freeSpace(at: root) {
                 Text("\(free.formattedBytes) free on this disk").font(.callout).foregroundStyle(.secondary)
             }
     }
 
     @ViewBuilder private var engineStep: some View {
-            title("Get the engine")
-            Text("Wine for macOS runs Windows programs through Rosetta 2. G-Player downloads Wine Staging with DXVK (about 200 MB) and checks every file before using it.")
-                .foregroundStyle(.secondary)
+            title("Get the engines")
+            Text(engineIntro).foregroundStyle(.secondary)
             checkRow(ok: rosetta == true, title: "Rosetta 2",
                      detail: rosetta == nil ? "Checking…" : rosetta! ? "Installed" : "Needed to run Wine",
                      actionTitle: rosetta == false ? "Install" : nil, action: installRosetta)
-            checkRow(ok: model.isInstalled(EngineCatalog.wineStaging), title: "Wine Staging \(EngineCatalog.wineStaging.version) with DXVK",
-                     detail: engineDetail,
-                     actionTitle: model.isInstalled(EngineCatalog.wineStaging) || model.isEngineBusy ? nil : "Download",
-                     action: downloadEngine)
+            ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { engineRow($0) }
             checkRow(ok: false, title: "Apple's Game Porting Toolkit (optional)",
                      detail: "For DirectX 12 games, if you install it yourself. Turn it on later in Settings › Engines.",
                      actionTitle: nil, action: {})
-            if let a = model.activities.first { ProgressView(value: a.progress ?? 0) { Text(a.message).font(.caption) } }
     }
 
     @ViewBuilder private var foundStep: some View {
@@ -109,6 +131,8 @@ struct OnboardingView: View {
                         }
                     }
                     .toggleStyle(.checkbox).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+                    .disabled(f.pathProblem != nil)
+                    if let problem = f.pathProblem { PathWarning(text: problem, font: .caption).padding(.bottom, 8) }
                     if f.id != found.last?.id { Divider() }
                 }
             }
@@ -148,7 +172,8 @@ struct OnboardingView: View {
             if step != .welcome { Button("Back") { go(-1) }.disabled(working) }
             Button(step == .apps ? "Open Library" : "Continue") { next() }
                 .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                .disabled(working || (step == .engine && rosetta == false))
+                .disabled(working || (step == .engine && rosetta == false)
+                          || (step == .location && model.libraryRootProblem(root) != nil))
         }
         .padding(.horizontal, 28).padding(.vertical, 18)
         .overlay(alignment: .top) { Divider() }
@@ -175,23 +200,45 @@ struct OnboardingView: View {
         .padding(.top, 4)
     }
 
-    private func checkRow(ok: Bool, title: String, detail: String, actionTitle: String?, action: @escaping () -> Void) -> some View {
+    private func checkRow(ok: Bool, title: String, detail: String, progress: Activity? = nil, actionTitle: String?,
+                          action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             Image(systemName: ok ? "checkmark.circle.fill" : "circle.dashed")
                 .font(.title3).foregroundStyle(ok ? .green : .secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.medium))
                 Text(detail).font(.caption).foregroundStyle(.secondary)
+                if let progress { ProgressView(value: progress.progress ?? 0).controlSize(.small).padding(.top, 2) }
             }
             Spacer()
             if let actionTitle { Button(actionTitle, action: action) }
         }
     }
 
-    private var engineDetail: String {
-        if model.isInstalled(EngineCatalog.wineStaging) { return "Installed" }
-        if model.isEngineBusy { return model.activities.first?.message ?? "Downloading…" }
-        return "Runs Steam and most DirectX 9–11 games"
+    /// An engine G-Player downloads: its own progress while it downloads, then Installed.
+    private func engineRow(_ info: EngineInfo) -> some View {
+        let installed = model.isInstalled(info)
+        let download = model.download(of: info)
+        return checkRow(ok: installed, title: info.displayName, detail: engineDetail(info, installed: installed, download: download),
+                        progress: download,
+                        actionTitle: installed || model.isEngineBusy || model.isInstallingFirstRun ? nil : "Download", action: downloadEngines)
+    }
+
+    private func engineDetail(_ info: EngineInfo, installed: Bool, download: Activity?) -> String {
+        if installed { return "Installed" }
+        if let download { return download.message }
+        if model.isInstallingFirstRun {
+            return info.isRecommended && !model.isInstalled(EngineCatalog.wineStaging) ? "Downloads after Wine Staging, reusing its libraries" : "Starting…"
+        }
+        return info.isRecommended ? "Recommended. Runs Steam and DirectX 9–11 games, and DirectX 12 with Apple's D3DMetal if you add it"
+                                  : "Alternative. Runs Steam and most DirectX 9–11 games"
+    }
+
+    /// What the engine step says before the rows: what G-Player uses and how much is left to download.
+    private var engineIntro: String {
+        let intro = "Wine for macOS runs Windows programs through Rosetta 2. G-Player uses G-Player Wine and keeps Wine Staging as an alternative."
+        let mb = EngineCatalog.firstRunBytes(installed: model.installedEngines) / 1_000_000
+        return mb == 0 ? intro : intro + " That takes about \(mb) MB to download. G-Player checks every file before using it."
     }
 
     private var hasSteamAlready: Bool {
@@ -225,13 +272,11 @@ struct OnboardingView: View {
             model.libraryRoot = root
             model.load()
             go(1)
-            if !model.isInstalled(EngineCatalog.wineStaging) && !model.isEngineBusy {
-                downloadEngine()
-            }
+            if !EngineCatalog.firstRunInstalls.allSatisfy({ model.isInstalled($0) }) { downloadEngines() }
         case .engine:
             let known = model.spaces.map(\.url) + [root]
             found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false)
-            chosenFound = Set(found.map(\.id))
+            chosenFound = Set(found.filter { $0.pathProblem == nil }.map(\.id))
             go(1)
         case .found:
             for f in found where chosenFound.contains(f.id) { model.adopt(f) }
@@ -243,17 +288,15 @@ struct OnboardingView: View {
             let wantMain = makeMain && !model.spaces.contains { $0.name == "Main" }
             let wantSteam = installSteam && !hasSteamAlready
             model.finishOnboarding(root: root)
-            Task {
-                if wantMain { _ = await model.createSpace(name: "Main") }
-                if wantSteam { await model.installPreset(AppPresets.steam) }
-            }
+            // Made once an engine is there, also after a quit before the downloads ended.
+            model.createFirstRunSpaces(main: wantMain, steam: wantSteam)
         default:
             go(1)
         }
     }
 
-    private func downloadEngine() {
-        Task { _ = await model.ensureEngine(EngineCatalog.wineStaging) }
+    private func downloadEngines() {
+        model.installFirstRunEngines()
     }
 
     private func installRosetta() {

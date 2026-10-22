@@ -96,7 +96,7 @@ extension AppModel {
     func offerGPlayerWine(for gameID: UUID) {
         guard let game = game(gameID), let space = space(game.spaceID) else { return }
         let info = EngineCatalog.info(space.engineID)
-        let from = info.map { "\($0.name) \($0.version)" } ?? space.engineID
+        let from = info?.displayName ?? space.engineID
         let mb = isInstalled(EngineCatalog.crossover) ? 0
             : EngineCatalog.crossover.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)) / 1_000_000
         engineMove = EngineMove(gameID: gameID, spaceName: space.name, fromEngine: from, olderWine: info?.kind == .wineStaging, downloadMB: mb)

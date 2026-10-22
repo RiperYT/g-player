@@ -82,7 +82,7 @@ struct SpaceView: View {
             HStack(spacing: 18) {
                 Picker("Engine", selection: Binding(get: { space.engineID }, set: { if $0 != space.engineID { pendingEngine = $0 } })) {
                     ForEach(model.engineChoices(for: space)) { info in
-                        Text("\(info.name) \(info.kind == .gptk ? "(D3DMetal)" : info.version)")
+                        Text(info.kind == .gptk ? "\(info.name) (D3DMetal)" : info.displayName)
                             + Text(model.engineNote(info)).foregroundStyle(.secondary)
                     }
                 }
@@ -213,7 +213,13 @@ struct NewSpaceSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var engineID = EngineCatalog.wineStaging.id
+    /// The user's pick; until then the engine a new space gets without a choice (G-Player Wine, or Wine Staging while
+    /// that is the only one installed, so nothing downloads unasked).
+    @State private var picked: String?
+
+    private var engine: EngineInfo {
+        picked.flatMap(EngineCatalog.info) ?? model.newSpaceEngine
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -222,19 +228,20 @@ struct NewSpaceSheet: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Form {
                 TextField("Name", text: $name, prompt: Text("e.g. Main or Witcher 3"))
-                Picker("Engine", selection: $engineID) {
+                Picker("Engine", selection: Binding(get: { engine.id }, set: { picked = $0 })) {
                     ForEach(model.availableEngines) { info in
-                        Text("\(info.name) · \(info.summary)").tag(info.id)
+                        Text(info.displayName + model.engineNote(info, listsInstalled: true)).tag(info.id)
                     }
                 }
             }
             .formStyle(.grouped).scrollDisabled(true).frame(height: 120)
+            Text(engine.summary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Create") {
                     let n = name.trimmingCharacters(in: .whitespaces)
-                    let info = EngineCatalog.info(engineID) ?? EngineCatalog.wineStaging
+                    let info = engine
                     dismiss()
                     Task { if let s = await model.createSpace(name: n, engineInfo: info) { model.selection = .space(s.id) } }
                 }

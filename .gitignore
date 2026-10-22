@@ -9,3 +9,5 @@ DerivedData/
 *.tar.xz
 *.tar.gz
 !releases/**
+# The copy of the engine build script that runs (editing a running bash script breaks it)
+scripts/.build-engine-cx.run.sh

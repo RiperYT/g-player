@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds build/G-Player.app from the Swift package.
 #   scripts/build-app.sh                 ad-hoc signed (runs on this Mac; others must allow it once)
-#   SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh
+#   SIGN_IDENTITY="<a signing identity>" scripts/build-app.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="$(cat VERSION)"
@@ -21,6 +21,18 @@ cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp LICENSE NOTICE "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" scripts/Info.plist > "$APP/Contents/Info.plist"
 
-codesign --force --options runtime --timestamp=none --sign "${SIGN_IDENTITY:--}" "$APP"
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+  # Every Mach-O in the app must carry the same team's signature. The bundled engine fixes are signed where they are
+  # kept, since EngineFixes pins their checksums, so this only checks them.
+  TEAM="$(sed -n 's/.*(\([A-Z0-9]*\))$/\1/p' <<<"$SIGN_IDENTITY")"
+  while IFS= read -r -d '' f; do
+    file -b "$f" | grep -q Mach-O || continue
+    codesign -dv "$f" 2>&1 | grep -q "TeamIdentifier=$TEAM" \
+      || { echo "${f#$APP/} isn't signed by $TEAM" >&2; exit 1; }
+  done < <(find "$APP/Contents/Resources" -type f -print0)
+  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+else
+  codesign --force --options runtime --timestamp=none --sign - "$APP"
+fi
 codesign --verify --strict "$APP"
 echo "app: $APP ($VERSION, build $BUILD)"

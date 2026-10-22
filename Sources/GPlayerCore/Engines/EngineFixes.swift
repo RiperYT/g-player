@@ -13,6 +13,12 @@ public enum EngineFixes {
         public let fixedSHA256: String
         /// The fixed file inside GPlayerCore/Resources.
         public let resource: String
+        /// Earlier versions of the fixed file that count as applied (the same code before it was signed with
+        /// G-Player's Developer ID): an engine that has one is left as it is.
+        public var alsoFixed: [String] = []
+        /// Earlier fixed files this one replaces (an older version of the same fix). The engine's original stays the
+        /// backup, so the file can still go back to it.
+        public var replaces: [String] = []
     }
 
     /// wow64cpu with the Rosetta 2 far-jump workaround: 32-bit programs stop crashing at random (WineHQ 60494).
@@ -23,15 +29,17 @@ public enum EngineFixes {
         fixedSHA256: "3b3137fc3bd3e136f2d6139ee721d863ed33d5287f242272306a7e4aa6fecec1",
         resource: "engine-fixes/wow64cpu.dll")
 
-    /// MoltenVK 1.4.2 from the Khronos release, unchanged (scripts/fetch-moltenvk.sh). The engine's 1.4.0 refuses the
+    /// MoltenVK 1.4.2 from the Khronos release, its code unchanged and signed with G-Player's Developer ID for notarization
+    /// (scripts/fetch-moltenvk.sh). The engine's 1.4.0 refuses the
     /// host-memory buffers Wine makes so that 32-bit programs can reach Vulkan memory, so 32-bit DirectX 10/11 games
     /// couldn't start through DXVK.
     public static let moltenVK = FileFix(
         engineID: EngineCatalog.wineStaging.id,
         path: "lib/libMoltenVK.dylib",
         originalSHA256: "aac02fea75b00aa23fca5af9c19fc0d4b2e0f12dc0f78b3bee57b7b67fa5b61b",
-        fixedSHA256: "aef00b13bcc808adf15b85bef9ae67393d92be7ed5dfe41cad16fa809e4a4c5f",
-        resource: "engine-fixes/libMoltenVK.dylib")
+        fixedSHA256: "d19a384ea38ab9fff1e64ee51967ff4401682476f91882804e2e81f3f11f68a7",
+        resource: "engine-fixes/libMoltenVK.dylib",
+        alsoFixed: ["aef00b13bcc808adf15b85bef9ae67393d92be7ed5dfe41cad16fa809e4a4c5f"])
 
     /// G-Player Wine's ntdll with tools/wine-patches/cx-nx-compat.patch. Wine made every readable page executable for
     /// a whole 32-bit process as soon as any DLL in it lacked the NX flag (old Microsoft DLLs such as xinput1_3 or
@@ -41,8 +49,9 @@ public enum EngineFixes {
     public static let ntdllNoExec = [
         FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-unix/ntdll.so",
                 originalSHA256: "ff9596b1a376f634b04be5ee9aa2b74520f8742a9534fee8228ffdd5ddcab50b",
-                fixedSHA256: "e007f39cb2145966eb895002587c8732fb7be6ea90411d2b497edfeab7b36673",
-                resource: "engine-fixes/cx-ntdll.so"),
+                fixedSHA256: "b502e8d6a37a568965e2d13dd7028fb17167f7c6db9298d7e3c917e487a0743f",
+                resource: "engine-fixes/cx-ntdll.so",
+                alsoFixed: ["e007f39cb2145966eb895002587c8732fb7be6ea90411d2b497edfeab7b36673"]),
         FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-windows/ntdll.dll",
                 originalSHA256: "2d2b919c595771278823051ab6d8aaccc27381e93570bdaaf432241a8daaf072",
                 fixedSHA256: "f2a0de442f64d5c2ff188ce82a3f1d683d7f5a454b43958d5429200a7071cb7f",
@@ -53,7 +62,20 @@ public enum EngineFixes {
                 resource: "engine-fixes/cx-ntdll-i386.dll"),
     ]
 
-    public static let all = [wow64cpu, moltenVK] + ntdllNoExec
+    /// G-Player Wine's CoreAudio driver with tools/wine-patches/cx-coreaudio-stream-volume.patch. Wine wrote a game's own
+    /// volume into the Mac's output device: on AirPods and the MacBook speakers that failed, so a game's volume setting
+    /// did nothing, and on outputs where it worked it changed the Mac's volume. The patched driver scales the game's
+    /// samples instead, as Wine's ALSA driver does, and leaves the Mac's volume to the user.
+    public static let coreAudioVolume = FileFix(
+        engineID: EngineCatalog.crossover.id,
+        path: "lib/wine/x86_64-unix/winecoreaudio.so",
+        originalSHA256: "b2e5cd42b7b1300f01818212a4f16a5ec94118a7ddd5352a01efe729a1548132",
+        fixedSHA256: "1c08e468be49c6019d270fd25887b1474ed8272e9052352bf13946786905cdba",
+        resource: "engine-fixes/cx-winecoreaudio.so",
+        // The first version wrapped 32-bit peaks around and didn't apply a program's capture volume.
+        replaces: ["728e0db3d81eb021b76d60c052ee727d018d2c97b403b511111805f612850d6b"])
+
+    public static let all = [wow64cpu, moltenVK] + ntdllNoExec + [coreAudioVolume]
 
     public enum Outcome: Equatable, Sendable {
         /// The fixed file was put in place; the original is kept next to it as `<name>.gcenx`.
@@ -79,14 +101,17 @@ public enum EngineFixes {
         let fm = FileManager.default
         let target = wineRoot.appendingPathComponent(fix.path)
         guard let current = try? Files.sha256(of: target) else { return .unavailable }
-        if current == fix.fixedSHA256 { return .alreadyApplied }
-        guard current == fix.originalSHA256 else { return .unknownOriginal }
+        if current == fix.fixedSHA256 || fix.alsoFixed.contains(current) { return .alreadyApplied }
+        let upgrade = fix.replaces.contains(current)
+        guard current == fix.originalSHA256 || upgrade else { return .unknownOriginal }
         guard let source = resources(fix.resource), (try? Files.sha256(of: source)) == fix.fixedSHA256 else { return .unavailable }
         let backup = target.appendingPathExtension("gcenx")
         let staged = target.appendingPathExtension("gplayer-new")
         do {
-            // The original is kept whole: a backup cut short by an earlier attempt is made again.
-            if (try? Files.sha256(of: backup)) != fix.originalSHA256 {
+            // The original is kept whole: a backup cut short by an earlier attempt is made again. An older fix in
+            // place means the backup is already the original, and only then may it be replaced.
+            if upgrade, (try? Files.sha256(of: backup)) != fix.originalSHA256 { return .unknownOriginal }
+            if !upgrade, (try? Files.sha256(of: backup)) != fix.originalSHA256 {
                 try? fm.removeItem(at: staged)
                 try fm.copyItem(at: target, to: staged)
                 guard try Files.sha256(of: staged) == fix.originalSHA256 else { throw CocoaError(.fileWriteUnknown) }

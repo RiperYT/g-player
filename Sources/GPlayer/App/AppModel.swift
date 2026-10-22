@@ -35,19 +35,21 @@ struct Activity: Identifiable, Equatable {
 @MainActor @Observable
 final class AppModel {
     // MARK: Settings (stored in UserDefaults)
+    /// Where the settings live: the user's defaults, or a throwaway suite when the UI is drawn for review (`SnapshotRenderer`).
+    @ObservationIgnored private let defaults: UserDefaults
     var libraryRoot: URL? {
-        didSet { UserDefaults.standard.set(libraryRoot?.path, forKey: "libraryRoot") }
+        didSet { defaults.set(libraryRoot?.path, forKey: "libraryRoot") }
     }
     var onboardingDone: Bool {
-        didSet { UserDefaults.standard.set(onboardingDone, forKey: "onboardingDone") }
+        didSet { defaults.set(onboardingDone, forKey: "onboardingDone") }
     }
     var verboseLogs: Bool {
-        didSet { UserDefaults.standard.set(verboseLogs, forKey: "verboseLogs") }
+        didSet { defaults.set(verboseLogs, forKey: "verboseLogs") }
     }
     /// Use Apple's Game Porting Toolkit when the user installed it. Off by default (Apple's license).
     var useAppleToolkit: Bool {
         didSet {
-            UserDefaults.standard.set(useAppleToolkit, forKey: "useAppleToolkit"); engineVersion += 1
+            defaults.set(useAppleToolkit, forKey: "useAppleToolkit"); engineVersion += 1
             if useAppleToolkit != oldValue { syncD3DMetal() }
         }
     }
@@ -112,15 +114,29 @@ final class AppModel {
     /// Installs and store setups queued or running, per space (launches use the queue too but don't count).
     private var queuedInstalls: [UUID: Int] = [:]
     private var queuedWork: [UUID: Int] = [:]
+    /// Engine downloads running, by engine id (`ensureEngine`), and why the last one of each failed.
+    @ObservationIgnored private var engineInstalls: [String: Task<Engine?, Never>] = [:]
+    @ObservationIgnored private var engineFailures: [String: Error] = [:]
+    /// The first spaces onboarding promised ("main", "steam") that aren't made yet. Kept on disk, so quitting before
+    /// the engines are in doesn't lose them.
+    private(set) var firstRunSpaces: [String] {
+        didSet { defaults.set(firstRunSpaces, forKey: "firstRunSpaces") }
+    }
+    @ObservationIgnored private var makingFirstRunSpaces = false
+    /// The first run's engine installs while they run (`installFirstRunEngines`); onboarding shows them.
+    private var firstRunInstall: Task<Void, Never>?
+    var isInstallingFirstRun: Bool { firstRunInstall != nil }
     var engineVersion = 0                        // bumps when engines change, so views re-read them
     var componentsVersion = 0                    // bumps when components are installed
 
-    init() {
-        let d = UserDefaults.standard
+    /// - Parameter watching: false keeps the model passive (no process watcher, no observers), for drawing the UI.
+    init(defaults d: UserDefaults = .standard, watching: Bool = true) {
+        defaults = d
         libraryRoot = d.string(forKey: "libraryRoot").map { URL(fileURLWithPath: $0, isDirectory: true) }
         onboardingDone = d.bool(forKey: "onboardingDone")
         verboseLogs = d.bool(forKey: "verboseLogs")
         useAppleToolkit = d.bool(forKey: "useAppleToolkit")
+        firstRunSpaces = d.stringArray(forKey: "firstRunSpaces") ?? []
         if libraryRoot != nil { load() }
         // For screenshots and UI checks: `open G-Player.app --args -selectGame "<title>"` (not saved).
         if let title = d.volatileDomain(forName: UserDefaults.argumentDomain)["selectGame"] as? String,
@@ -128,6 +144,7 @@ final class AppModel {
             selection = g.isHidden ? .hidden : .allGames
             selectedGameID = g.id
         }
+        guard watching else { return }
         NotificationCenter.default.addObserver(forName: .gplayerOpenFile, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
                 guard let self, self.onboardingDone, let url = note.object as? URL, let source = ImportSource(url) else { return }
@@ -139,9 +156,12 @@ final class AppModel {
             MainActor.assumeIsolated { self?.refreshStores(); self?.refreshPrograms() }
         }
         watchPrograms()
+        if onboardingDone, libraryRoot != nil { resumeFirstRunSpaces() }
     }
 
     var paths: LibraryPaths? { libraryRoot.map(LibraryPaths.init) }
+    /// Why a library folder can't be used (its path is too long for Wine), or nil. See `PrefixPath`.
+    func libraryRootProblem(_ root: URL) -> String? { PrefixPath.libraryRootProblem(root) }
     var spaces: [Space] { state.spaces }
     var games: [Game] { state.games }
     var visibleGames: [Game] { state.visibleGames }
@@ -223,10 +243,21 @@ final class AppModel {
     /// A space on Apple's toolkit while the toolkit is turned off.
     func needsAppleToolkit(_ space: Space) -> Bool { space.engineID == EngineCatalog.gptk.id && !useAppleToolkit }
 
-    /// What the engine picker adds after an engine's name.
-    func engineNote(_ info: EngineInfo) -> String {
-        if info.kind == .gptk && !useAppleToolkit { return "  · turned off" }
-        return isInstalled(info) ? "" : "  · not installed"
+    /// The engine for a new space made without a choice (`EngineCatalog.engineForNewSpace`).
+    var newSpaceEngine: EngineInfo { EngineCatalog.engineForNewSpace(installed: installedEngines) }
+
+    /// What an engine picker adds after an engine's name: recommended, and whether it needs a download (with its
+    /// size) or isn't there. `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
+    func engineNote(_ info: EngineInfo, listsInstalled: Bool = false) -> String {
+        var notes = info.isRecommended ? ["recommended"] : []
+        if info.kind == .gptk && !useAppleToolkit { notes.append("turned off") }
+        else if isInstalled(info) { if listsInstalled { notes.append("installed") } }
+        else if info.downloads.isEmpty { notes.append("not installed") }
+        else {
+            let mb = info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)) / 1_000_000
+            notes.append("\(mb) MB to download")
+        }
+        return notes.isEmpty ? "" : "  · " + notes.joined(separator: ", ")
     }
 
     /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away).
@@ -247,7 +278,7 @@ final class AppModel {
     /// Spaces from before 0.3 that already run on the toolkit keep working: turn it on once for them. The answer is
     /// saved either way, so spaces found later never turn it on by themselves.
     private func migrateAppleToolkitSetting() {
-        guard UserDefaults.standard.object(forKey: "useAppleToolkit") == nil else { return }
+        guard defaults.object(forKey: "useAppleToolkit") == nil else { return }
         useAppleToolkit = state.spaces.contains { $0.engineID == EngineCatalog.gptk.id }
     }
 
@@ -263,9 +294,20 @@ final class AppModel {
         if changed { save() }
     }
 
-    var isEngineBusy: Bool { activities.contains { $0.title.hasPrefix("Downloading Wine") } }
+    /// What an engine's download is called in the sidebar, and what views look for to show its progress.
+    static func downloadTitle(_ info: EngineInfo) -> String { "Downloading \(info.name)" }
 
-    /// Downloads an engine if it is missing. Returns nil when that failed (the error is shown).
+    /// The engine's download while it runs.
+    func download(of info: EngineInfo) -> Activity? { activities.first { $0.title == Self.downloadTitle(info) } }
+
+    var isEngineBusy: Bool { EngineCatalog.all.contains { download(of: $0) != nil } }
+
+    /// The engines installed on this Mac.
+    var installedEngines: [EngineInfo] { EngineCatalog.all.filter { isInstalled($0) } }
+
+    /// Downloads an engine if it is missing. Returns nil when that failed (the error is shown). Asked again while
+    /// the engine downloads (onboarding and a new space can ask at once), it waits for that download: two would
+    /// write the same file.
     @discardableResult
     func ensureEngine(_ info: EngineInfo) async -> Engine? {
         guard let manager = engineManager else { return nil }
@@ -280,8 +322,16 @@ final class AppModel {
                 : "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
             return nil
         }
-        let activity = begin("Downloading Wine \(info.version)", "Starting")
-        defer { end(activity) }
+        if let running = engineInstalls[info.id] { return await running.value }
+        let task = Task { await self.installEngine(info, with: manager) }
+        engineInstalls[info.id] = task
+        return await task.value
+    }
+
+    private func installEngine(_ info: EngineInfo, with manager: EngineManager) async -> Engine? {
+        let activity = begin(Self.downloadTitle(info), "Starting")
+        defer { end(activity); engineInstalls[info.id] = nil }
+        engineFailures[info.id] = nil
         do {
             let engine = try await manager.install(info) { [weak self] fraction, message in
                 Task { @MainActor in self?.progress(activity, fraction, message) }
@@ -292,6 +342,7 @@ final class AppModel {
         } catch is CancellationError {
             return nil
         } catch {
+            engineFailures[info.id] = error
             errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)"
             return nil
         }
@@ -300,6 +351,68 @@ final class AppModel {
     func removeEngine(_ info: EngineInfo) {
         do { try engineManager?.remove(info); engineVersion += 1 }
         catch { errorMessage = error.localizedDescription }
+    }
+
+    /// The first run's engines: Wine Staging, then G-Player Wine, which reuses Staging's libraries (no second download).
+    /// Starts once at a time. All failures show in one message, and the message says what the first spaces use then.
+    /// When Staging failed because the connection is down, G-Player Wine isn't tried: its libraries come from the
+    /// same download.
+    func installFirstRunEngines() {
+        guard firstRunInstall == nil else { return }
+        firstRunInstall = Task {
+            var failures: [String] = []
+            for info in EngineCatalog.firstRunInstalls where await ensureEngine(info) == nil {
+                failures.append(errorMessage ?? "\(info.name) wasn't installed.")
+                errorMessage = nil                                  // shown together below, not one over the other
+                if let error = engineFailures[info.id], EngineManager.isConnectionFailure(error) { break }
+            }
+            if !failures.isEmpty {
+                let gplayerWine = isInstalled(EngineCatalog.defaultForNewSpaces), staging = isInstalled(EngineCatalog.wineStaging)
+                failures.append(gplayerWine ? "" : staging
+                    ? "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines."
+                    : "Download the engines again in Settings › Engines. The first spaces are made once an engine is installed.")
+                errorMessage = failures.filter { !$0.isEmpty }.joined(separator: "\n\n")
+            }
+            firstRunInstall = nil
+        }
+    }
+
+    /// The engine for the spaces the first run creates, once its installs are over: G-Player Wine, or Wine Staging
+    /// when that is all there is. Nil with neither installed.
+    func firstRunEngine() async -> EngineInfo? {
+        await firstRunInstall?.value
+        return EngineCatalog.firstRunEngine(installed: installedEngines)
+    }
+
+    /// Makes the first spaces onboarding offered (Main, Steam) once an engine is there. The list is saved, so quitting
+    /// before the engines are in doesn't lose them: `resumeFirstRunSpaces` goes on at the next start.
+    func createFirstRunSpaces(main: Bool, steam: Bool) {
+        firstRunSpaces = (main ? ["main"] : []) + (steam ? ["steam"] : [])
+        resumeFirstRunSpaces()
+    }
+
+    /// Installs the engines still missing and makes the first spaces still on the list, each once. With no engine
+    /// installed (the download failed) they stay on the list for the next start.
+    func resumeFirstRunSpaces() {
+        guard !firstRunSpaces.isEmpty, !makingFirstRunSpaces else { return }
+        makingFirstRunSpaces = true
+        Task {
+            defer { makingFirstRunSpaces = false }
+            if !EngineCatalog.firstRunInstalls.allSatisfy({ isInstalled($0) }) { installFirstRunEngines() }
+            guard let engine = await firstRunEngine() else { return }
+            for key in firstRunSpaces {
+                switch key {
+                case "main":
+                    if !spaces.contains(where: { $0.name == "Main" }) { _ = await createSpace(name: "Main", engineInfo: engine) }
+                case "steam":
+                    if !isInstalled(AppPresets.steam), presetSpace(AppPresets.steam) == nil {
+                        await installPreset(AppPresets.steam, engineInfo: engine)
+                    }
+                default: break
+                }
+                firstRunSpaces.removeAll { $0 == key }              // tried: a failure was shown, not tried again at every start
+            }
+        }
     }
 
     // MARK: Activities
@@ -373,9 +486,22 @@ final class AppModel {
 
     func nextColor() -> Int { SpaceColor.next(after: state.spaces.map(\.colorIndex)) }
 
-    /// Creates a space (downloading the engine first if needed).
-    func createSpace(name: String, engineInfo: EngineInfo = EngineCatalog.wineStaging, presetID: String? = nil) async -> Space? {
-        guard let paths, let engine = await ensureEngine(engineInfo) else { return nil }
+    /// Creates a space (downloading the engine first if needed). Without a choice it gets `newSpaceEngine`: G-Player
+    /// Wine, or Wine Staging while that is the only engine installed. When G-Player Wine can't be downloaded and
+    /// Wine Staging is installed, the space gets Staging and the message says so.
+    func createSpace(name: String, engineInfo: EngineInfo? = nil, presetID: String? = nil) async -> Space? {
+        guard let paths else { return nil }
+        // Before an engine is downloaded for it: a library folder with a path too long can't hold any space.
+        if let problem = libraryRootProblem(paths.root) { errorMessage = "Couldn't create the space. \(problem)"; return nil }
+        let wanted = engineInfo ?? newSpaceEngine
+        var chosen = await ensureEngine(wanted)
+        if chosen == nil, wanted.id == EngineCatalog.defaultForNewSpaces.id,
+           let staging = engineManager?.engine(EngineCatalog.wineStaging) {
+            errorMessage = (errorMessage ?? "\(wanted.name) wasn't installed.")
+                + "\n\n“\(name)” uses \(staging.info.name) instead. You can switch its engine in the space's settings once \(wanted.name) is installed."
+            chosen = staging
+        }
+        guard let engine = chosen else { return nil }
         let activity = begin("Creating “\(name)”", "Setting up Windows. This takes about a minute the first time.")
         defer { end(activity) }
         do {
@@ -394,8 +520,11 @@ final class AppModel {
         }
     }
 
-    /// Uses an environment found on the Mac (CrossOver bottle, older prefix) in place, with its games.
-    func adopt(_ found: FoundEnvironment) {
+    /// Uses an environment found on the Mac (CrossOver bottle, older prefix) in place, with its games. One whose path is
+    /// too long for Wine is refused, with the reason shown.
+    @discardableResult
+    func adopt(_ found: FoundEnvironment) -> Bool {
+        if let problem = found.pathProblem { errorMessage = "Couldn't add “\(found.name)”. \(problem)"; return false }
         let space = Space(name: found.name, path: found.url.path, engineID: found.suggestedEngineID, origin: .external,
                           originNote: found.originNote, presetID: found.presetID, colorIndex: nextColor())
         mutate { s in
@@ -407,6 +536,7 @@ final class AppModel {
         }
         ensureLauncherEntry(for: space)
         refreshStores()
+        return true
     }
 
     func removeSpace(_ space: Space, deleteFiles: Bool) {
@@ -439,7 +569,7 @@ final class AppModel {
 
     func isInstalled(_ preset: AppPreset) -> Bool { presetSpace(preset).map(preset.isInstalled) ?? false }
 
-    func installPreset(_ preset: AppPreset) async {
+    func installPreset(_ preset: AppPreset, engineInfo: EngineInfo? = nil) async {
         guard let paths else { return }
         var space = presetSpace(preset)
         if let found = space, !found.mayChange {
@@ -447,7 +577,7 @@ final class AppModel {
             askToChange(found) { allowed in if allowed { Task { await self.installPreset(preset) } } }
             return
         }
-        if space == nil { space = await createSpace(name: preset.name, presetID: preset.id) }
+        if space == nil { space = await createSpace(name: preset.name, engineInfo: engineInfo, presetID: preset.id) }
         guard let space, let engine = engine(for: space) else { return }
         let activity = begin("Setting up \(preset.name)", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting")
         defer { end(activity); cancellers[activity] = nil }
@@ -707,6 +837,10 @@ final class AppModel {
     /// When helpers running without the wrapper were first seen, per space.
     private var unwrappedSince: [UUID: Date] = [:]
     private var lookingAtPrograms = false
+    /// Spaces being stopped because Wine ran away in them (`guardRunaways`), so the next look doesn't stop them twice.
+    private var stoppingRunaways = Set<UUID>()
+    /// A space is past half a runaway limit: the next looks come quickly.
+    private var runawayLikely = false
 
     /// Looks at which programs run, off the main thread. A look already under way makes this a no-op.
     func refreshPrograms() {
@@ -734,6 +868,55 @@ final class AppModel {
             noticeStoreGames(found)
             noticeWorkingGames(found)
             guardHelperWrappers(all)
+            guardRunaways(all, found: found)
+        }
+    }
+
+    /// Wine that starts programs without end (a prefix whose path is too long does it: Explorer never comes up, and every
+    /// program starts another one) would use up the Mac's processes. A space past the limits of `SpaceLoad` is stopped at
+    /// once, and the user is told.
+    private func guardRunaways(_ all: [WineProcess], found: [UUID: [WineProcess]]) {
+        var likely = false
+        for space in state.spaces where !stoppingRunaways.contains(space.id) {
+            // Programs of the space's games count too, also those of a game kept outside the space's folder.
+            let load = WineProcesses.load(of: space, from: all,
+                                          alsoAttributed: state.games(in: space).flatMap { found[$0.id] ?? [] })
+            likely = likely || load.isGrowing
+            if load.isRunaway { stopRunaway(space, load) }
+        }
+        runawayLikely = likely
+    }
+
+    /// Kills what runs in the space, then asks its Wine server to quit. Signals first: with thousands of processes the Mac
+    /// may refuse to start the `wineserver -k` that follows. What is left or comes back is killed again, up to five times.
+    private func stopRunaway(_ space: Space, _ load: SpaceLoad) {
+        stoppingRunaways.insert(space.id)
+        errorMessage = load.message(spaceName: space.name)
+        let games = state.games(in: space)
+        for g in games { autoLaunches[g.id] = nil }                 // stopped on purpose: not a failure to learn from
+        let engine = engineManager?.engine(id: space.engineID)      // also with Apple's toolkit off, as Stop All
+        let entries = games.map { (game: $0, space: space) }
+        Task.detached(priority: .userInitiated) {
+            // Looked up again each time, so a pid reused since the look that found the runaway is never hit.
+            func left() -> [WineProcess] {
+                let all = WineProcesses.snapshot()
+                let found = RunningGames.programs(of: entries, in: all)
+                return WineProcesses.load(of: space, from: all, alsoAttributed: found.values.flatMap { $0 }).processes
+                    .filter { $0.pid > 1 }
+            }
+            left().forEach { kill($0.pid, SIGKILL) }
+            if let engine { await WineLauncher.killAll(engine: engine, space: space) }
+            for _ in 0..<5 {
+                try? await Task.sleep(for: .milliseconds(500))
+                let rest = left()
+                if rest.isEmpty { break }
+                rest.forEach { kill($0.pid, SIGKILL) }
+            }
+            await MainActor.run {
+                self.stoppingRunaways.remove(space.id)
+                for g in games { self.running[g.id] = nil }
+                self.refreshPrograms()
+            }
         }
     }
 
@@ -825,6 +1008,7 @@ final class AppModel {
                 self.refreshPrograms()
                 // Closely while a store game is starting, so one that closes within seconds is seen at all.
                 let watching = !self.startingUntil.isEmpty || !self.firstSeen.isEmpty || !self.helperWatchUntil.isEmpty
+                    || self.runawayLikely
                 let seconds: Double = watching ? 1.5 : NSApp?.isActive == true ? 4 : 20
                 try? await Task.sleep(for: .seconds(seconds))
             }

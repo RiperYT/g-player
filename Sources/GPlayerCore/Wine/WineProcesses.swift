@@ -72,6 +72,16 @@ public enum WineProcesses {
         programs(in: space, from: processes).contains { !$0.isWineService }
     }
 
+    /// What runs in the space, counted to catch Wine starting programs without end (`SpaceLoad`). Wine's programs
+    /// have lost their parent (the launch daemon is it), so the parent says nothing: a program is the space's by where
+    /// it works and what it was started with, as in `programs(in:from:)`. `alsoAttributed` adds programs found another
+    /// way, such as those of a game kept outside the space's folder (`RunningGames.programs`).
+    public static func load(of space: Space, from processes: [WineProcess], alsoAttributed: [WineProcess] = []) -> SpaceLoad {
+        var seen = Set<Int32>()
+        let mine = (programs(in: space, from: processes) + alsoAttributed).filter { seen.insert($0.pid).inserted }
+        return SpaceLoad(processes: mine)
+    }
+
     /// True when Steam or one of its helpers runs in the space.
     public static func isSteamRunning(in space: Space, processes: [WineProcess]) -> Bool {
         programs(in: space, from: processes).contains { p in
@@ -183,6 +193,37 @@ public enum WineProcesses {
             let bytes = raw.prefix { $0 != 0 }
             return bytes.isEmpty ? nil : String(decoding: bytes, as: UTF8.self)
         }
+    }
+}
+
+/// The Windows programs of one space, and whether there are far more than a space ever runs. A prefix Wine can't
+/// start in (one whose path is too long, say) makes `explorer.exe /desktop` fail, and every Wine program then starts
+/// another one until the Mac can't start any process. G-Player stops a space past these limits at once.
+public struct SpaceLoad: Sendable {
+    /// More copies of Explorer than this: a space has one for its desktop, and one per Explorer window the user opens.
+    public static let maxExplorers = 12
+    /// More programs than this in one space: Wine's services, Steam and its helpers, and a game with its own helpers
+    /// come to a few dozen.
+    public static let maxPrograms = 200
+
+    public let processes: [WineProcess]
+
+    public var programs: Int { processes.count }
+    public var explorers: Int { processes.filter { $0.programName == "explorer.exe" }.count }
+
+    /// Past a limit: stop the space.
+    public var isRunaway: Bool { explorers > Self.maxExplorers || programs > Self.maxPrograms }
+    /// Past half a limit: worth looking at again soon.
+    public var isGrowing: Bool { explorers > Self.maxExplorers / 2 || programs > Self.maxPrograms / 2 }
+
+    /// What to tell the user after the space was stopped: what happened, and what usually causes it.
+    public func message(spaceName: String) -> String {
+        let what = explorers > Self.maxExplorers
+            ? "\(programs) Windows programs were running, \(explorers) of them Windows Explorer"
+            : "\(programs) Windows programs were running"
+        return "“\(spaceName)” was starting Windows programs without end: \(what). G-Player stopped everything in it "
+            + "to keep your Mac usable. A long folder path is the usual cause. Keep a space's path under "
+            + "\(PrefixPath.maxLength) characters."
     }
 }
 

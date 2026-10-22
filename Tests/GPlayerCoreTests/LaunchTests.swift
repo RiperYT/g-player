@@ -325,12 +325,56 @@ import Testing
         let found = EnvironmentFinder.find(home: home, gptkInstalled: true)
         let byName = Dictionary(uniqueKeysWithValues: found.map { ($0.name, $0) })
         #expect(byName["Steam"]?.presetID == "steam")
-        #expect(byName["Steam"]?.suggestedEngineID == EngineCatalog.wineStaging.id)
+        #expect(byName["Steam"]?.suggestedEngineID == EngineCatalog.defaultForNewSpaces.id)     // a CrossOver bottle
         #expect(byName["Celeste"]?.games.first?.executable.path == exe.path)
         #expect(byName["Celeste"]?.suggestedEngineID == EngineCatalog.gptk.id)
         #expect(byName["Lumen"]?.games.first?.executable.path == lumen.path)
         #expect(byName["Lumen"]?.games.first?.title == "Lumen")
         #expect(byName["Lumen"]?.games.first?.arguments.contains("--in-process-gpu") == true)
+    }
+
+    @Test func bottlesGetGPlayerWineAndOtherPrefixesKeepTheirEngine() {
+        let tmp = TempFolder()
+        _ = tmp.prefix("Library/Application Support/CrossOver/Bottles/Bottle")
+        _ = tmp.prefix("Library/Containers/com.isaacmarovitz.Whisky/Bottles/Old")
+        _ = tmp.prefix("Games/Plain")
+        _ = tmp.prefix("Games/Scripted")
+        tmp.file("Games/play-scripted.sh", contents: Data("""
+        export WINEPREFIX="$HOME/Games/Scripted"
+        exec "/Applications/Wine Staging.app/Contents/Resources/wine/bin/wine64" "$@"
+        """.utf8))
+        let gplayerWine = EngineCatalog.crossover.id, staging = EngineCatalog.wineStaging.id
+        for toolkit in [false, true] {
+            let byName = Dictionary(uniqueKeysWithValues: EnvironmentFinder.find(home: tmp.url, gptkInstalled: toolkit).map { ($0.name, $0) })
+            #expect(byName["Bottle"]?.suggestedEngineID == gplayerWine)
+            #expect(byName["Old"]?.suggestedEngineID == gplayerWine)
+            // A plain prefix may have been opened by Wine Staging 11.18: it isn't moved to an older Wine unasked.
+            #expect(byName["Plain"]?.suggestedEngineID == (toolkit ? EngineCatalog.gptk.id : staging))
+            #expect(byName["Scripted"]?.suggestedEngineID == staging)
+        }
+    }
+
+    @Test func aLauncherScriptsEngineWinsAlsoForSteamPrefixes() {
+        let tmp = TempFolder()
+        let steam = "drive_c/Program Files (x86)/Steam/steam.exe"
+        for name in ["Plain", "ByScript", "ByToolkitScript"] {
+            _ = tmp.prefix("Games/\(name)")
+            tmp.file("Games/\(name)/\(steam)")
+        }
+        tmp.file("Games/play-byscript.sh", contents: Data("""
+        export WINEPREFIX="$HOME/Games/ByScript"
+        exec "/Applications/Wine Staging.app/Contents/Resources/wine/bin/wine64" "$@"
+        """.utf8))
+        tmp.file("Games/play-bytoolkit.sh", contents: Data("""
+        export WINEPREFIX="$HOME/Games/ByToolkitScript"
+        GPTK="/Applications/Game Porting Toolkit.app/Contents/Resources/wine"
+        """.utf8))
+        let byName = Dictionary(uniqueKeysWithValues: EnvironmentFinder.find(home: tmp.url, gptkInstalled: true).map { ($0.name, $0) })
+        // Steam doesn't start on Apple's wine 7.7, so a script naming it doesn't decide for a Steam prefix.
+        for name in ["Plain", "ByScript", "ByToolkitScript"] {
+            #expect(byName[name]?.presetID == "steam")
+            #expect(byName[name]?.suggestedEngineID == EngineCatalog.wineStaging.id)
+        }
     }
 
     @Test func skipsTheLibraryItself() {

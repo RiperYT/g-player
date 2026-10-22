@@ -2,7 +2,17 @@ import AppKit
 import GPlayerCore
 import SwiftUI
 
-@main
+/// The entry point. A start with `--render-onboarding <folder>` draws the UI into PNGs and exits (`SnapshotRenderer`).
+@main @MainActor
+enum Launcher {
+    static func main() {
+        if let folder = LaunchArguments.snapshotFolder(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment) {
+            SnapshotRenderer.run(into: folder)
+        }
+        GPlayerApp.main()
+    }
+}
+
 struct GPlayerApp: App {
     @State private var model = AppModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate

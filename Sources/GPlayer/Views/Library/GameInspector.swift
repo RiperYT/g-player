@@ -117,7 +117,7 @@ struct GameInspector: View {
                 }
                 GridRow {
                     Text("Engine").foregroundStyle(.secondary)
-                    Text(EngineCatalog.info(space.engineID).map { "\($0.name) \($0.version)" } ?? space.engineID)
+                    Text(EngineCatalog.info(space.engineID)?.displayName ?? space.engineID)
                 }
             }
             GridRow { Text("Source").foregroundStyle(.secondary); Text(game.source.label) }

@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+- **A runaway Wine can no longer flood the Mac with processes.** G-Player won't create or add a space whose folder
+  path is over 150 characters (the library folder is limited to 114), and long space names are shortened. If a space
+  ever runs more than 12 Windows Explorer copies or 200 programs, G-Player stops everything in it and says why.
+- **G-Player Wine is the recommended engine.** The first launch installs Wine Staging and then G-Player Wine, which
+  reuses Staging's libraries, so nothing downloads twice. The first spaces (Main, Steam) are made once an engine is in,
+  also after a quit before the downloads ended. A new space gets G-Player Wine, or Wine Staging while that is the only
+  engine installed (no download when you're offline), and the pickers show each engine's size. If G-Player Wine can't be
+  downloaded for a new space, Staging is used and G-Player says so. CrossOver and Whisky bottles found on the Mac get
+  G-Player Wine; other prefixes keep their engine. Settings › Engines lists G-Player Wine first as Recommended. Spaces you
+  already have keep their engine. Engine downloads no longer share files, and a download asked for twice at once is
+  shared.
+- **Releases are a disk image.** Open `G-Player-<version>.dmg` and drag G-Player onto Applications. The app is signed
+  and notarized, so macOS opens it without asking; a newer version goes over the old one and the library stays.
+- **Game volume on G-Player Wine.** Wine applied a game's own volume by writing the Mac's output volume, which failed
+  on AirPods and the MacBook speakers (a game's volume setting did nothing) and changed the Mac's volume on outputs
+  where it worked. G-Player Wine's CoreAudio driver now scales the game's sound itself, as Wine does on Linux, and never
+  touches the Mac's volume; a program's recording volume and mute apply to what it records
+  (`tools/wine-patches/cx-coreaudio-stream-volume.patch`, put into the installed engine like the other engine fixes, and
+  over the first version of this fix).
+
 ## [0.4.1] - 2026-10-22
 
 - **Automatic graphics.** With the Recommended or Fast profile, a game that fails because its graphics don't start (or crash)

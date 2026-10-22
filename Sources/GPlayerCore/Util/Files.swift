@@ -34,12 +34,24 @@ public enum Files {
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &dir) && dir.boolValue
     }
 
-    /// A folder name that is safe on macOS and inside Wine (no slashes, colons or reserved characters).
-    public static func safeName(_ name: String) -> String {
+    /// The longest folder name `safeName` makes unless asked for less.
+    public static let defaultNameLength = 80
+
+    /// A folder name that is safe on macOS and inside Wine (no slashes, colons or reserved characters), cut to
+    /// `maxLength` UTF-16 units (how Windows counts) so a long title can't make a path Wine can't use (`PrefixPath`).
+    public static func safeName(_ name: String, maxLength: Int = defaultNameLength) -> String {
         let bad = CharacterSet(charactersIn: "/\\:*?\"<>|").union(.controlCharacters)
-        let cleaned = name.components(separatedBy: bad).joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
-        return cleaned.isEmpty ? "Untitled" : String(cleaned.prefix(80))
+        let trim = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "."))
+        let cleaned = name.components(separatedBy: bad).joined(separator: " ").trimmingCharacters(in: trim)
+        var cut = "", units = 0
+        for character in cleaned {
+            units += String(character).utf16.count
+            if units > maxLength { break }
+            cut.append(character)
+        }
+        // A cut can end on a space or a dot, which Windows drops from a folder name.
+        cut = cut.trimmingCharacters(in: trim)
+        return cut.isEmpty ? "Untitled" : cut
     }
 
     /// `base`, or `base 2`, `base 3`… so nothing existing is overwritten.

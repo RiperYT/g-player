@@ -26,6 +26,46 @@ import Testing
         #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .alreadyApplied)
     }
 
+    @Test func anOlderFixIsReplacedAndTheOriginalStaysTheBackup() throws {
+        let tmp = TempFolder()
+        let original = Data("gcenx".utf8), older = Data("fixed v1".utf8), fixed = Data("fixed v2".utf8)
+        let root = tmp.url.appendingPathComponent("wine")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        try older.write(to: root.appendingPathComponent("lib/x.dll"))
+        try original.write(to: root.appendingPathComponent("lib/x.dll.gcenx"))
+        let source = tmp.file("fixed.dll", contents: fixed)
+        var f = fix(original: original, fixed: fixed)
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .unknownOriginal)
+        f.replaces = [sha(older)]
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .applied)
+        #expect(try Data(contentsOf: root.appendingPathComponent("lib/x.dll")) == fixed)
+        #expect(try Data(contentsOf: root.appendingPathComponent("lib/x.dll.gcenx")) == original)
+    }
+
+    @Test func anOlderFixWithoutTheOriginalBackupIsLeftAlone() throws {
+        let tmp = TempFolder()
+        let older = Data("fixed v1".utf8)
+        let root = tmp.url.appendingPathComponent("wine")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        try older.write(to: root.appendingPathComponent("lib/x.dll"))
+        let source = tmp.file("fixed.dll", contents: Data("fixed v2".utf8))
+        var f = fix(original: Data("gcenx".utf8), fixed: Data("fixed v2".utf8))
+        f.replaces = [sha(older)]
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .unknownOriginal)
+        #expect(try Data(contentsOf: root.appendingPathComponent("lib/x.dll")) == older)
+    }
+
+    @Test func theSameCodeSignedDifferentlyCountsAsApplied() throws {
+        let tmp = TempFolder()
+        let unsigned = Data("fixed, unsigned".utf8)
+        let root = tmp.url.appendingPathComponent("wine")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        try unsigned.write(to: root.appendingPathComponent("lib/x.dll"))
+        var f = fix(original: Data("gcenx".utf8), fixed: Data("fixed, signed".utf8))
+        f.alsoFixed = [sha(unsigned)]
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in nil }) == .alreadyApplied)
+    }
+
     @Test func anUnknownFileIsLeftAlone() throws {
         let tmp = TempFolder()
         let root = tmp.url.appendingPathComponent("wine")

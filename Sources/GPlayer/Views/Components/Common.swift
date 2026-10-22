@@ -61,6 +61,20 @@ struct ActivityPanel: View {
     }
 }
 
+/// Why a folder can't be used: a warning icon and the reason.
+struct PathWarning: View {
+    let text: String
+    var font: Font = .callout
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(text).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(font)
+    }
+}
+
 /// A path in monospace with a Finder button.
 struct PathRow: View {
     let url: URL

@@ -91,6 +91,22 @@ public struct EngineManager: Sendable {
         return nil
     }
 
+    /// Where an engine's downloads go while it installs. One folder per engine: Wine Staging and G-Player Wine both
+    /// download the same DXVK archive, and each deletes its copy after unpacking, which would break the other's.
+    func downloadFolder(for info: EngineInfo) -> URL { paths.downloads.appendingPathComponent(info.id, isDirectory: true) }
+    func downloadFile(_ item: PinnedDownload, of info: EngineInfo) -> URL {
+        downloadFolder(for: info).appendingPathComponent(item.fileName)
+    }
+
+    /// A download that failed because the connection is down, so the same download would fail again right now.
+    public static func isConnectionFailure(_ error: Error) -> Bool {
+        guard let code = (error as? URLError)?.code else { return false }
+        let down: Set<URLError.Code> = [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost,
+                                        .cannotConnectToHost, .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff,
+                                        .secureConnectionFailed]
+        return down.contains(code)
+    }
+
     /// Downloads, verifies and unpacks an engine. `progress` gets 0…1.
     public func install(_ info: EngineInfo, progress: @escaping @Sendable (Double, String) -> Void) async throws -> Engine {
         guard !info.downloads.isEmpty else {
@@ -111,7 +127,7 @@ public struct EngineManager: Sendable {
                 done += Double(item.approximateBytes)
                 continue
             }
-            let file = paths.downloads.appendingPathComponent(item.fileName)
+            let file = downloadFile(item, of: info)
             if !(FileManager.default.fileExists(atPath: file.path) && (try? Files.sha256(of: file)) == item.sha256) {
                 let base = done
                 try await FileDownloader.download(item.url, to: file) { fraction in
@@ -143,6 +159,7 @@ public struct EngineManager: Sendable {
         await Files.clearQuarantine(staging)
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: staging, to: target)
+        try? FileManager.default.removeItem(at: downloadFolder(for: info))
         progress(1, "Ready")
         guard let engine = engine(info) else { throw ShellError.failed("\(info.name) was unpacked but can't be found.") }
         EngineFixes.apply(to: engine)

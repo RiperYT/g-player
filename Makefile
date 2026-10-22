@@ -15,7 +15,7 @@ app: ## Build build/G-Player.app
 run: app ## Build and open the app
 	open build/G-Player.app
 
-release: ## Zip the app into releases/v<VERSION>/
+release: ## Disk image of the app in releases/v<VERSION>/
 	scripts/release.sh
 
 publish: ## release + create the GitHub release

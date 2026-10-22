@@ -33,14 +33,14 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - Store installers (Steam, Epic Games Launcher, GOG Galaxy, Ubisoft Connect) from their publishers.
   - Steam cover art from Valve's CDN, shown in the library and cached on the user's Mac.
 
-G-Player includes three modified Wine files for G-Player Wine, Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll.so,
-cx-ntdll-x86_64.dll and cx-ntdll-i386.dll, built from CodeWeavers' CrossOver 26.3.0 source
+G-Player includes four modified Wine files for G-Player Wine, Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll.so,
+cx-ntdll-x86_64.dll, cx-ntdll-i386.dll and cx-winecoreaudio.so, built from CodeWeavers' CrossOver 26.3.0 source
 (https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz, SHA-256
 ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872, LGPL-2.1+) with tools/wine-patches/cx-*.patch
 (LGPL-2.1+; cx-nx-compat.patch is by Alexander Theißen, from https://github.com/athei/wine commit
 539aa62220ad23a390ce9f2a1c99ee5d3831907b), by scripts/build-engine-cx.sh. That tarball, the patches and the build
 script are the complete corresponding source for these files (the source tarball published with G-Player Wine
-26.3.0-1 is the same tree before cx-nx-compat.patch).
+26.3.0-1 is the same tree before cx-nx-compat.patch and cx-coreaudio-stream-volume.patch).
 
 G-Player includes one more modified Wine file, Sources/GPlayerCore/Resources/engine-fixes/wow64cpu.dll, built from the
 Wine 11.18 source tarball (https://dl.winehq.org/wine/source/11.x/wine-11.18.tar.xz, SHA-256
@@ -50,7 +50,7 @@ of CodeWeavers' CrossOver (CW HACK 20760, also LGPL). Wine's license is in
 Sources/GPlayerCore/Resources/licenses/Wine-COPYING.LIB.txt. That tarball, the patch and the build script are the
 complete corresponding source for the file.
 
-G-Player includes MoltenVK 1.4.2 unchanged, Sources/GPlayerCore/Resources/engine-fixes/libMoltenVK.dylib, from the
+G-Player includes MoltenVK 1.4.2 (code unchanged, signed with G-Player's Developer ID), Sources/GPlayerCore/Resources/engine-fixes/libMoltenVK.dylib, from the
 Khronos Group's release (https://github.com/KhronosGroup/MoltenVK/releases/tag/v1.4.2, MoltenVK-macos.tar, SHA-256
 f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e), fetched by scripts/fetch-moltenvk.sh:
   MoltenVK, Copyright (c) 2015-2026 The Brenwill Workshop Ltd., Apache License 2.0.
