@@ -217,10 +217,14 @@ import Testing
 
     @Test func aSpaceThatIsDiscardedIsGoneForGoodAndAnExternalOneIsNeverTouched() throws {
         let tmp = TempFolder()
-        let manager = SpaceManager(paths: LibraryPaths(root: tmp.url))
+        let manager = SpaceManager(paths: LibraryPaths(root: tmp.url.appendingPathComponent("Library")))
         let made = space(at: tmp.prefix("Library/Spaces/Made"))
         try manager.delete(made, permanently: true)
         #expect(!FileManager.default.fileExists(atPath: made.url.path))
+        // A managed record pointing outside the library's Spaces folder is never deleted for good.
+        let stray = space(at: tmp.prefix("Elsewhere/Made"))
+        #expect(throws: ShellError.self) { try manager.delete(stray, permanently: true) }
+        #expect(FileManager.default.fileExists(atPath: stray.url.path))
         var found = space(at: tmp.prefix("Bottles/Mine"))
         found.origin = .external
         try manager.delete(found, permanently: true)

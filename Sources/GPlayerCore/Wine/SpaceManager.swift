@@ -120,7 +120,14 @@ public struct SpaceManager: Sendable {
     /// moment ago for something that came to nothing, which has only Windows in it and isn't worth a Trash full of Wine).
     public func delete(_ space: Space, permanently: Bool = false) throws {
         guard space.origin == .managed else { return }
-        if permanently { try FileManager.default.removeItem(at: space.url) }
+        if permanently {
+            // Never for good outside the library's own Spaces folder, whatever the record says.
+            let spaces = paths.spaces.standardizedFileURL.resolvingSymlinksInPath().path + "/"
+            guard space.url.standardizedFileURL.resolvingSymlinksInPath().path.hasPrefix(spaces) else {
+                throw ShellError.failed("“\(space.name)” isn't in the library's Spaces folder, so G-Player leaves it where it is.")
+            }
+            try FileManager.default.removeItem(at: space.url)
+        }
         else { try FileManager.default.trashItem(at: space.url, resultingItemURL: nil) }
     }
 
