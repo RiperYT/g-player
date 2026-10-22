@@ -27,8 +27,8 @@ if [ -n "${SIGN_IDENTITY:-}" ]; then
   TEAM="$(sed -n 's/.*(\([A-Z0-9]*\))$/\1/p' <<<"$SIGN_IDENTITY")"
   while IFS= read -r -d '' f; do
     file -b "$f" | grep -q Mach-O || continue
-    codesign -dv "$f" 2>&1 | grep -q "TeamIdentifier=$TEAM" \
-      || { echo "${f#$APP/} isn't signed by $TEAM" >&2; exit 1; }
+    info="$(codesign -dv "$f" 2>&1 || true)"     # read whole: grep -q would cut the pipe under pipefail
+    [[ "$info" == *"TeamIdentifier=$TEAM"* ]] || { echo "${f#$APP/} isn't signed by $TEAM" >&2; exit 1; }
   done < <(find "$APP/Contents/Resources" -type f -print0)
   codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
 else
