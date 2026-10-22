@@ -1,3 +1,6 @@
+Rosetta 2 far-jump workaround for Wine 11.18 dlls/wow64cpu (see README.md).
+Licensed under the GNU LGPL 2.1 or later, like Wine. Approach after CodeWeavers CrossOver "CW HACK 20760".
+
 --- a/dlls/wow64cpu/cpu.c
 +++ b/dlls/wow64cpu/cpu.c
 @@ -19,6 +19,7 @@
@@ -56,7 +59,7 @@
 +
 +static BOOL is_rosetta(void)
 +{
-+    char buffer[64];
++    char DECLSPEC_ALIGN(4) buffer[64];   /* the call fails on a misaligned buffer */
 +    if (NtQuerySystemInformation( SystemProcessorBrandString, buffer, sizeof(buffer), NULL )) return FALSE;
 +    buffer[sizeof(buffer) - 1] = 0;
 +    return strstr( buffer, "VirtualApple" ) != NULL;

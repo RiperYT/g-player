@@ -21,10 +21,12 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - Steam cover art from Valve's CDN, shown in the library and cached on the user's Mac.
 
 G-Player includes one modified Wine file, Sources/GPlayerCore/Resources/engine-fixes/wow64cpu.dll, built from the
-Wine 11.18 source (https://www.winehq.org, LGPL-2.1+) with tools/wine-patches/wow64cpu-rosetta.patch by
-scripts/build-wow64cpu.sh. The patch follows the approach of CodeWeavers' CrossOver (CW HACK 20760, also LGPL).
-Wine's license is in Sources/GPlayerCore/Resources/licenses/Wine-COPYING.LIB.txt; the patch and the build script
-are the complete corresponding source for that file.
+Wine 11.18 source tarball (https://dl.winehq.org/wine/source/11.x/wine-11.18.tar.xz, SHA-256
+c6282f6d4daecf11f3ab9f9a2b6c598f67be7e28c363ba2cae8a3c44b611e7a4, LGPL-2.1+) with
+tools/wine-patches/wow64cpu-rosetta.patch (LGPL-2.1+), by scripts/build-wow64cpu.sh. The patch follows the approach
+of CodeWeavers' CrossOver (CW HACK 20760, also LGPL). Wine's license is in
+Sources/GPlayerCore/Resources/licenses/Wine-COPYING.LIB.txt. That tarball, the patch and the build script are the
+complete corresponding source for the file.
 
 Apple's Game Porting Toolkit and D3DMetal are never part of G-Player and are never downloaded by it.
 G-Player can use a copy the user installed themselves, only when they turn it on in Settings.

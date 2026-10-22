@@ -1,91 +1,69 @@
+import Darwin
 import Foundation
 
-/// Which Windows programs run in a space, read from the Mac's process list. Installers and settings changes wait for
-/// every program in a space to quit, so G-Player doesn't start them while a game or Steam is open.
-public enum WineProcesses {
-    /// The command line of every process on the Mac, one per line (`ps -axo command=`). It takes a moment, so the
-    /// caller runs it off the main thread.
-    public static func commandLines() -> String {
-        let ps = Process()
-        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
-        ps.arguments = ["-axo", "command="]
-        let out = Pipe()
-        ps.standardOutput = out
-        ps.standardError = FileHandle.nullDevice
-        guard (try? ps.run()) != nil else { return "" }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        ps.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    /// True when a program of the space runs: some command line holds the path of its `drive_c`, or sets
-    /// `WINEPREFIX=<space path> ` (with the space after it, so `Main` doesn't match `Main 2`).
-    public static func isRunning(in space: Space, commandLines: String) -> Bool {
-        !lines(of: space, in: commandLines).isEmpty
-    }
-
-    /// True when Steam runs in the space: one of its programs (`steam.exe`, `steamwebhelper.exe`, `steamservice.exe`)
-    /// is among the space's processes.
-    public static func isSteamRunning(in space: Space, commandLines: String) -> Bool {
-        lines(of: space, in: commandLines).contains { line in
-            let lower = line.lowercased()
-            return lower.contains("steam.exe") || lower.contains("steamwebhelper") || lower.contains("steamservice.exe")
-        }
-    }
-
-    /// The command lines that belong to the space.
-    private static func lines(of space: Space, in commandLines: String) -> [Substring] {
-        let driveC = space.driveC.path
-        let prefix = "WINEPREFIX=\(space.path) "
-        return commandLines.split(separator: "\n").filter { $0.contains(driveC) || $0.contains(prefix) }
-    }
-}
-
-/// A Windows program running on the Mac, as the process list shows it.
+/// A Windows program running on the Mac, as the kernel's process table shows it.
 public struct WineProcess: Sendable, Hashable {
     public let pid: Int32
     /// Its command line: a Windows path (`C:\…\steam.exe -silent`) or, for programs G-Player started, a Mac path.
     public let command: String
     /// The Mac folder it works in. Wine keeps a program's working folder in step with its Windows current folder,
-    /// which lies in the space's `drive_c` for programs installed there, so this tells which space it belongs to
-    /// even when the command line doesn't.
+    /// which lies in the space's `drive_c` for programs installed there, or in the game's folder elsewhere.
     public var directory: String?
+    /// `WINEPREFIX` from its environment. Only programs started straight from the Mac (by G-Player or a script)
+    /// have it; Windows programs those start don't show their environment.
+    public var prefix: String?
+    /// "steam.exe": the file name of the program, lowercased, if the command line names a .exe.
+    public let programName: String?
 
-    public init(pid: Int32, command: String, directory: String? = nil) {
-        self.pid = pid; self.command = command; self.directory = directory
+    public init(pid: Int32, command: String, directory: String? = nil, prefix: String? = nil) {
+        self.pid = pid; self.command = command; self.directory = directory; self.prefix = prefix
+        programName = Self.programName(in: command)
     }
 
-    /// "steam.exe": the file name of the program, lowercased, if the command line names a .exe.
-    public var programName: String? {
+    static func programName(in command: String) -> String? {
         guard let end = command.range(of: ".exe", options: .caseInsensitive) else { return nil }
         let path = command[..<end.upperBound]
         let start = path.lastIndex { $0 == "\\" || $0 == "/" }.map { path.index(after: $0) } ?? path.startIndex
         return String(path[start...]).lowercased()
     }
 
-    /// Wine's own background programs (services.exe, explorer.exe /desktop…), which run as long as anything does.
-    public var isWineService: Bool { command.lowercased().hasPrefix(#"c:\windows\"#) }
-}
-
-extension WineProcesses {
-    /// Every Windows program running on the Mac, with its working folder. Reads `ps` and `lsof`, so it takes a
-    /// moment: call it off the main thread.
-    public static func snapshot() -> [WineProcess] {
-        let found = windowsPrograms(inProcessList: run("/bin/ps", ["-axww", "-o", "pid=,command="]))
-        guard !found.isEmpty else { return [] }
-        let folders = workingFolders(inLsof: run("/usr/sbin/lsof", ["-nP", "-a", "-d", "cwd", "-Fpn", "-p",
-                                                                    found.map { String($0.pid) }.joined(separator: ",")]))
-        return found.map { var p = $0; p.directory = folders[p.pid]; return p }
+    /// Wine's own background programs, which run as long as anything in the space does. Tools the user opens from
+    /// C:\windows (winecfg, regedit, msiexec, cmd…) are not among them.
+    public var isWineService: Bool {
+        let lower = command.lowercased()
+        guard lower.hasPrefix(#"c:\windows\"#) else { return false }
+        if programName == "explorer.exe" { return lower.contains("/desktop") }
+        return Self.services.contains(programName ?? "")
     }
 
-    /// The programs among `processes` that belong to the space: they work in a folder inside it, or their command
-    /// line is a program from its `drive_c`.
+    static let services: Set<String> = ["services.exe", "winedevice.exe", "plugplay.exe", "svchost.exe", "rpcss.exe",
+                                        "lsass.exe", "conhost.exe", "tabtip.exe", "wineboot.exe", "mscorsvw.exe"]
+}
+
+/// Which Windows programs run where. Installers wait for every program in a space to quit, so G-Player doesn't start
+/// them while a game or Steam is open, and the library shows what is running.
+public enum WineProcesses {
+    /// Every Windows program running on the Mac, with its working folder and, when it shows, its `WINEPREFIX`. Reads
+    /// the kernel's process table directly (no `ps`), so names in any language come through; still, call it off the
+    /// main thread.
+    public static func snapshot() -> [WineProcess] {
+        allPIDs().compactMap { pid in
+            guard let (arguments, environment) = arguments(of: pid) else { return nil }
+            let command = arguments.joined(separator: " ")
+            guard isWindowsProgram(command) else { return nil }
+            return WineProcess(pid: pid, command: command, directory: workingFolder(of: pid),
+                               prefix: environment["WINEPREFIX"])
+        }
+    }
+
+    /// The programs among `processes` that belong to the space: started with its `WINEPREFIX`, working in a folder
+    /// inside it, or running a program from its `drive_c`.
     public static func programs(in space: Space, from processes: [WineProcess]) -> [WineProcess] {
-        let roots = Set([space.url.standardizedFileURL.path, space.url.resolvingSymlinksInPath().path])
-        let driveCs = roots.map { $0 + "/drive_c/" }
+        let roots = paths(of: space.url)
         return processes.filter { p in
-            if let dir = p.directory, roots.contains(where: { dir == $0 || dir.hasPrefix($0 + "/") }) { return true }
-            return driveCs.contains { p.command.contains($0) }
+            if let prefix = p.prefix, roots.contains(standardized(prefix)) { return true }
+            if let dir = p.directory, roots.contains(where: { isInside(dir, $0) }) { return true }
+            return roots.contains { p.command.contains($0 + "/drive_c/") }
         }
     }
 
@@ -102,42 +80,156 @@ extension WineProcesses {
         }
     }
 
-    // MARK: Reading the lists
+    /// The programs of one game: those working in its folder (any space, so a game kept outside its space's
+    /// `drive_c` counts), or naming a program inside it. A launcher has no folder of its own worth matching (Steam's
+    /// games live inside Steam's folder), so it is matched by its program name within its space instead.
+    public static func programs(ofGameIn folder: URL?, programName: String?, space: Space,
+                                from processes: [WineProcess]) -> [WineProcess] {
+        if let folder {
+            let roots = paths(of: folder)
+            return processes.filter { p in
+                if p.isWineService { return false }
+                if let dir = p.directory, roots.contains(where: { isInside(dir, $0) }) { return true }
+                return roots.contains { p.command.contains($0 + "/") }
+            }
+        }
+        guard let name = programName?.lowercased() else { return [] }
+        return programs(in: space, from: processes).filter { $0.programName == name }
+    }
 
-    /// `pid command` lines from `ps`, keeping the ones that are Windows programs: a command line that starts with a
-    /// drive letter, names a program in a `drive_c`, or names a .exe.
-    static func windowsPrograms(inProcessList text: String) -> [WineProcess] {
-        text.split(separator: "\n").compactMap { line in
-            let trimmed = line.drop { $0 == " " }
-            guard let space = trimmed.firstIndex(of: " "), let pid = Int32(trimmed[..<space]) else { return nil }
-            let command = String(trimmed[trimmed.index(after: space)...])
-            let isWindows = command.range(of: #"^[A-Za-z]:\\"#, options: .regularExpression) != nil
-                || command.contains("/drive_c/") || command.range(of: ".exe", options: .caseInsensitive) != nil
-            return isWindows ? WineProcess(pid: pid, command: command) : nil
+    // MARK: Paths
+
+    /// A folder's path as given and with symlinks resolved, without a trailing slash.
+    static func paths(of url: URL) -> Set<String> {
+        Set([url.standardizedFileURL.path, url.resolvingSymlinksInPath().path].map { standardized($0) })
+    }
+
+    static func standardized(_ path: String) -> String {
+        path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+    }
+
+    /// `path` is `folder` or inside it (`/a/Main` is not inside `/a/Main 2`).
+    static func isInside(_ path: String, _ folder: String) -> Bool {
+        path == folder || path.hasPrefix(folder + "/")
+    }
+
+    /// A command line that is a Windows program: it starts with a drive letter, runs something from a `drive_c`, or
+    /// names a .exe.
+    static func isWindowsProgram(_ command: String) -> Bool {
+        command.range(of: #"^[A-Za-z]:\\"#, options: .regularExpression) != nil
+            || command.contains("/drive_c/") || command.range(of: ".exe", options: .caseInsensitive) != nil
+    }
+
+    // MARK: The process table
+
+    private static func allPIDs() -> [pid_t] {
+        let needed = proc_listallpids(nil, 0)
+        guard needed > 0 else { return [] }
+        var pids = [pid_t](repeating: 0, count: Int(needed) + 64)
+        let count = pids.withUnsafeMutableBytes { proc_listallpids($0.baseAddress, Int32($0.count)) }
+        return count > 0 ? pids.prefix(Int(count)).filter { $0 > 0 } : []
+    }
+
+    /// The arguments and environment of a process (the user's own processes only), from `KERN_PROCARGS2`.
+    static func arguments(of pid: pid_t) -> ([String], [String: String])? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size else { return nil }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return nil }
+        return parseProcArgs(Array(buffer.prefix(size)))
+    }
+
+    /// `KERN_PROCARGS2` layout: argc (Int32), the executable path, NUL padding, then argc arguments and the
+    /// environment, each NUL-terminated.
+    static func parseProcArgs(_ bytes: [UInt8]) -> ([String], [String: String])? {
+        guard bytes.count > 4 else { return nil }
+        let argc = Int(bytes.withUnsafeBytes { $0.loadUnaligned(as: Int32.self) })
+        guard argc >= 0 else { return nil }
+        var i = 4
+        while i < bytes.count, bytes[i] != 0 { i += 1 }          // executable path
+        while i < bytes.count, bytes[i] == 0 { i += 1 }          // padding
+        func next() -> String? {
+            guard i < bytes.count else { return nil }
+            let start = i
+            while i < bytes.count, bytes[i] != 0 { i += 1 }
+            defer { i += 1 }
+            return String(decoding: bytes[start..<i], as: UTF8.self)
+        }
+        var args: [String] = []
+        for _ in 0..<argc { guard let a = next() else { break }; args.append(a) }
+        var env: [String: String] = [:]
+        while let entry = next(), !entry.isEmpty {
+            guard let eq = entry.firstIndex(of: "=") else { continue }
+            env[String(entry[..<eq])] = String(entry[entry.index(after: eq)...])
+        }
+        return (args, env)
+    }
+
+    /// The process's working folder (`proc_pidinfo` with `PROC_PIDVNODEPATHINFO`).
+    private static func workingFolder(of pid: pid_t) -> String? {
+        var info = proc_vnodepathinfo()
+        let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else { return nil }
+        return withUnsafeBytes(of: info.pvi_cdir.vip_path) { raw in
+            let bytes = raw.prefix { $0 != 0 }
+            return bytes.isEmpty ? nil : String(decoding: bytes, as: UTF8.self)
+        }
+    }
+}
+
+/// Which library entries are running, from the process table.
+public enum RunningGames {
+    /// How a game's programs are recognised: by the folder it lives in, or (launchers, and games whose folder is
+    /// too broad to tell apart) by its program's name within its space.
+    public struct Key: Sendable, Hashable {
+        public let folder: URL?
+        public let programName: String?
+    }
+
+    public static func key(for game: Game, in space: Space) -> Key {
+        if game.kind == .app {
+            return Key(folder: nil, programName: game.executablePath.map { ($0 as NSString).lastPathComponent.lowercased() })
+        }
+        switch game.source {
+        case .executable:
+            guard let exe = game.executableURL(in: space) else { return Key(folder: nil, programName: nil) }
+            let folder = exe.deletingLastPathComponent()
+            let name = exe.lastPathComponent.lowercased()
+            return isTooBroad(folder, in: space) ? Key(folder: nil, programName: name) : Key(folder: folder, programName: name)
+        case .steam:
+            // The game's own folder under steamapps/common, from the program the analysis looked at.
+            guard let path = game.analysis?.programPath, let range = path.range(of: "/steamapps/common/") else {
+                return Key(folder: nil, programName: nil)
+            }
+            let rest = path[range.upperBound...]
+            guard let name = rest.split(separator: "/").first else { return Key(folder: nil, programName: nil) }
+            return Key(folder: URL(fileURLWithPath: String(path[..<range.upperBound]) + name, isDirectory: true),
+                       programName: (path as NSString).lastPathComponent.lowercased())
+        case .epic:
+            return Key(folder: nil, programName: nil)
         }
     }
 
-    /// pid → working folder from `lsof -Fpn` output (`p<pid>` and `n<path>` lines).
-    static func workingFolders(inLsof text: String) -> [Int32: String] {
-        var result: [Int32: String] = [:]
-        var pid: Int32?
-        for line in text.split(separator: "\n") {
-            if line.hasPrefix("p") { pid = Int32(line.dropFirst()) }
-            else if line.hasPrefix("n"), let p = pid { result[p] = String(line.dropFirst()) }
+    /// A folder many programs share (the space itself, drive_c, Program Files, the user's home): matching by it would
+    /// count unrelated programs as the game.
+    static func isTooBroad(_ folder: URL, in space: Space) -> Bool {
+        let path = WineProcesses.standardized(folder.standardizedFileURL.path)
+        let driveC = space.driveC.standardizedFileURL.path
+        let broad = [space.url.standardizedFileURL.path, driveC, driveC + "/Program Files", driveC + "/Program Files (x86)",
+                     driveC + "/windows", "/", FileManager.default.homeDirectoryForCurrentUser.path]
+        return broad.map(WineProcesses.standardized).contains(path)
+    }
+
+    /// The running programs of each game, for games that have any.
+    public static func programs(of games: [(game: Game, space: Space)], in processes: [WineProcess]) -> [UUID: [WineProcess]] {
+        var result: [UUID: [WineProcess]] = [:]
+        for (game, space) in games {
+            let key = key(for: game, in: space)
+            guard key.folder != nil || key.programName != nil else { continue }
+            let found = WineProcesses.programs(ofGameIn: key.folder, programName: key.programName, space: space, from: processes)
+            if !found.isEmpty { result[game.id] = found }
         }
         return result
-    }
-
-    private static func run(_ tool: String, _ arguments: [String]) -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: tool)
-        process.arguments = arguments
-        let out = Pipe()
-        process.standardOutput = out
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return "" }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
     }
 }

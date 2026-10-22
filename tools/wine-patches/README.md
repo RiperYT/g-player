@@ -16,6 +16,7 @@ with `lretq`. Elsewhere nothing changes.
 
 - Built by `scripts/build-wow64cpu.sh` from the Wine 11.18 source tarball (SHA-256 pinned there).
 - Shipped as `Sources/GPlayerCore/Resources/engine-fixes/wow64cpu.dll`.
+- The fix is for Wine Staging 11.18 only; a new engine version needs a rebuilt file and a new `EngineFixes` entry.
 - `EngineFixes` puts it into Wine Staging 11.18 only when the file there is the exact one Gcenx's build ships, and
   keeps that original next to it as `wow64cpu.dll.gcenx`.
 

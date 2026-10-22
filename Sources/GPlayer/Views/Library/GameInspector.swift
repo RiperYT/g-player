@@ -44,6 +44,7 @@ struct GameInspector: View {
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .disabled(model.isPreparing(game))
+                .help(model.isRunning(game) ? model.stopHelp(game) : "")
                 .keyboardShortcut(.return, modifiers: [])
 
                 facts(space)

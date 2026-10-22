@@ -8,7 +8,8 @@ REPO="$PWD"
 VERSION=11.18
 SHA256=c6282f6d4daecf11f3ab9f9a2b6c598f67be7e28c363ba2cae8a3c44b611e7a4
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# On failure the logs stay, and their place is printed.
+trap 'status=$?; if [ $status -eq 0 ]; then rm -rf "$WORK"; else echo "Failed; logs in $WORK/build" >&2; fi' EXIT
 cd "$WORK"
 curl -fsSL -o wine.tar.xz "https://dl.winehq.org/wine/source/11.x/wine-$VERSION.tar.xz"
 echo "$SHA256  wine.tar.xz" | shasum -a 256 -c -
@@ -19,14 +20,14 @@ mkdir build && cd build
 arch -x86_64 "../wine-$VERSION/configure" --enable-archs=x86_64 --disable-tests --without-x --without-freetype \
   --without-gstreamer --without-cups --without-sane --without-gphoto --without-krb5 --without-netapi --without-pcap \
   --without-usb --without-v4l2 --without-sdl --without-capi --without-gnutls --without-vulkan --without-opencl \
-  --without-coreaudio --without-pulse --without-alsa --without-oss --without-dbus --without-udev --without-unwind \
+  --without-coreaudio --without-pulse --without-alsa --without-oss --without-dbus --without-udev \
   --without-inotify --without-ffmpeg CC="clang -arch x86_64" BISON="$(brew --prefix bison)/bin/bison" > configure.log
 arch -x86_64 make -j"$(sysctl -n hw.ncpu)" dlls/wow64cpu/x86_64-windows/wow64cpu.dll > make.log
 BUNDLED="$REPO/Sources/GPlayerCore/Resources/engine-fixes/wow64cpu.dll"
 x86_64-w64-mingw32-strip -o wow64cpu.dll dlls/wow64cpu/x86_64-windows/wow64cpu.dll
 # Two builds differ only in the PE time stamp, header checksum and build id, so compare the code and data.
 same=yes
-for part in -d "-s -j .rdata" "-s -j .data" "-s -j .edata" "-s -j .pdata" "-s -j .xdata" "-s -j .reloc"; do
+for part in -d "-s -j .rdata" "-s -j .data" "-s -j .edata" "-s -j .idata" "-s -j .pdata" "-s -j .xdata" "-s -j .reloc"; do
   cmp -s <(x86_64-w64-mingw32-objdump $part wow64cpu.dll | tail -n +4) \
          <(x86_64-w64-mingw32-objdump $part "$BUNDLED" | tail -n +4) || same=no
 done

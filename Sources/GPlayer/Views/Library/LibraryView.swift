@@ -147,6 +147,7 @@ struct GameTile: View {
                                 .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
                         }
                         .buttonStyle(.plain)
+                        .help(model.isRunning(game) ? model.stopHelp(game) : "Play")
                         .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
                 }
