@@ -30,6 +30,8 @@ struct Activity: Identifiable, Equatable {
     var stopHelp = "Stop"
     /// Stop was pressed; the work is winding down.
     var stopping = false
+    /// Setting something up (an engine, a space, Windows components, a store app): quitting asks first (`quitQuestion`).
+    var isSetup = false
 }
 
 @MainActor @Observable
@@ -67,6 +69,12 @@ final class AppModel {
     @ObservationIgnored private let readyCache = ReadyCache()
 
     // MARK: State
+    /// Why the library can't be used right now. While it stands nothing is saved and the window asks the user what to do
+    /// (`LibraryProblemView`), so a library that is only out of reach is never replaced by an empty one.
+    private(set) var libraryProblem: LibraryProblem?
+    /// Where the library was before the user located it somewhere else, until it has loaded from there: its spaces' paths
+    /// point into the old folder and are moved to the new one (`LibraryState.movingLibrary`).
+    @ObservationIgnored private var libraryMovedFrom: URL?
     private(set) var state = LibraryState() {
         // The Hidden item disappears with the last hidden game, so don't leave it selected.
         didSet { if selection == .hidden, state.hiddenGames.isEmpty { selection = .allGames } }
@@ -117,6 +125,14 @@ final class AppModel {
     /// Engine downloads running, by engine id (`ensureEngine`), and why the last one of each failed.
     @ObservationIgnored private var engineInstalls: [String: Task<Engine?, Never>] = [:]
     @ObservationIgnored private var engineFailures: [String: Error] = [:]
+    /// Engines whose download the user stopped (Stop in the sidebar), so the first run doesn't go on to the next one.
+    @ObservationIgnored private var stoppedEngines: Set<String> = []
+    /// The clean-up of what an earlier engine install left (`cleanEngineLeftovers`); an install waits for it, so it never
+    /// removes the folder of the one that has just begun.
+    @ObservationIgnored private var leftoversCleaning: Task<Void, Never>?
+    /// Store apps being set up (`installPreset`), by preset id: a second request for the same one is ignored, so
+    /// "Steam" never becomes "Steam" and "Steam 2".
+    private(set) var installingPresets: Set<String> = []
     /// The first spaces onboarding promised ("main", "steam") that aren't made yet. Kept on disk, so quitting before
     /// the engines are in doesn't lose them.
     private(set) var firstRunSpaces: [String] {
@@ -137,7 +153,7 @@ final class AppModel {
         verboseLogs = d.bool(forKey: "verboseLogs")
         useAppleToolkit = d.bool(forKey: "useAppleToolkit")
         firstRunSpaces = d.stringArray(forKey: "firstRunSpaces") ?? []
-        if libraryRoot != nil { load() }
+        if libraryRoot != nil { load(expectingLibrary: true); cleanEngineLeftovers() }
         // For screenshots and UI checks: `open G-Player.app --args -selectGame "<title>"` (not saved).
         if let title = d.volatileDomain(forName: UserDefaults.argumentDomain)["selectGame"] as? String,
            let g = state.games.first(where: { $0.title == title }) {
@@ -159,9 +175,17 @@ final class AppModel {
         if onboardingDone, libraryRoot != nil { resumeFirstRunSpaces() }
     }
 
-    var paths: LibraryPaths? { libraryRoot.map(LibraryPaths.init) }
-    /// Why a library folder can't be used (its path is too long for Wine), or nil. See `PrefixPath`.
-    func libraryRootProblem(_ root: URL) -> String? { PrefixPath.libraryRootProblem(root) }
+    /// The library's folders, or nil while there is no library or it can't be used (`libraryProblem`): every write to the
+    /// library goes through this, so none happens then.
+    var paths: LibraryPaths? { libraryProblem == nil ? libraryRoot.map(LibraryPaths.init) : nil }
+    /// Why a library folder can't be used (its path is too long for Wine), or nil. See `PrefixPath`. For the library in
+    /// use the answer says how to move it; for a folder being chosen, to choose another.
+    func libraryRootProblem(_ root: URL) -> String? {
+        if onboardingDone, root.standardizedFileURL == libraryRoot?.standardizedFileURL {
+            return PrefixPath.existingLibraryProblem(root)
+        }
+        return PrefixPath.libraryRootProblem(root)
+    }
     var spaces: [Space] { state.spaces }
     var games: [Game] { state.games }
     var visibleGames: [Game] { state.visibleGames }
@@ -173,20 +197,86 @@ final class AppModel {
 
     // MARK: Persistence
 
-    func load() {
-        guard let paths else { return }
+    /// Opens the library. A library that can't be read (`libraryProblem`) is never replaced by an empty one: the state stays
+    /// empty, nothing is saved, and the user decides. Returns true when the library is open.
+    /// - Parameter expectingLibrary: the folder is one a library was set up in, so one that is gone is a problem and not made
+    ///   again, empty. Without it that is so once onboarding is done; at start it is always so (the folder was made then).
+    @discardableResult
+    func load(expectingLibrary: Bool? = nil) -> Bool {
+        guard let root = libraryRoot else { return false }
         images.removeAllObjects()
-        do {
-            try paths.createFolders()
-            state = try LibraryStore(paths: paths).load()
+        let store = LibraryStore(paths: LibraryPaths(root: root))
+        switch store.open(expectingLibrary: expectingLibrary ?? onboardingDone) {
+        case .blocked(let problem):
+            libraryProblem = problem
+            state = LibraryState()
+            return false
+        case .ready(var loaded):
+            libraryProblem = nil
+            do { try store.paths.createFolders() } catch { errorMessage = "Couldn't create the library folders: \(error.localizedDescription)" }
+            var moved = false
+            if let old = libraryMovedFrom {
+                loaded = loaded.movingLibrary(from: old, to: root)
+                libraryMovedFrom = nil
+                moved = true
+            }
+            state = loaded
+            if moved { save() }
             migrateAppleToolkitSetting()
             migrateManualGraphics()
             applyEngineFixes()
             syncD3DMetal()
-        } catch {
-            errorMessage = "Couldn't read the library: \(error.localizedDescription)"
+            refreshStores()
+            return true
         }
+    }
+
+    /// Try Again on the library screen.
+    func retryLibrary() {
+        if load() { libraryOpened() }
+    }
+
+    /// Locate… on the library screen: `chosen` is the folder the library is in now. A folder without one is refused.
+    func locateLibrary(_ chosen: URL) {
+        guard let folder = LibraryStore.libraryFolder(in: chosen) else {
+            errorMessage = "“\(chosen.lastPathComponent)” has no G-Player library in it. Choose the folder that holds library.json."
+            return
+        }
+        if libraryMovedFrom == nil, let old = libraryRoot, old.standardizedFileURL != folder { libraryMovedFrom = old }
+        libraryRoot = folder
+        if load() { libraryOpened() }
+    }
+
+    /// Use Previous Copy on the library screen: the copy G-Player kept of the library as it was before its last change.
+    func restorePreviousLibrary() {
+        guard let root = libraryRoot else { return }
+        do { _ = try LibraryStore(paths: LibraryPaths(root: root)).restorePrevious() }
+        catch { errorMessage = "Couldn't use the previous copy: \(error.localizedDescription)"; return }
+        if load() { libraryOpened() }
+    }
+
+    /// Start Empty on the library screen: an empty library in its place. The unreadable library.json stays next to it as
+    /// `library.json.broken-…`.
+    func startEmptyLibrary() {
+        guard let problem = libraryProblem, let root = libraryRoot else { return }
+        // Without that copy the file would be lost: leave it alone.
+        if problem.kind == .unreadable, problem.brokenCopy == nil {
+            errorMessage = "G-Player couldn't keep a copy of library.json, so it won't replace it. Move the file away yourself, then try again."
+            return
+        }
+        do { try LibraryPaths(root: root).createFolders() }
+        catch { errorMessage = "Couldn't create the library folder: \(error.localizedDescription)"; return }
+        libraryProblem = nil
+        libraryMovedFrom = nil
+        state = LibraryState()
+        save()
+        libraryOpened()
         refreshStores()
+    }
+
+    /// What waited for the library: the first spaces onboarding promised.
+    private func libraryOpened() {
+        if onboardingDone { resumeFirstRunSpaces() }
     }
 
     private func save() {
@@ -196,6 +286,7 @@ final class AppModel {
     }
 
     func mutate(_ change: (inout LibraryState) -> Void) {
+        guard libraryProblem == nil else { return }
         change(&state)
         save()
     }
@@ -329,9 +420,16 @@ final class AppModel {
     }
 
     private func installEngine(_ info: EngineInfo, with manager: EngineManager) async -> Engine? {
-        let activity = begin(Self.downloadTitle(info), "Starting")
-        defer { end(activity); engineInstalls[info.id] = nil }
+        await leftoversCleaning?.value
+        let activity = begin(Self.downloadTitle(info), "Starting", setup: true)
+        defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil }
         engineFailures[info.id] = nil
+        stoppedEngines.remove(info.id)
+        // What came stays on disk, so downloading again goes on from there.
+        setStop(activity, help: "Stop downloading \(info.name). What came is kept, and the download goes on from there next time.") { [weak self] in
+            self?.stoppedEngines.insert(info.id)
+            self?.engineInstalls[info.id]?.cancel()
+        }
         do {
             let engine = try await manager.install(info) { [weak self] fraction, message in
                 Task { @MainActor in self?.progress(activity, fraction, message) }
@@ -348,9 +446,31 @@ final class AppModel {
         }
     }
 
-    func removeEngine(_ info: EngineInfo) {
+    /// The spaces on this engine that have programs running or installs going on: the engine's files are in use there.
+    func busySpaces(using info: EngineInfo) async -> [Space] {
+        let onEngine = state.spaces.filter { $0.engineID == info.id }
+        let running = await Task.detached(priority: .userInitiated) { () -> [UUID] in
+            let all = WineProcesses.snapshot()
+            return onEngine.filter { WineProcesses.isRunning(in: $0, processes: all) }.map(\.id)
+        }.value
+        return onEngine.filter { running.contains($0.id) || installingSpaces.contains($0.id) }
+    }
+
+    /// Removes an engine unless programs run on it. Returns the spaces that keep it busy (nothing is removed then).
+    @discardableResult
+    func removeEngine(_ info: EngineInfo) async -> [Space] {
+        let busy = await busySpaces(using: info)
+        guard busy.isEmpty else { return busy }
         do { try engineManager?.remove(info); engineVersion += 1 }
         catch { errorMessage = error.localizedDescription }
+        return []
+    }
+
+    /// Clears what an engine install that never ended left behind (hidden folders in Engines, stale downloads), once per
+    /// start and never while an engine is downloading.
+    private func cleanEngineLeftovers() {
+        guard let manager = engineManager, engineInstalls.isEmpty, firstRunInstall == nil else { return }
+        leftoversCleaning = Task.detached(priority: .utility) { manager.cleanLeftovers() }
     }
 
     /// The first run's engines: Wine Staging, then G-Player Wine, which reuses Staging's libraries (no second download).
@@ -358,10 +478,14 @@ final class AppModel {
     /// When Staging failed because the connection is down, G-Player Wine isn't tried: its libraries come from the
     /// same download.
     func installFirstRunEngines() {
-        guard firstRunInstall == nil else { return }
+        guard firstRunInstall == nil, let manager = engineManager else { return }
+        // Both engines take about 2.7 GB: said before anything is downloaded, not when the disk fills up.
+        let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
+        if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
         firstRunInstall = Task {
             var failures: [String] = []
             for info in EngineCatalog.firstRunInstalls where await ensureEngine(info) == nil {
+                if stoppedEngines.contains(info.id) { break }                           // Stop means stop: not the next one either
                 failures.append(errorMessage ?? "\(info.name) wasn't installed.")
                 errorMessage = nil                                  // shown together below, not one over the other
                 if let error = engineFailures[info.id], EngineManager.isConnectionFailure(error) { break }
@@ -394,7 +518,7 @@ final class AppModel {
     /// Installs the engines still missing and makes the first spaces still on the list, each once. With no engine
     /// installed (the download failed) they stay on the list for the next start.
     func resumeFirstRunSpaces() {
-        guard !firstRunSpaces.isEmpty, !makingFirstRunSpaces else { return }
+        guard !firstRunSpaces.isEmpty, !makingFirstRunSpaces, libraryProblem == nil else { return }
         makingFirstRunSpaces = true
         Task {
             defer { makingFirstRunSpaces = false }
@@ -405,9 +529,8 @@ final class AppModel {
                 case "main":
                     if !spaces.contains(where: { $0.name == "Main" }) { _ = await createSpace(name: "Main", engineInfo: engine) }
                 case "steam":
-                    if !isInstalled(AppPresets.steam), presetSpace(AppPresets.steam) == nil {
-                        await installPreset(AppPresets.steam, engineInfo: engine)
-                    }
+                    // Also when an earlier start made the space and quit before Steam was in: the install goes on in it.
+                    if !isInstalled(AppPresets.steam) { await installPreset(AppPresets.steam, engineInfo: engine) }
                 default: break
                 }
                 firstRunSpaces.removeAll { $0 == key }              // tried: a failure was shown, not tried again at every start
@@ -417,10 +540,19 @@ final class AppModel {
 
     // MARK: Activities
 
-    func begin(_ title: String, _ message: String, progress: Double? = nil) -> UUID {
-        let a = Activity(title: title, message: message, progress: progress)
+    func begin(_ title: String, _ message: String, progress: Double? = nil, setup: Bool = false) -> UUID {
+        var a = Activity(title: title, message: message, progress: progress)
+        a.isSetup = setup
         activities.append(a)
         return a.id
+    }
+
+    /// The question to ask before quitting while something is being set up, or nil when nothing is. Setup goes on by itself
+    /// at the next start only for the first run (its engines and spaces); the rest is started again by hand.
+    var quitQuestion: (title: String, detail: String)? {
+        let titles = activities.filter { $0.isSetup && !$0.stopping }.map(\.title)
+        guard !titles.isEmpty else { return nil }
+        return SetupQuit.question(titles: titles, resumes: !onboardingDone || !firstRunSpaces.isEmpty || isInstallingFirstRun)
     }
 
     func progress(_ id: UUID, _ fraction: Double?, _ message: String) {
@@ -491,8 +623,8 @@ final class AppModel {
     /// Wine Staging is installed, the space gets Staging and the message says so.
     func createSpace(name: String, engineInfo: EngineInfo? = nil, presetID: String? = nil) async -> Space? {
         guard let paths else { return nil }
-        // Before an engine is downloaded for it: a library folder with a path too long can't hold any space.
-        if let problem = libraryRootProblem(paths.root) { errorMessage = "Couldn't create the space. \(problem)"; return nil }
+        // Before an engine is downloaded for it: a library folder with a path too long can't hold any new space.
+        if let problem = PrefixPath.existingLibraryProblem(paths.root) { errorMessage = problem; return nil }
         let wanted = engineInfo ?? newSpaceEngine
         var chosen = await ensureEngine(wanted)
         if chosen == nil, wanted.id == EngineCatalog.defaultForNewSpaces.id,
@@ -502,7 +634,7 @@ final class AppModel {
             chosen = staging
         }
         guard let engine = chosen else { return nil }
-        let activity = begin("Creating “\(name)”", "Setting up Windows. This takes about a minute the first time.")
+        let activity = begin("Creating “\(name)”", "Setting up Windows. This takes about a minute the first time.", setup: true)
         defer { end(activity) }
         do {
             let space = try await SpaceManager(paths: paths).create(name: name, engine: engine,
@@ -569,8 +701,14 @@ final class AppModel {
 
     func isInstalled(_ preset: AppPreset) -> Bool { presetSpace(preset).map(preset.isInstalled) ?? false }
 
+    func isInstalling(_ preset: AppPreset) -> Bool { installingPresets.contains(preset.id) }
+
     func installPreset(_ preset: AppPreset, engineInfo: EngineInfo? = nil) async {
         guard let paths else { return }
+        // The first run and Get Apps can ask at once, and the space only exists once Windows is set up in it (a minute):
+        // a second request would make another space.
+        guard installingPresets.insert(preset.id).inserted else { return }
+        defer { installingPresets.remove(preset.id) }
         var space = presetSpace(preset)
         if let found = space, !found.mayChange {
             // An adopted bottle Steam was removed from: install into it only with the user's go-ahead.
@@ -578,8 +716,13 @@ final class AppModel {
             return
         }
         if space == nil { space = await createSpace(name: preset.name, engineInfo: engineInfo, presetID: preset.id) }
-        guard let space, let engine = engine(for: space) else { return }
-        let activity = begin("Setting up \(preset.name)", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting")
+        guard let space else { return }
+        // The space's engine may be gone (removed, or a download that was stopped): get it again, don't do nothing.
+        var ready = engine(for: space)
+        if ready == nil { ready = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
+        guard let engine = ready else { return }
+        let activity = begin("Setting up \(preset.name)", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting",
+                             setup: true)
         defer { end(activity); cancellers[activity] = nil }
         let help = "Stop setting up \(preset.name). You can set it up again later."
         setStop(activity, help: help) { [weak self] in self?.end(activity) }    // while waiting, Stop drops the setup
@@ -1276,12 +1419,18 @@ final class AppModel {
             var found = engine(for: space)
             if found == nil { found = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
             guard let engine = found else { return }
-            do {
-                _ = try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: file),
+            // Starts after the installs queued in the space, as a launch does: an installer started next to Windows components
+            // being installed fails (error 1618, another installation is in progress).
+            let verbose = verboseLogs
+            let started = await enqueue(in: space.id, isInstall: false) { () -> Result<RunningProgram, Error> in
+                Result {
+                    try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: file),
                                            workingDirectory: file.deletingLastPathComponent(), backend: .auto,
-                                           tweaks: LaunchTweaks(verboseLogs: verboseLogs),
+                                           tweaks: LaunchTweaks(verboseLogs: verbose),
                                            logsFolder: paths.logs, logName: file.deletingPathExtension().lastPathComponent)
-            } catch { errorMessage = error.localizedDescription }
+                }
+            }.value
+            if case .failure(let error) = started { errorMessage = error.localizedDescription }
         }
     }
 

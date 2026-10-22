@@ -31,7 +31,7 @@ struct PresetCard: View {
 
     var body: some View {
         let installed = model.isInstalled(preset)
-        let busy = model.activities.contains { $0.title.contains(preset.name) }
+        let busy = model.isInstalling(preset)
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: preset.symbol).font(.system(size: 22, weight: .regular))
                 .frame(width: 44, height: 44)

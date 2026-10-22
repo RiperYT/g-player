@@ -283,7 +283,7 @@ extension AppModel {
         var resolved = engine
         if resolved == nil { resolved = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
         guard let engine = resolved else { return .done }
-        let activity = begin("Installing Windows components \(reason)", componentsLabel(missing))
+        let activity = begin("Installing Windows components \(reason)", componentsLabel(missing), setup: true)
         activeInstalls[space.id, default: 0] += 1
         defer { Self.decrement(&activeInstalls, space.id) }
         let work = Task.detached {

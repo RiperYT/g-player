@@ -52,6 +52,13 @@ G-Player/
 Spaces found elsewhere (a CrossOver bottle) stay where they are. `library.json` stores their absolute path,
 and game paths inside a space are stored relative to it, so a moved library keeps working.
 
+`library.json` is saved atomically, and the file it replaces stays as `library.json.previous`. When the library can't
+be read (a disk that isn't connected yet, a folder that was moved or renamed, a file this version can't decode) G-Player
+writes nothing: `LibraryStore.open` returns a `LibraryProblem`, an unreadable file is first copied to
+`library.json.broken-<date>`, `AppModel.paths` is nil, and the window asks (Try Again, Locate…, Use Previous Copy, Start
+Empty). Locate… is also how a library is moved: quit, move the folder, start G-Player, choose it; the paths of the
+spaces inside it are pointed at the new place (`LibraryState.movingLibrary`).
+
 ## A launch
 
 `LaunchPlanner.plan` turns a game and its space into arguments, working folder, graphics backend and tweaks.

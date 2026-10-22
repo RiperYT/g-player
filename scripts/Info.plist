@@ -15,6 +15,7 @@
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>LSMultipleInstancesProhibited</key><true/>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
