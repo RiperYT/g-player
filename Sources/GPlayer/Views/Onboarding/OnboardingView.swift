@@ -84,9 +84,9 @@ struct OnboardingView: View {
                      detail: engineDetail,
                      actionTitle: model.isInstalled(EngineCatalog.wineStaging) || model.isEngineBusy ? nil : "Download",
                      action: downloadEngine)
-            checkRow(ok: model.isInstalled(EngineCatalog.gptk), title: "Apple Game Porting Toolkit (optional)",
-                     detail: model.isInstalled(EngineCatalog.gptk) ? "Found. DirectX 11 and 12 games can use D3DMetal."
-                        : "For DirectX 12 games. Install it later from Settings › Engines.", actionTitle: nil, action: {})
+            checkRow(ok: false, title: "Apple's Game Porting Toolkit (optional)",
+                     detail: "For DirectX 12 games, if you install it yourself. Turn it on later in Settings › Engines.",
+                     actionTitle: nil, action: {})
             if let a = model.activities.first { ProgressView(value: a.progress ?? 0) { Text(a.message).font(.caption) } }
     }
 
@@ -230,7 +230,7 @@ struct OnboardingView: View {
             }
         case .engine:
             let known = model.spaces.map(\.url) + [root]
-            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.isInstalled(EngineCatalog.gptk))
+            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false)
             chosenFound = Set(found.map(\.id))
             go(1)
         case .found:

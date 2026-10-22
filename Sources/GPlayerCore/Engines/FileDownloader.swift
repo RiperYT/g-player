@@ -4,21 +4,31 @@ import Foundation
 public final class FileDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let destination: URL
     private let progress: @Sendable (Double) -> Void
+    private let lock = NSLock()
     private var continuation: CheckedContinuation<Void, Error>?
+    /// The outcome when it came before the continuation was stored (a download cancelled right at the start).
+    private var early: Result<Void, Error>?
 
     private init(destination: URL, progress: @escaping @Sendable (Double) -> Void) {
         self.destination = destination
         self.progress = progress
     }
 
+    /// Throws `CancellationError` when the calling task is cancelled; the download stops then.
     public static func download(_ url: URL, to destination: URL,
                                 progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
         let delegate = FileDownloader(destination: destination, progress: progress)
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
-        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
-            delegate.continuation = c
-            session.downloadTask(with: url).resume()
+        try Task.checkCancellation()
+        let task = session.downloadTask(with: url)
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                delegate.attach(c)
+                task.resume()                       // a task cancelled before this ends at once with .cancelled
+            }
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -41,12 +51,32 @@ public final class FileDownloader: NSObject, URLSessionDownloadDelegate, @unchec
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error { finish(error) }
+        guard let error else { return }
+        finish((error as? URLError)?.code == .cancelled ? CancellationError() : error)
     }
 
+    private func attach(_ c: CheckedContinuation<Void, Error>) {
+        lock.lock()
+        if let result = early {
+            lock.unlock()
+            c.resume(with: result)
+        } else {
+            continuation = c
+            lock.unlock()
+        }
+    }
+
+    /// Resumes the waiting call once; an outcome that arrives before it waits is kept for it.
     private func finish(_ error: Error?) {
-        guard let c = continuation else { return }
+        let result: Result<Void, Error> = error.map { .failure($0) } ?? .success(())
+        lock.lock()
+        guard let c = continuation else {
+            if early == nil { early = result }
+            lock.unlock()
+            return
+        }
         continuation = nil
-        if let error { c.resume(throwing: error) } else { c.resume() }
+        lock.unlock()
+        c.resume(with: result)
     }
 }

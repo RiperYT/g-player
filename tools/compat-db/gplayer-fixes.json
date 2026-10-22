@@ -1,0 +1,13 @@
+{
+  "fixes": [
+    {
+      "id": "gplayer-overcooked",
+      "title": "Overcooked",
+      "steamAppIDs": ["448510"],
+      "macStatus": "broken",
+      "verifiedOnMac": true,
+      "source": "g-player",
+      "notes": "32-bit Unity 5.5 game. DXVK can't create a 32-bit DirectX 11 device and WineD3D hangs on Wine 11 for macOS; it also crashes on Apple's Game Porting Toolkit. Tested 2026-10-21 on an M5 Mac with macOS 26.4."
+    }
+  ]
+}

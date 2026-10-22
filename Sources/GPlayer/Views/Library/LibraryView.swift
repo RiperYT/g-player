@@ -133,7 +133,12 @@ struct GameTile: View {
         VStack(alignment: .leading, spacing: 8) {
             CoverView(game: game, hovering: hovering)
                 .overlay {
-                    if hovering {
+                    if model.isPreparing(game) {
+                        ProgressView().controlSize(.regular)
+                            .frame(width: 46, height: 46)
+                            .background(.white.opacity(0.92), in: Circle())
+                            .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+                    } else if hovering {
                         Button { model.isRunning(game) ? model.stop(game) : model.play(game) } label: {
                             Image(systemName: model.isRunning(game) ? "stop.fill" : "play.fill")
                                 .font(.system(size: 18, weight: .bold)).foregroundStyle(.black.opacity(0.85))
@@ -162,6 +167,7 @@ struct GameTile: View {
     }
 
     private var subtitle: String {
+        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…" }
         if model.isRunning(game) { return "Running" }
         if let d = game.lastPlayedAt { return "Played " + d.formatted(.relative(presentation: .named)) }
         if game.kind == .app { return "Launcher" }

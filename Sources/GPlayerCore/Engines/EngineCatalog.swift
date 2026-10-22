@@ -19,7 +19,7 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     public let summary: String
     /// Graphics backends this engine can run. The first one is what `.auto` means.
     public let backends: [GraphicsBackend]
-    /// Files to download. Empty when the engine is installed some other way (Homebrew).
+    /// Files to download. Empty when G-Player never downloads the engine (Apple's toolkit).
     public let downloads: [PinnedDownload]
 
     public var defaultBackend: GraphicsBackend { backends.first ?? .wined3d }
@@ -51,20 +51,22 @@ public enum EngineCatalog {
                 approximateBytes: 3_900_000),
         ])
 
-    /// Apple's Game Porting Toolkit as packaged by Gcenx's Homebrew cask (wine 7.7 + D3DMetal).
-    /// Best DirectX 11/12 speed, but the 2026 Steam client no longer starts on wine 7.7.
+    /// Apple's Game Porting Toolkit (wine 7.7 + D3DMetal), only when the user installed it themselves.
+    /// G-Player never ships, downloads or installs Apple's files: Apple's license allows the toolkit for
+    /// developing, testing and evaluating games, and distribution only for non-commercial purposes.
+    /// Off by default; turned on in Settings › Engines. The 2026 Steam client doesn't start on wine 7.7.
     public static let gptk = EngineInfo(
         id: "gptk",
         name: "Game Porting Toolkit",
-        version: "Homebrew cask",
+        version: "installed by you",
         kind: .gptk,
-        summary: "Apple's D3DMetal for DirectX 11 and 12 games. Install with Homebrew.",
+        summary: "Apple's D3DMetal for DirectX 11 and 12 games, from a toolkit you installed yourself.",
         backends: [.d3dmetal, .wined3d],
         downloads: [])
 
     public static let all = [wineStaging, gptk]
     public static func info(_ id: String) -> EngineInfo? { all.first { $0.id == id } }
 
-    public static let gptkHomebrewCommand =
-        #"brew install --cask --no-quarantine gcenx/wine/game-porting-toolkit"#
+    /// Apple's page about the toolkit and its license.
+    public static let gptkInfoURL = URL(string: "https://developer.apple.com/games/game-porting-toolkit/")!
 }

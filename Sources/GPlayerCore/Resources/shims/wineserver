@@ -1,0 +1,3 @@
+#!/bin/sh
+# wineserver for winetricks, through Rosetta like the wine shim. Winetricks.swift sets GPLAYER_WINESERVER.
+exec /usr/bin/arch -x86_64 "${GPLAYER_WINESERVER:?GPLAYER_WINESERVER is not set}" "$@"

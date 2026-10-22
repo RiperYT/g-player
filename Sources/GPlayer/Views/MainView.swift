@@ -25,6 +25,46 @@ struct MainView: View {
         }
         .sheet(isPresented: $model.showAddGame) { AddGameSheet(initialSource: model.addGameSource) }
         .sheet(isPresented: $model.showNewSpace) { NewSpaceSheet() }
+        .alert("This game may not run", isPresented: Binding(get: { model.blockedLaunch != nil },
+                                                             set: { if !$0 { model.blockedLaunch = nil } }),
+               presenting: model.blockedLaunch) { blocked in
+            Button("Play Anyway") {
+                model.acknowledgedBlockers.insert(blocked.gameID)
+                if let g = model.game(blocked.gameID) { model.play(g, skipping: blocked.skipped.union([.blockers])) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { blocked in
+            Text(blocked.notes.map { [$0.title, $0.detail].compactMap { $0 }.joined(separator: ". ") }.joined(separator: "\n\n"))
+        }
+        .alert("Steam is already running", isPresented: Binding(get: { model.steamRestart != nil },
+                                                                set: { if !$0 { model.steamRestart = nil } }),
+               presenting: model.steamRestart) { request in
+            Button("Restart Steam and Play") { model.restartSteamAndPlay(request) }
+            Button("Play Anyway") {
+                if let g = model.game(request.gameID) { model.play(g, skipping: request.skipped.union([.runningSteam])) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? "this game")'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
+        }
+        // Every answer goes through a button (Esc is Don't Allow), which takes the request off the list.
+        .alert(changesTitle, isPresented: Binding(get: { model.changesRequest != nil }, set: { _ in }),
+               presenting: model.changesRequest) { _ in
+            Button("Allow") { model.answerChangesRequest(true) }
+            Button("Don't Allow", role: .cancel) { model.answerChangesRequest(false) }
+        } message: { request in
+            let where_ = model.space(request.spaceID)?.originNote.map { " (\($0))" } ?? ""
+            Text("""
+            This space\(where_) belongs to another app, and G-Player uses it in place. To help games run, G-Player can:
+            • install Windows components such as Visual C++ into it
+            • change Wine settings in its registry: per-game DLL and Windows-version settings, Retina mode, and removing ones it set before
+            • put DXVK's graphics files and Steam's window fix in place of Wine's own (it keeps Wine's copies)
+            • install a store app such as Steam into it, when you ask
+            • keep small notes next to drive_c about what it added
+
+            Your games and saves stay untouched. If you don't allow it, games start with the space as it is, and may not run. You can change this later in the space.
+            """)
+        }
         .confirmationDialog("Remove from Library?", isPresented: Binding(get: { model.gamePendingRemoval != nil },
                                                                         set: { if !$0 { model.gamePendingRemoval = nil } }),
                             titleVisibility: .visible, presenting: model.gamePendingRemoval) { game in
@@ -32,6 +72,12 @@ struct MainView: View {
         } message: { game in
             Text("“\(game.title)” leaves the library. Its files stay in the space, and you can add it again.")
         }
+    }
+}
+
+extension MainView {
+    private var changesTitle: String {
+        "Allow G-Player to change “\(model.space(model.changesRequest?.spaceID)?.name ?? "this space")”?"
     }
 }
 

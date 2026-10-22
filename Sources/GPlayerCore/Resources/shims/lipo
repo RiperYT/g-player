@@ -1,0 +1,11 @@
+#!/bin/sh
+# lipo for winetricks, which runs `lipo -archs FILE` to see whether Wine's binaries are x86_64.
+# /usr/bin/lipo is a stub that asks for the Command Line Tools; this answers from `file`, which is always there.
+# Prints the architectures like lipo does ("x86_64", or "x86_64 arm64" for a universal binary).
+[ "$#" -eq 2 ] && [ "$1" = "-archs" ] || { echo "lipo: only -archs FILE is supported" >&2; exit 1; }
+info=$(/usr/bin/file -b "$2" 2>/dev/null)
+case $info in
+    "Mach-O universal binary"*) printf '%s\n' "$info" | grep -o '\[[a-z0-9_]*:' | tr -d '[:' | tr '\n' ' ' | sed 's/ $//'; echo ;;
+    "Mach-O"*) echo "${info##* }" ;;
+    *) echo "lipo: can't figure out the architecture type of: $2" >&2; exit 1 ;;
+esac

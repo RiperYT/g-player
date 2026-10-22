@@ -3,6 +3,19 @@ import Foundation
 import GPlayerCore
 import Observation
 
+struct LaunchRecord {
+    let program: RunningProgram
+    let profile: LaunchProfile
+    let diagnose: Bool
+}
+
+struct BlockedLaunch: Identifiable {
+    var id: UUID { gameID }
+    let gameID: UUID
+    let notes: [CompatNote]
+    let skipped: Set<PlayCheck>
+}
+
 enum SidebarItem: Hashable {
     case allGames, recent, hidden, space(UUID), files, apps
 }
@@ -13,6 +26,10 @@ struct Activity: Identifiable, Equatable {
     var title: String
     var message: String
     var progress: Double?
+    /// What the Stop button does, for its tooltip.
+    var stopHelp = "Stop"
+    /// Stop was pressed; the work is winding down.
+    var stopping = false
 }
 
 @MainActor @Observable
@@ -26,6 +43,10 @@ final class AppModel {
     }
     var verboseLogs: Bool {
         didSet { UserDefaults.standard.set(verboseLogs, forKey: "verboseLogs") }
+    }
+    /// Use Apple's Game Porting Toolkit when the user installed it. Off by default (Apple's license).
+    var useAppleToolkit: Bool {
+        didSet { UserDefaults.standard.set(useAppleToolkit, forKey: "useAppleToolkit"); engineVersion += 1 }
     }
 
     // MARK: State
@@ -46,14 +67,48 @@ final class AppModel {
     /// The space the Files browser shows.
     var filesSpaceID: UUID?
     private(set) var running: [UUID: RunningProgram] = [:]
+    /// Every launch until it ends, for the diagnosis afterwards.
+    private var launches: [UUID: LaunchRecord] = [:]
+    /// What went wrong in a game's last launch, if anything.
+    var diagnoses: [UUID: [Diagnosis]] = [:]
+    /// A launch waiting for the user to confirm despite a blocker (anti-cheat, known broken).
+    var blockedLaunch: BlockedLaunch?
+    var acknowledgedBlockers = Set<UUID>()
+    var analysisAttempts = Set<UUID>()
+    /// Components a busy space still needs, installed once nothing runs there.
+    var pendingComponents: [UUID: Set<String>] = [:]
+    /// Components the user stopped installing for a space; launches skip them until the app quits.
+    var skippedComponents: [UUID: Set<String>] = [:]
+    /// Games between pressing Play and their program starting (analysis, components, settings).
+    var preparing = Set<UUID>()
+    /// A Steam game waiting for the user to restart Steam or play with the running one.
+    var steamRestart: SteamRestart?
+    /// External spaces waiting for the user to allow or refuse changes, first one shown.
+    var changesRequests: [ChangesRequest] = []
+    var changesRequest: ChangesRequest? { changesRequests.first }
+    /// Stops for activities that can be stopped, by activity id.
+    var cancellers: [UUID: () -> Void] = [:]
+    /// Work queued per space (installs, store setup), so two installers never run in one space at once.
+    private var spaceQueues: [UUID: Task<Void, Never>] = [:]
+    /// Installs and store setups queued or running, per space (launches use the queue too but don't count).
+    private var queuedInstalls: [UUID: Int] = [:]
+    private var queuedWork: [UUID: Int] = [:]
     private(set) var engineVersion = 0           // bumps when engines change, so views re-read them
+    var componentsVersion = 0                    // bumps when components are installed
 
     init() {
         let d = UserDefaults.standard
         libraryRoot = d.string(forKey: "libraryRoot").map { URL(fileURLWithPath: $0, isDirectory: true) }
         onboardingDone = d.bool(forKey: "onboardingDone")
         verboseLogs = d.bool(forKey: "verboseLogs")
+        useAppleToolkit = d.bool(forKey: "useAppleToolkit")
         if libraryRoot != nil { load() }
+        // For screenshots and UI checks: `open G-Player.app --args -selectGame "<title>"` (not saved).
+        if let title = d.volatileDomain(forName: UserDefaults.argumentDomain)["selectGame"] as? String,
+           let g = state.games.first(where: { $0.title == title }) {
+            selection = g.isHidden ? .hidden : .allGames
+            selectedGameID = g.id
+        }
         NotificationCenter.default.addObserver(forName: .gplayerOpenFile, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
                 guard let self, self.onboardingDone, let url = note.object as? URL, let source = ImportSource(url) else { return }
@@ -84,6 +139,8 @@ final class AppModel {
         do {
             try paths.createFolders()
             state = try LibraryStore(paths: paths).load()
+            migrateAppleToolkitSetting()
+            migrateManualGraphics()
         } catch {
             errorMessage = "Couldn't read the library: \(error.localizedDescription)"
         }
@@ -110,12 +167,52 @@ final class AppModel {
 
     func engine(for space: Space) -> Engine? {
         _ = engineVersion
+        if space.engineID == EngineCatalog.gptk.id && !useAppleToolkit { return nil }
         return engineManager?.engine(id: space.engineID)
     }
 
     func isInstalled(_ info: EngineInfo) -> Bool {
         _ = engineVersion
+        if info.kind == .gptk && !useAppleToolkit { return false }
         return engineManager?.isInstalled(info) ?? false
+    }
+
+    /// Engines to offer when choosing one: Apple's toolkit only when it is turned on.
+    var availableEngines: [EngineInfo] { EngineCatalog.all.filter { $0.kind != .gptk || useAppleToolkit } }
+
+    /// A space on Apple's toolkit while the toolkit is turned off.
+    func needsAppleToolkit(_ space: Space) -> Bool { space.engineID == EngineCatalog.gptk.id && !useAppleToolkit }
+
+    /// What the engine picker adds after an engine's name.
+    func engineNote(_ info: EngineInfo) -> String {
+        if info.kind == .gptk && !useAppleToolkit { return "  · turned off" }
+        return isInstalled(info) ? "" : "  · not installed"
+    }
+
+    /// The engines a space can switch to: the available ones, plus the one it uses now.
+    func engineChoices(for space: Space) -> [EngineInfo] {
+        var list = availableEngines
+        if !list.contains(where: { $0.id == space.engineID }), let current = EngineCatalog.info(space.engineID) { list.append(current) }
+        return list
+    }
+
+    /// Spaces from before 0.3 that already run on the toolkit keep working: turn it on once for them. The answer is
+    /// saved either way, so spaces found later never turn it on by themselves.
+    private func migrateAppleToolkitSetting() {
+        guard UserDefaults.standard.object(forKey: "useAppleToolkit") == nil else { return }
+        useAppleToolkit = state.spaces.contains { $0.engineID == EngineCatalog.gptk.id }
+    }
+
+    /// 0.2 had only the graphics picker. A choice made there means the Custom profile now, or Recommended would
+    /// override it.
+    private func migrateManualGraphics() {
+        var changed = false
+        for i in state.games.indices where state.games[i].kind == .game && state.games[i].graphics != .auto
+            && state.games[i].options == nil {
+            state.games[i].options = LaunchOptions(profile: .custom)
+            changed = true
+        }
+        if changed { save() }
     }
 
     var isEngineBusy: Bool { activities.contains { $0.title.hasPrefix("Downloading Wine") } }
@@ -124,9 +221,15 @@ final class AppModel {
     @discardableResult
     func ensureEngine(_ info: EngineInfo) async -> Engine? {
         guard let manager = engineManager else { return nil }
+        if info.kind == .gptk && !useAppleToolkit {
+            errorMessage = "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
+            return nil
+        }
         if let e = manager.engine(info) { return e }
         if info.downloads.isEmpty {
-            errorMessage = "\(info.name) isn't installed. In Terminal, run:\n\(EngineCatalog.gptkHomebrewCommand)"
+            errorMessage = useAppleToolkit
+                ? "\(info.name) isn't installed on this Mac. G-Player doesn't download it; see Settings › Engines."
+                : "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
             return nil
         }
         let activity = begin("Downloading Wine \(info.version)", "Starting")
@@ -137,6 +240,8 @@ final class AppModel {
             }
             engineVersion += 1
             return engine
+        } catch is CancellationError {
+            return nil
         } catch {
             errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)"
             return nil
@@ -157,12 +262,63 @@ final class AppModel {
     }
 
     func progress(_ id: UUID, _ fraction: Double?, _ message: String) {
-        guard let i = activities.firstIndex(where: { $0.id == id }) else { return }
+        guard let i = activities.firstIndex(where: { $0.id == id }), !activities[i].stopping else { return }
         activities[i].progress = fraction
         activities[i].message = message
     }
 
+    /// Makes an activity stoppable: `stop` runs when the user presses Stop.
+    func setStop(_ id: UUID, help: String, _ stop: @escaping () -> Void) {
+        cancellers[id] = stop
+        if let i = activities.firstIndex(where: { $0.id == id }) { activities[i].stopHelp = help }
+    }
+
+    func isStopping(_ id: UUID) -> Bool { activities.first { $0.id == id }?.stopping ?? false }
+
     func end(_ id: UUID) { activities.removeAll { $0.id == id } }
+
+    func canCancel(_ id: UUID) -> Bool { cancellers[id] != nil }
+
+    /// Stops an activity. It stays in the sidebar, saying so, until its work has really ended.
+    func cancel(_ id: UUID) {
+        guard let stop = cancellers.removeValue(forKey: id) else { return }
+        progress(id, nil, "Stopping…")
+        if let i = activities.firstIndex(where: { $0.id == id }) { activities[i].stopping = true }
+        stop()
+    }
+
+    // MARK: Per-space queue
+
+    /// Spaces with installs or store setup queued or running.
+    var installingSpaces: Set<UUID> { Set(queuedInstalls.keys).union(activeInstalls.keys) }
+    /// Component installs running right now, per space (also those a launch started).
+    var activeInstalls: [UUID: Int] = [:]
+
+    /// Runs `work` after everything queued for the space before it. Queuing happens at once, so the order of calls
+    /// is the order of work. Queued work must never wait for the queue of its own space (that would wait forever).
+    /// - Parameter isInstall: counts towards `installingSpaces`. Launches pass false.
+    @discardableResult
+    func enqueue<T: Sendable>(in spaceID: UUID, isInstall: Bool = true, _ work: @escaping @MainActor () async -> T) -> Task<T, Never> {
+        let previous = spaceQueues[spaceID]
+        queuedWork[spaceID, default: 0] += 1
+        if isInstall { queuedInstalls[spaceID, default: 0] += 1 }
+        let task = Task { @MainActor () -> T in
+            await previous?.value
+            let result = await work()
+            if isInstall { Self.decrement(&self.queuedInstalls, spaceID) }
+            if Self.decrement(&self.queuedWork, spaceID) == 0 { self.spaceQueues[spaceID] = nil }
+            return result
+        }
+        spaceQueues[spaceID] = Task { _ = await task.value }
+        return task
+    }
+
+    @discardableResult
+    static func decrement(_ counts: inout [UUID: Int], _ id: UUID) -> Int {
+        let left = (counts[id] ?? 1) - 1
+        counts[id] = left > 0 ? left : nil
+        return max(left, 0)
+    }
 
     // MARK: Spaces
 
@@ -177,6 +333,11 @@ final class AppModel {
             let space = try await SpaceManager(paths: paths).create(name: name, engine: engine,
                                                                      colorIndex: nextColor(), presetID: presetID)
             mutate { $0.spaces.append(space) }
+            // Queued now, so a store setup that follows waits for these installers.
+            let base = CompatResolver.baseComponents
+            enqueue(in: space.id) {
+                await self.installNow(base, in: space, engine: engine, reason: "for “\(name)”", retryFailed: false)
+            }
             return space
         } catch {
             errorMessage = "Couldn't create the space: \(error.localizedDescription)"
@@ -213,8 +374,9 @@ final class AppModel {
         if selection == .space(space.id) { selection = .allGames }
     }
 
+    /// Works with Apple's toolkit turned off too, so a space that uses it can always be stopped.
     func stopAll(in space: Space) {
-        guard let engine = engine(for: space) else { return }
+        guard let engine = engineManager?.engine(id: space.engineID) else { return }
         Task {
             await WineLauncher.killAll(engine: engine, space: space)
             await MainActor.run { for g in state.games(in: space) { running[g.id] = nil } }
@@ -230,19 +392,39 @@ final class AppModel {
     func installPreset(_ preset: AppPreset) async {
         guard let paths else { return }
         var space = presetSpace(preset)
+        if let found = space, !found.mayChange {
+            // An adopted bottle Steam was removed from: install into it only with the user's go-ahead.
+            askToChange(found) { allowed in if allowed { Task { await self.installPreset(preset) } } }
+            return
+        }
         if space == nil { space = await createSpace(name: preset.name, presetID: preset.id) }
         guard let space, let engine = engine(for: space) else { return }
-        let activity = begin("Setting up \(preset.name)", "Starting")
-        defer { end(activity) }
-        do {
-            try await PresetInstaller(paths: paths).install(preset, in: space, engine: engine) { [weak self] f, m in
-                Task { @MainActor in self?.progress(activity, f, m) }
+        let activity = begin("Setting up \(preset.name)", installingSpaces.contains(space.id) ? "Waiting for Windows components" : "Starting")
+        defer { end(activity); cancellers[activity] = nil }
+        let help = "Stop setting up \(preset.name). You can set it up again later."
+        setStop(activity, help: help) { [weak self] in self?.end(activity) }    // while waiting, Stop drops the setup
+        // After the space's base components: Steam's first start stops every program in the space.
+        await enqueue(in: space.id) {
+            // Stopped while waiting (the activity is gone), or set up by an earlier press of the same button.
+            guard self.activities.contains(where: { $0.id == activity && !$0.stopping }),
+                  !preset.isInstalled(in: space) else { return }
+            let work = Task.detached {
+                try await PresetInstaller(paths: paths).install(preset, in: space, engine: engine) { [weak self] f, m in
+                    Task { @MainActor in self?.progress(activity, f, m) }
+                }
             }
-            ensureLauncherEntry(for: space)
-            refreshStores()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+            self.setStop(activity, help: help) { work.cancel() }
+            defer { self.cancellers[activity] = nil }
+            do {
+                try await work.value
+                self.ensureLauncherEntry(for: space)
+                self.refreshStores()
+            } catch is CancellationError {
+                return
+            } catch {
+                self.errorMessage = error.localizedDescription
+            }
+        }.value
     }
 
     /// A library tile for the store launcher itself (Steam, Epic…).
@@ -282,6 +464,8 @@ final class AppModel {
         if changed { state = next; save() }
         fetchMissingCovers()
         extractMissingIcons()
+        analyzeMissing()
+        installPendingComponents()
     }
 
     // MARK: Covers and icons
@@ -398,6 +582,7 @@ final class AppModel {
     func addGame(_ game: Game) {
         mutate { $0.games.append(game) }
         extractMissingIcons()
+        analyzeMissing()
         selectedGameID = game.id
     }
 
@@ -424,45 +609,151 @@ final class AppModel {
         let oldIcon = g.iconFile
         g.executablePath = Game.storedPath(for: url, in: space)
         g.iconFile = nil
+        g.analysis = nil                                    // another program: look at it again
         update(g)
         if let oldIcon { deleteIcon(oldIcon) }
         iconAttempts.remove(g.id)
+        analysisAttempts.remove(g.id)
+        diagnoses[g.id] = nil
         extractMissingIcons()
+        analyzeMissing()
     }
 
     func isRunning(_ game: Game) -> Bool { running[game.id]?.isRunning == true }
 
-    func play(_ game: Game) {
-        guard let paths, let space = space(game.spaceID) else { return }
+    /// True from pressing Play until the program starts.
+    func isPreparing(_ game: Game) -> Bool { preparing.contains(game.id) }
+
+    /// Starting, but waiting for installs in the game's space to finish first.
+    func isWaitingForInstalls(_ game: Game) -> Bool { preparing.contains(game.id) && installingSpaces.contains(game.spaceID) }
+
+    /// Starts a game through the compatibility layers: analysis → known fixes → profile → components → registry → Wine.
+    /// Does nothing while the game is already starting or running.
+    func play(_ game: Game, skipping skipped: Set<PlayCheck> = []) {
+        // A launcher that is open may be started again: that brings its window back.
+        guard paths != nil, space(game.spaceID) != nil, !preparing.contains(game.id),
+              !isRunning(game) || game.kind == .app else { return }
+        preparing.insert(game.id)
         Task {
-            guard let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return }
-            do {
-                let plan = try LaunchPlanner.plan(for: game, in: space, verboseLogs: verboseLogs)
-                if !plan.chromiumHelpers.isEmpty {
-                    try ChromiumHelperWrapper.apply(helpers: plan.chromiumHelpers, in: space)
-                }
-                try SpaceManager(paths: paths).prepareGraphics(plan.backend, engine: engine, space: space)
-                let gameID = game.id
-                let program = try WineLauncher.start(
-                    engine: engine, space: space, arguments: plan.arguments, workingDirectory: plan.workingDirectory,
-                    backend: plan.backend, tweaks: plan.tweaks, logsFolder: paths.logs, logName: game.title
-                ) { [weak self] _ in
-                    Task { @MainActor in self?.finished(gameID) }
-                }
-                // The game may have changed while Wine was starting (hidden, new icon), so write to the current one.
-                if var current = self.game(game.id) { current.lastPlayedAt = Date(); update(current) }
-                if case .executable = game.source { running[game.id] = program }
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            await launch(game, skipping: skipped)
+            preparing.remove(game.id)
         }
     }
 
-    private func finished(_ gameID: UUID) {
-        if let program = running.removeValue(forKey: gameID), var g = game(gameID) {
-            g.secondsPlayed += Date().timeIntervalSince(program.startedAt)
-            update(g)
+    private func launch(_ game: Game, skipping skipped: Set<PlayCheck>) async {
+        guard let paths, let space = space(game.spaceID),
+              let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return }
+        do {
+            var current = self.game(game.id) ?? game
+            if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
+            let fixes = current.kind == .game ? self.fixes(for: current) : []
+            let planned = current, verbose = verboseLogs
+            // Planning reads the game's folder (program names, .NET), so it runs off the main thread.
+            let plan = try await Task.detached(priority: .userInitiated) {
+                try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose)
+            }.value
+            if let blockers = plan.compat?.blockers, !blockers.isEmpty, !skipped.contains(.blockers),
+               !acknowledgedBlockers.contains(game.id) {
+                blockedLaunch = BlockedLaunch(gameID: game.id, notes: blockers, skipped: skipped)
+                return
+            }
+            if plan.needsFreshLauncher, !skipped.contains(.runningSteam), case .steam = current.source,
+               await Self.isSteamRunning(in: space) {
+                steamRestart = SteamRestart(gameID: game.id, skipped: skipped)
+                return
+            }
+            if plan.writesToSpace(engine: engine.info), space.origin == .external,
+               self.space(space.id)?.allowsChanges == nil {
+                // Asked once per space; either answer starts the game.
+                askToChange(space) { [weak self] _ in
+                    if let g = self?.game(game.id) { self?.play(g, skipping: skipped) }
+                }
+                return
+            }
+            diagnoses[game.id] = nil
+            // Waits for installs queued in the space before it, and starts the program in the same turn of the
+            // queue, so an installer never runs next to it.
+            let started = await enqueue(in: space.id, isInstall: false) {
+                await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths)
+            }.value
+            let program = try started.get()
+            if launches[game.id]?.program.isRunning != true {
+                launches[game.id] = LaunchRecord(program: program, profile: current.launchOptions.profile,
+                                                 diagnose: current.kind == .game && current.storeKey == nil)
+            }
+            // The game may have changed while Wine was starting (hidden, new icon), so write to the current one.
+            if var latest = self.game(game.id) { latest.lastPlayedAt = Date(); update(latest) }
+            // A launcher started again hands over to the open one and quits; the open one stays the running one.
+            if case .executable = game.source, running[game.id]?.isRunning != true { running[game.id] = program }
+            // A program that died before it was recorded: its exit came first and found nothing to clear.
+            if !program.isRunning { finished(game.id, status: program.process.terminationStatus) }
+        } catch {
+            errorMessage = error.localizedDescription
         }
+    }
+
+    /// Components, registry, Steam's wrapper and DXVK (only where G-Player may change the space), then Wine.
+    /// Runs from the space's queue.
+    private func prepareAndStart(_ game: Game, plan: LaunchPlan, in space: Space, engine: Engine,
+                                 paths: LibraryPaths) async -> Result<RunningProgram, Error> {
+        // Read now: the answer may have changed while this waited.
+        if self.space(space.id)?.mayChange == true {
+            let wanted = plan.components.filter { !(skippedComponents[space.id]?.contains($0) ?? false) }
+            if !wanted.isEmpty {
+                switch await installNow(wanted, in: space, engine: engine, reason: "for \(game.title)", retryFailed: false) {
+                case .waiting:
+                    diagnoses[game.id] = [Diagnosis(kind: .missingComponent, title: Self.componentsLaterTitle,
+                        detail: "Another program is open in “\(space.name)”, so the game started without \(componentsLabel(wanted)). G-Player installs them once everything in the space has quit.",
+                        remedy: .none)]
+                case .cancelled:
+                    skippedComponents[space.id, default: []].formUnion(wanted)
+                case .done, .notAllowed:
+                    break
+                }
+            }
+            if !plan.registry.isEmpty { await applyRegistryNow(plan.registry, for: game.id, in: space, engine: engine) }
+        }
+        let helpers = plan.chromiumHelpers, backend = plan.backend
+        let allowed = self.space(space.id)?.mayChange == true
+        let gameID = game.id, logName = game.title
+        // The Steam helper wrapper and DXVK's files compare multi-MB files, so off the main thread.
+        return await Task.detached(priority: .userInitiated) { () -> Result<RunningProgram, Error> in
+            Result {
+                if allowed {
+                    if !helpers.isEmpty { _ = try ChromiumHelperWrapper.apply(helpers: helpers, in: space) }
+                    try SpaceManager(paths: paths).prepareGraphics(backend, engine: engine, space: space)
+                }
+                return try WineLauncher.start(
+                    engine: engine, space: space, arguments: plan.arguments, workingDirectory: plan.workingDirectory,
+                    backend: backend, tweaks: plan.tweaks, logsFolder: paths.logs, logName: logName
+                ) { [weak self] status in
+                    Task { @MainActor in self?.finished(gameID, status: status) }
+                }
+            }
+        }.value
+    }
+
+    static let componentsLaterTitle = "Components install later"
+
+    /// A program of the game quit. A second copy of a launcher that handed over to the open one leaves it running.
+    private func finished(_ gameID: UUID, status: Int32) {
+        if let program = running[gameID], !program.isRunning {
+            running[gameID] = nil
+            if var g = game(gameID) { g.secondsPlayed += Date().timeIntervalSince(program.startedAt); update(g) }
+        }
+        if let record = launches[gameID], !record.program.isRunning, record.diagnose {
+            launches[gameID] = nil
+            let seconds = Date().timeIntervalSince(record.program.startedAt)
+            let log = record.program.logFile
+            let profile = record.profile
+            Task.detached(priority: .utility) {
+                let found = LogDiagnosis.diagnose(log: LogDiagnosis.tail(of: log), exitStatus: status,
+                                                  seconds: seconds, profile: profile)
+                await MainActor.run { self.diagnoses[gameID] = found.isEmpty ? nil : found }
+            }
+        }
+        if launches[gameID]?.program.isRunning == false { launches[gameID] = nil }
+        componentsVersion += 1                              // the space may be free for installs now
         refreshStores()
     }
 

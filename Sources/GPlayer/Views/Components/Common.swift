@@ -38,7 +38,15 @@ struct ActivityPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(model.activities) { a in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(a.title).font(.callout.weight(.medium)).lineLimit(1)
+                        HStack(spacing: 6) {
+                            Text(a.title).font(.callout.weight(.medium)).lineLimit(1)
+                            Spacer(minLength: 0)
+                            if model.canCancel(a.id) {
+                                Button { model.cancel(a.id) } label: { Image(systemName: "xmark.circle.fill") }
+                                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                                    .help(a.stopHelp).accessibilityLabel("Stop")
+                            }
+                        }
                         if let p = a.progress { ProgressView(value: p).controlSize(.small) }
                         else { ProgressView().progressViewStyle(.linear).controlSize(.small) }
                         Text(a.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)

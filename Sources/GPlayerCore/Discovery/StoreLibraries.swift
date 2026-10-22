@@ -59,6 +59,18 @@ public enum SteamLibrary {
         return games.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
+    /// Where Steam installed a game, if it is installed in this space.
+    public static func installFolder(appID: String, in space: Space) -> URL? {
+        scan(space).first { $0.source == .steam(appID: appID) }?.installFolder
+    }
+
+    /// The likely .exe names of a Steam game (best guesses first), for per-program Wine settings.
+    public static func programNames(appID: String, in space: Space) -> [String] {
+        guard let folder = installFolder(appID: appID, in: space) else { return [] }
+        let names = ExecutableScanner.scan(folder, maxDepth: 4).filter { $0.score > -40 }.prefix(3).map(\.name)
+        return Array(names)
+    }
+
     public static func parseManifest(_ text: String, steamapps: URL) -> StoreGame? {
         guard let state = (try? VDF.parse(text))?["AppState"], let id = state["appid"]?.string,
               let name = state["name"]?.string, !ignoredAppIDs.contains(id),

@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0] - 2026-10-22
+
+Compatibility layers: G-Player now works out what a game needs and sets it up, so you don't have to touch Wine.
+
+- **Profiles instead of Wine settings.** Each game has Recommended, Compatible and Custom (plus Fast on engines
+  with D3DMetal), and a few plain switches: window mode, sharper Retina, frame rate, known fixes.
+- **Game analysis.** G-Player reads the game's files and shows its engine (Unity, Unreal, Godot…), DirectX
+  version, 32/64-bit and .NET, and warns before launch about anti-cheat that blocks Wine or a game known not
+  to work on a Mac. Detection rules come from SteamDB's FileDetectionRuleSets (MIT).
+- **Known fixes for 200+ games**, imported from umu-protonfixes (BSD-2): DLL settings, environment, arguments,
+  Windows version and the components each game asks for.
+- **Windows components.** New spaces get Visual C++ 2015–2022 and the DirectX shader compiler. Games add what
+  they need (DirectX 9 helpers, XACT, .NET, XNA, PhysX, fonts…) from their makers' servers, each file checked
+  by SHA-256, through a hardened copy of winetricks. Installs queue per space, can be stopped from the
+  sidebar, time out if an installer hangs, and failed ones can be retried.
+- **After a failed launch** G-Player reads the log and offers one next step, such as installing a missing
+  component or trying the Compatible profile.
+- **Steam games** get their settings per program, and if Steam is already open G-Player offers to restart it
+  so the game's settings reach it.
+- **Spaces from other apps** (a CrossOver bottle used in place) are only changed after you allow it once.
+- **Apple's Game Porting Toolkit is now opt-in** (Settings › Engines), off by default. G-Player never ships or
+  downloads Apple's files; it only uses a copy you installed. Spaces that used it before keep working.
+- Docs: `docs/COMPATIBILITY.md` (how the layers work, where downloads come from) and `docs/LEGAL.md`.
+
 ## [0.2.0] - 2026-10-22
 
 - Real icons: G-Player reads each program's icon from its .exe. Launchers (Steam, Epic…) get square tiles with

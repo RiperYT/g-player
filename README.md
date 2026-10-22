@@ -14,9 +14,9 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 - **Steam that draws.** Steam's 2026 client shows a black window under plain Wine on macOS. G-Player fixes
   it the way MaPC does (see [How Steam works here](docs/HOW-STEAM-WORKS.md)).
 - **Brings over what you have.** CrossOver bottles, Whisky bottles and hand-made prefixes are found on first
-  launch and used in place, with their games and saves.
+  launch and used in place, with their games and saves. G-Player asks once before it changes one of them.
 - **No account, no telemetry.** G-Player talks to GitHub (engine downloads), the stores' own CDNs (installers,
-  cover art) and nothing else.
+  cover art), the makers of Windows components when it installs them (Microsoft, NVIDIA…), and nothing else.
 
 ## Download
 
@@ -38,20 +38,16 @@ install it), about 1 GB for the engine plus room for games.
 |---|---|
 | Steam client and most DirectX 9–11 games through DXVK | Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) |
 | Portable games, Unity, Unreal, Electron and RPG Maker games | Games that need a GPU driver Wine can't fake |
-| DirectX 11/12 games through Apple's D3DMetal (optional, see below) | |
+| DirectX 12 through Apple's D3DMetal, if you installed it (see below) | 32-bit DirectX 10/11 games, often |
 
 The first minutes of a game can stutter while shaders compile. That settles once the cache is built.
 
-### Apple's Game Porting Toolkit (optional)
+### Apple's Game Porting Toolkit (optional, off by default)
 
-For DirectX 12 games, install Apple's toolkit with Homebrew. G-Player finds it and offers it as a second
-engine with D3DMetal:
-
-```bash
-brew install --cask --no-quarantine gcenx/wine/game-porting-toolkit
-```
-
-G-Player never ships Apple's files. Their license doesn't allow it.
+G-Player never includes, downloads or installs Apple's files. If you installed Apple's Game Porting Toolkit
+yourself, you can turn it on in **Settings › Engines** and use its D3DMetal for DirectX 11 and 12 games.
+Apple's license allows the toolkit for developing, testing and evaluating games; check that it fits how you
+use it. See [docs/LEGAL.md](docs/LEGAL.md).
 
 ## Build from source
 

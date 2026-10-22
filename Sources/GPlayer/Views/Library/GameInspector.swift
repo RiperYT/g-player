@@ -30,17 +30,33 @@ struct GameInspector: View {
                     .onSubmit { rename() }
 
                 Button { model.isRunning(game) ? model.stop(game) : model.play(game) } label: {
-                    Label(model.isRunning(game) ? "Stop" : "Play",
-                          systemImage: model.isRunning(game) ? "stop.fill" : "play.fill")
-                        .frame(maxWidth: .infinity)
+                    if model.isPreparing(game) {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text(model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…")
+                        }
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label(model.isRunning(game) ? "Stop" : "Play",
+                              systemImage: model.isRunning(game) ? "stop.fill" : "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
+                .disabled(model.isPreparing(game))
                 .keyboardShortcut(.return, modifiers: [])
 
                 facts(space)
 
                 if let space, case .executable = game.source { executableSettings(space) }
-                if let space { graphicsSettings(space) }
+                if let space {
+                    if game.kind == .game {
+                        HowItRunsSection(game: game, space: space)
+                    } else {
+                        if model.changesRefused(for: game) { RefusedChangesNote(space: space) }
+                        graphicsSettings(space)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Cover").sectionTitle()
@@ -163,7 +179,8 @@ struct GameInspector: View {
         let info = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
         VStack(alignment: .leading, spacing: 8) {
             Text("Graphics").sectionTitle()
-            Picker("Graphics", selection: Binding(get: { game.graphics }, set: { v in var g = game; g.graphics = v; model.update(g) })) {
+            Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },
+                                                  set: { model.setGraphics($0, for: game) })) {
                 Text("Automatic (\(info.defaultBackend.displayName))").tag(GraphicsBackend.auto)
                 ForEach(info.backends) { Text($0.displayName).tag($0) }
             }

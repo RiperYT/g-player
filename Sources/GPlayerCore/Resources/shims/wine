@@ -1,0 +1,4 @@
+#!/bin/sh
+# wine for winetricks. Wine for macOS is an x86_64 build, so it runs through Rosetta, the way G-Player starts it
+# (WineLauncher). Winetricks.swift sets GPLAYER_WINE to the engine's real bin/wine.
+exec /usr/bin/arch -x86_64 "${GPLAYER_WINE:?GPLAYER_WINE is not set}" "$@"

@@ -7,6 +7,9 @@ public struct PresetInstaller: Sendable {
 
     public typealias Progress = @Sendable (Double?, String) -> Void
 
+    /// A store installer that runs longer than this is stopped, so a hung one can't block the space.
+    public static let installerTimeout: TimeInterval = 30 * 60
+
     /// Installs `preset` into `space` (made beforehand with `SpaceManager.create`).
     public func install(_ preset: AppPreset, in space: Space, engine: Engine, progress: @escaping Progress) async throws {
         let installer = paths.downloads.appendingPathComponent(preset.installerFileName)
@@ -18,8 +21,11 @@ public struct PresetInstaller: Sendable {
         let status = try await WineLauncher.runAndWait(
             engine: engine, space: space,
             arguments: WineLauncher.arguments(toOpen: installer, extra: preset.installerArguments),
-            workingDirectory: paths.downloads, logsFolder: paths.logs, logName: "Install \(preset.name)")
-        await WineLauncher.waitForAll(engine: engine, space: space)
+            workingDirectory: paths.downloads, logsFolder: paths.logs, logName: "Install \(preset.name)",
+            timeout: Self.installerTimeout)
+        try Task.checkCancellation()
+        await WineLauncher.waitForAll(engine: engine, space: space, timeout: 120)
+        try Task.checkCancellation()
         guard preset.isInstalled(in: space) else {
             let looked = preset.executables.map { "C:\\" + $0.replacingOccurrences(of: "/", with: "\\") }.joined(separator: ", ")
             throw ShellError.failed("The \(preset.name) installer finished (code \(status)), but \(preset.name) isn't in \(looked). The installer's log is in \(paths.logs.path).")
@@ -41,13 +47,19 @@ public struct PresetInstaller: Sendable {
             backend: .auto, tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides, environment: steam.environment),
             logsFolder: paths.logs, logName: "Steam first start")
         let deadline = Date().addingTimeInterval(20 * 60)
-        while !SteamLibrary.isClientReady(in: space), Date() < deadline {
-            try await Task.sleep(for: .seconds(3))
-            if !program.isRunning && !SteamLibrary.isClientReady(in: space) {
-                throw ShellError.failed("Steam quit before it finished downloading. Open it from the library to continue.")
+        do {
+            while !SteamLibrary.isClientReady(in: space), Date() < deadline {
+                try await Task.sleep(for: .seconds(3))
+                if !program.isRunning && !SteamLibrary.isClientReady(in: space) {
+                    throw ShellError.failed("Steam quit before it finished downloading. Open it from the library to continue.")
+                }
             }
+            try await Task.sleep(for: .seconds(8))      // let it finish writing the new files
+        } catch is CancellationError {
+            // Stopped from the sidebar: Steam and its helpers go too, so the new space isn't left busy.
+            await WineLauncher.killAll(engine: engine, space: space)
+            throw CancellationError()
         }
-        try await Task.sleep(for: .seconds(8))      // let it finish writing the new files
         await WineLauncher.killAll(engine: engine, space: space)
         guard SteamLibrary.isClientReady(in: space) else {
             throw ShellError.failed("Steam didn't finish downloading in 20 minutes. Open it from the library to continue.")

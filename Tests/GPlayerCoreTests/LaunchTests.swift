@@ -21,6 +21,21 @@ import Testing
         #expect(gptk["WINEDLLOVERRIDES"]?.contains("dxgi=b") == true)
     }
 
+    @Test func dotNetStaysDisabledUntilTheSpaceHasIt() {
+        let without = WineEnvironment.make(engine: fakeEngine(), space: s, backend: .wined3d, base: [:])
+        #expect(without["WINEDLLOVERRIDES"]?.hasPrefix("mscoree,mshtml=;winemenubuilder.exe=d") == true)
+        #expect(LaunchTweaks().dotNetAvailable == false)
+
+        let tweaks = LaunchTweaks(dotNetAvailable: true)
+        let with = WineEnvironment.make(engine: fakeEngine(), space: s, backend: .wined3d, tweaks: tweaks, base: [:])
+        #expect(with["WINEDLLOVERRIDES"] == "mshtml=;winemenubuilder.exe=d")
+        #expect(with["WINEDLLOVERRIDES"]?.contains("mscoree") == false)
+        // Gecko stays off, and everything else keeps working next to it.
+        let dxvk = WineEnvironment.make(engine: fakeEngine(), space: s, backend: .dxvk,
+                                        tweaks: LaunchTweaks(dllOverrides: ["bcrypt=b"], dotNetAvailable: true), base: [:])
+        #expect(dxvk["WINEDLLOVERRIDES"] == "mshtml=;winemenubuilder.exe=d;d3d11,d3d10core=n,b;bcrypt=b")
+    }
+
     @Test func tweaksAreAppendedAndUserEnvironmentWins() {
         let t = LaunchTweaks(dllOverrides: ["bcrypt=b"], environment: ["DXVK_ASYNC": "0"])
         let env = WineEnvironment.make(engine: fakeEngine(), space: s, backend: .dxvk, tweaks: t, base: ["HOME": "/h", "SECRET": "x"])
@@ -55,6 +70,155 @@ import Testing
         let launcher = Game(title: "Steam", kind: .app, spaceID: s.id,
                             executablePath: "drive_c/Program Files (x86)/Steam/steam.exe")
         #expect(try LaunchPlanner.plan(for: launcher, in: s).arguments.contains("-noverifyfiles"))
+    }
+
+    // MARK: Steam games
+
+    /// A space with Steam, and Steam game 1 installed with a program in its folder.
+    private func steamSpace(_ tmp: TempFolder, engine: String = EngineCatalog.wineStaging.id) -> Space {
+        var s = space(at: tmp.prefix("Steam"), preset: "steam")
+        s.engineID = engine
+        let steam = "Steam/drive_c/Program Files (x86)/Steam"
+        tmp.file("\(steam)/steam.exe")
+        tmp.file("\(steam)/steamapps/appmanifest_1.acf", contents: Data("""
+            "AppState" { "appid" "1" "name" "Test Game" "StateFlags" "4" "installdir" "TestGame" }
+            """.utf8))
+        tmp.file("\(steam)/steamapps/common/TestGame/TestGame.exe")
+        return s
+    }
+
+    private func steamGame(_ s: Space, _ options: LaunchOptions? = nil, environment: [String: String] = [:]) -> Game {
+        var g = Game(title: "Test Game", spaceID: s.id, source: .steam(appID: "1"), environment: environment)
+        g.options = options
+        return g
+    }
+
+    private let overrideFix = GameFix(id: "steam-1", steamAppIDs: ["1"], dllOverrides: ["xaudio2_7": .native], source: "t")
+
+    @Test func programNamesFromTheCallerReplaceTheFolderSearch() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let scanned = try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [overrideFix])
+        #expect(scanned.registry.contains { $0.key == #"HKCU\Software\Wine\AppDefaults\TestGame.exe\DllOverrides"# && $0.name == "xaudio2_7" })
+
+        let given = try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [overrideFix], programNames: ["Given.exe", "Other.exe"])
+        let keys = Set(given.registry.filter { $0.key.contains("AppDefaults") }.map(\.key))
+        #expect(keys == [#"HKCU\Software\Wine\AppDefaults\Given.exe\DllOverrides"#, #"HKCU\Software\Wine\AppDefaults\Other.exe\DllOverrides"#])
+
+        // An empty list is an answer too: nothing to write for, and no search.
+        let none = try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [overrideFix], programNames: [])
+        #expect(!none.registry.contains { $0.key.contains("AppDefaults") })
+    }
+
+    @Test func aWindowsVersionFixGoesToTheProgramNamesTheCallerGave() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let fix = GameFix(id: "steam-1", steamAppIDs: ["1"], components: ["win7"], source: "t")
+        let plan = try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [fix], programNames: ["Given.exe"])
+        #expect(plan.registry.contains(RegistryValue(key: #"HKCU\Software\Wine\AppDefaults\Given.exe"#, name: "Version", value: "win7")))
+        #expect(!plan.components.contains("win7"))
+        // A program the user added is its own program name.
+        let exe = tmp.file("Steam/drive_c/Games/My Game.exe")
+        let mine = Game(title: "Mine", spaceID: s.id, executablePath: Game.storedPath(for: exe, in: s))
+        let own = try LaunchPlanner.plan(for: mine, in: s, fixes: [fix])
+        #expect(own.registry.contains(RegistryValue(key: #"HKCU\Software\Wine\AppDefaults\My Game.exe"#, name: "Version", value: "win7")))
+    }
+
+    @Test func aPlainSteamGameDoesNotNeedAFreshSteam() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let plan = try LaunchPlanner.plan(for: steamGame(s), in: s)
+        #expect(plan.needsFreshLauncher == false)
+        #expect(plan.compat?.environment.isEmpty == true)
+        // Arguments and DLL settings reach a running Steam without a restart (`-applaunch`, and the registry).
+        var withArguments = steamGame(s)
+        withArguments.arguments = ["-windowed"]
+        #expect(try LaunchPlanner.plan(for: withArguments, in: s, fixes: [overrideFix]).needsFreshLauncher == false)
+        // A stored Fast profile on an engine without D3DMetal is Recommended.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .fast)), in: s).needsFreshLauncher == false)
+        // A switch that only changes the registry doesn't need it either.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(windowMode: .windowed, retina: true)), in: s).needsFreshLauncher == false)
+    }
+
+    @Test func environmentProfilesAndBackendsNeedAFreshSteam() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        for profile in [LaunchProfile.compatible, .custom] {
+            let plan = try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: profile)), in: s)
+            #expect(plan.needsFreshLauncher, "\(profile)")
+        }
+        // The profile's own environment.
+        let compatible = try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .compatible)), in: s)
+        #expect(compatible.backend == .wined3d && compatible.compat?.environment["WINEESYNC"] == "0")
+        // A fix's environment, the frame rate overlay, and the game's own variables.
+        let env = GameFix(id: "steam-1", steamAppIDs: ["1"], environment: ["DXVK_HUD": "0"], source: "t")
+        #expect(try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [env]).needsFreshLauncher)
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(showFrameRate: true)), in: s).needsFreshLauncher)
+        #expect(try LaunchPlanner.plan(for: steamGame(s, environment: ["WINEDEBUG": "+all"]), in: s).needsFreshLauncher)
+        // Fixes switched off don't count.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(useKnownFixes: false)), in: s, fixes: [env]).needsFreshLauncher == false)
+    }
+
+    @Test func theToolkitsDefaultBackendIsNotADifference() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp, engine: EngineCatalog.gptk.id)
+        let plan = try LaunchPlanner.plan(for: steamGame(s), in: s)
+        #expect(plan.backend == .d3dmetal)
+        #expect(plan.needsFreshLauncher == false)
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .fast)), in: s).needsFreshLauncher == true)   // a profile other than Recommended
+    }
+
+    @Test func onlySteamGamesAskForAFreshLauncher() throws {
+        let tmp = TempFolder()
+        let s = space(at: tmp.prefix("Main"))
+        let exe = tmp.file("Main/drive_c/Games/g.exe")
+        var g = Game(title: "G", spaceID: s.id, executablePath: Game.storedPath(for: exe, in: s))
+        g.options = LaunchOptions(profile: .compatible, showFrameRate: true)
+        #expect(try LaunchPlanner.plan(for: g, in: s).needsFreshLauncher == false)
+    }
+
+    // MARK: .NET
+
+    @Test func dotNetIsAvailableWhenTheSpaceHasMonoOrTheRuntimeOrAComponent() throws {
+        func plan(_ prepare: (TempFolder) -> Void) throws -> LaunchPlan {
+            let tmp = TempFolder()
+            let s = space(at: tmp.prefix("Main"))
+            let exe = tmp.file("Main/drive_c/Games/g.exe")
+            prepare(tmp)
+            return try LaunchPlanner.plan(for: Game(title: "G", spaceID: s.id, executablePath: Game.storedPath(for: exe, in: s)), in: s)
+        }
+        let none = try plan { _ in }
+        #expect(none.tweaks.dotNetAvailable == false)
+        #expect(WineEnvironment.make(engine: fakeEngine(), space: space(at: URL(fileURLWithPath: "/tmp/M")), backend: .auto,
+                                     tweaks: none.tweaks, base: [:])["WINEDLLOVERRIDES"]?.contains("mscoree") == true)
+
+        let mono = try plan { $0.dir("Main/drive_c/windows/mono/mono-2.0") }
+        #expect(mono.tweaks.dotNetAvailable)
+        let runtime = try plan { $0.file("Main/drive_c/windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll") }
+        #expect(runtime.tweaks.dotNetAvailable)
+        let component = try plan { $0.file("Main/.gplayer-components.json", contents: Data(#"{"installed": {"dotnet48": "2026-01-01T00:00:00Z"}}"#.utf8)) }
+        #expect(component.tweaks.dotNetAvailable)
+        let other = try plan { $0.file("Main/.gplayer-components.json", contents: Data(#"{"installed": {"d3dx9": "2026-01-01T00:00:00Z"}}"#.utf8)) }
+        #expect(other.tweaks.dotNetAvailable == false)
+        // Only a space that failed to install .NET doesn't have it.
+        let failed = try plan { $0.file("Main/.gplayer-components.json", contents: Data(#"{"failed": {"dotnet48": "2026-01-01T00:00:00Z"}}"#.utf8)) }
+        #expect(failed.tweaks.dotNetAvailable == false)
+        // The older framework folder without clr.dll isn't .NET 4.
+        let empty = try plan { $0.dir("Main/drive_c/windows/Microsoft.NET/Framework64/v4.0.30319") }
+        #expect(empty.tweaks.dotNetAvailable == false)
+    }
+
+    @Test func steamAndEpicLaunchesKnowAboutDotNetToo() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        tmp.dir("Steam/drive_c/windows/mono")
+        #expect(try LaunchPlanner.plan(for: steamGame(s), in: s).tweaks.dotNetAvailable)
+        let epic = space(at: tmp.prefix("Epic"), preset: "epic")
+        tmp.file("Epic/drive_c/Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe")
+        let game = Game(title: "F", spaceID: epic.id, source: .epic(appName: "x", launchURI: "u"))
+        #expect(try LaunchPlanner.plan(for: game, in: epic).tweaks.dotNetAvailable == false)
+        tmp.dir("Epic/drive_c/windows/mono")
+        #expect(try LaunchPlanner.plan(for: game, in: epic).tweaks.dotNetAvailable)
     }
 
     @Test func missingExecutableIsAClearError() {
@@ -148,5 +312,93 @@ import Testing
         let plan = try LaunchPlanner.plan(for: g, in: s)
         #expect(plan.arguments.last == "com.epicgames.launcher://apps/x?action=launch")
         #expect(plan.chromiumHelpers.count == 2)
+    }
+}
+
+
+// MARK: Busy spaces
+
+@Suite struct WineProcessesTests {
+    let main = Space(name: "Main", path: "/Users/me/Games/G-Player/Spaces/Main", engineID: "x", origin: .managed)
+    let second = Space(name: "Main 2", path: "/Users/me/Games/G-Player/Spaces/Main 2", engineID: "x", origin: .managed)
+
+    private let idle = """
+    /sbin/launchd
+    /usr/libexec/logd
+    /Applications/G-Player.app/Contents/MacOS/GPlayer
+    /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
+    /bin/ps -axo command=
+    """
+
+    @Test func anIdleMacMeansAFreeSpace() {
+        #expect(!WineProcesses.isRunning(in: main, commandLines: idle))
+        #expect(!WineProcesses.isRunning(in: main, commandLines: ""))
+        #expect(!WineProcesses.isSteamRunning(in: main, commandLines: idle))
+    }
+
+    @Test func aProgramFromTheSpacesDriveMakesItBusy() {
+        let ps = idle + "\n/Users/me/Games/G-Player/Engines/wine/bin/wine64-preloader /Users/me/Games/G-Player/Spaces/Main/drive_c/Games/Game.exe -windowed\n"
+        #expect(WineProcesses.isRunning(in: main, commandLines: ps))
+        #expect(!WineProcesses.isRunning(in: second, commandLines: ps))                     // "Main" is not "Main 2"
+        #expect(!WineProcesses.isSteamRunning(in: main, commandLines: ps))
+    }
+
+    @Test func theWineprefixVariableCountsToo() {
+        let ps = idle + "\nenv WINEPREFIX=/Users/me/Games/G-Player/Spaces/Main wine winecfg\nsh -c WINEPREFIX=/Users/me/Games/G-Player/Spaces/Main 2 wine x\n"
+        #expect(WineProcesses.isRunning(in: main, commandLines: ps))
+        #expect(WineProcesses.isRunning(in: second, commandLines: ps))
+        let only = idle + "\nwinetricks WINEPREFIX=/Users/me/Games/G-Player/Spaces/Main2 vcrun2008"
+        #expect(!WineProcesses.isRunning(in: main, commandLines: only))                    // needs the space after the path
+    }
+
+    @Test func steamIsToldFromOtherPrograms() {
+        let steam = "/Users/me/Games/G-Player/Spaces/Main/drive_c/Program Files (x86)/Steam/steam.exe -silent -applaunch 1"
+        #expect(WineProcesses.isSteamRunning(in: main, commandLines: idle + "\n" + steam))
+        #expect(WineProcesses.isRunning(in: main, commandLines: idle + "\n" + steam))
+        #expect(!WineProcesses.isSteamRunning(in: second, commandLines: idle + "\n" + steam))
+        let helper = "/Users/me/Games/G-Player/Spaces/Main/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64/STEAMWEBHELPER.EXE --type=gpu"
+        #expect(WineProcesses.isSteamRunning(in: main, commandLines: helper))
+        // A game that Steam started is a busy space, but not a running Steam.
+        let game = "/Users/me/Games/G-Player/Spaces/Main/drive_c/Program Files (x86)/Steam/steamapps/common/Game/Game.exe"
+        #expect(WineProcesses.isRunning(in: main, commandLines: game))
+        #expect(!WineProcesses.isSteamRunning(in: main, commandLines: game))
+        // Steam in another space doesn't make this one busy.
+        let elsewhere = "/Users/me/Games/Other/drive_c/Program Files (x86)/Steam/steam.exe"
+        #expect(!WineProcesses.isRunning(in: main, commandLines: elsewhere))
+        #expect(!WineProcesses.isSteamRunning(in: main, commandLines: elsewhere))
+    }
+
+    @Test func theRealProcessListHasNothingForASpaceThatDoesNotExist() {
+        let list = WineProcesses.commandLines()
+        #expect(!list.isEmpty)
+        #expect(list.contains("ps"))
+        let ghost = Space(name: "Ghost", path: "/nonexistent/gplayer-ghost-\(UUID().uuidString)", engineID: "x", origin: .managed)
+        #expect(!WineProcesses.isRunning(in: ghost, commandLines: list))
+    }
+}
+
+/// Whether a launch writes into its space decides when an external space needs the user's consent.
+@Suite struct WritesToSpaceTests {
+    private func plan(_ backend: GraphicsBackend, components: [String] = [], registry: [RegistryValue] = [],
+                      helpers: [String] = []) -> LaunchPlan {
+        LaunchPlan(arguments: [], workingDirectory: nil, backend: backend, tweaks: LaunchTweaks(),
+                   chromiumHelpers: helpers, components: components, registry: registry)
+    }
+
+    @Test func plainWineD3DAndD3DMetalLeaveTheSpaceAlone() {
+        #expect(!plan(.wined3d).writesToSpace(engine: EngineCatalog.wineStaging))
+        #expect(!plan(.auto).writesToSpace(engine: EngineCatalog.gptk))
+    }
+
+    @Test func dxvkCopiesItsFiles() {
+        #expect(plan(.auto).writesToSpace(engine: EngineCatalog.wineStaging))        // DXVK is the Staging default
+        #expect(plan(.dxvk).writesToSpace(engine: EngineCatalog.wineStaging))
+    }
+
+    @Test func componentsSettingsAndTheSteamWrapperWrite() {
+        let staging = EngineCatalog.wineStaging
+        #expect(plan(.wined3d, components: ["vcrun2022"]).writesToSpace(engine: staging))
+        #expect(plan(.wined3d, registry: [RegistryValue(key: #"HKCU\Software\Wine"#, name: "n", value: "v")]).writesToSpace(engine: staging))
+        #expect(plan(.wined3d, helpers: ["Program Files (x86)/Steam/bin/cef/*/steamwebhelper.exe"]).writesToSpace(engine: staging))
     }
 }

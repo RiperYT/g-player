@@ -8,6 +8,26 @@ public struct LaunchPlan: Sendable, Equatable {
     public var tweaks: LaunchTweaks
     /// Helpers to wrap right before starting.
     public var chromiumHelpers: [String]
+    /// Runtime components the space must have first.
+    public var components: [String] = []
+    /// Registry values to set first (one `regedit /S` call).
+    public var registry: [RegistryValue] = []
+    /// What the compatibility layers decided, for the UI.
+    public var compat: CompatPlan? = nil
+    /// Steam games only: the plan carries something that reaches the game only when Steam is started for this launch,
+    /// because a Steam that is already running starts games with the environment it got when it started. That is
+    /// environment variables (the profile's, a fix's, the game's own), a profile other than Recommended, or a graphics
+    /// backend other than the engine's default. If Steam is already running, it has to be restarted first.
+    public var needsFreshLauncher: Bool = false
+}
+
+extension LaunchPlan {
+    /// True when carrying out the plan writes into the space: components, registry values, Steam's helper wrapper,
+    /// or DXVK's DLLs (copied over Wine's own when the backend is DXVK). An external space needs the user's consent
+    /// for any of these.
+    public func writesToSpace(engine: EngineInfo) -> Bool {
+        !components.isEmpty || !registry.isEmpty || !chromiumHelpers.isEmpty || engine.resolve(backend) == .dxvk
+    }
 }
 
 public enum LaunchPlanner {
@@ -21,44 +41,105 @@ public enum LaunchPlanner {
         }
     }
 
-    public static func plan(for game: Game, in space: Space, verboseLogs: Bool = false) throws -> LaunchPlan {
+    /// - Parameters:
+    ///   - fixes: known fixes that match the game (from `GameFixDatabase`).
+    ///   - programNames: the file names of the programs the game starts, when the caller has them (the app keeps them
+    ///     for Steam games). Nil: a Steam game's are looked for in its folder, a program the user added is its own .exe.
+    public static func plan(for game: Game, in space: Space, fixes: [GameFix] = [], verboseLogs: Bool = false,
+                            programNames: [String]? = nil) throws -> LaunchPlan {
         let preset = AppPresets.preset(space.presetID)
-        var tweaks = LaunchTweaks(dllOverrides: preset?.dllOverrides ?? [],
-                                  environment: (preset?.environment ?? [:]).merging(game.environment) { _, user in user },
-                                  verboseLogs: verboseLogs)
+        let engine = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
+        let isLauncher = game.kind == .app
+        let names = isLauncher ? [] : self.programNames(of: game, in: space, fixes: fixes, given: programNames)
+        // Launchers (Steam itself) run with their preset's recipe only; games get the compatibility layers.
+        let compat: CompatPlan? = isLauncher ? nil : CompatResolver.resolve(.init(
+            engine: engine, analysis: game.analysis, fixes: fixes, options: game.launchOptions,
+            userBackend: game.graphics, isStoreGame: game.storeKey != nil, programNames: names))
+        let dotNet = hasDotNet(space)
+
+        var environment = preset?.environment ?? [:]
+        for (k, v) in compat?.environment ?? [:] { environment[k] = v }
+        for (k, v) in game.environment { environment[k] = v }                        // the user's own settings win
+        var overrides = preset?.dllOverrides ?? []
+        overrides += (compat?.dllOverrides ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }
+        let tweaks = LaunchTweaks(dllOverrides: overrides, environment: environment, verboseLogs: verboseLogs,
+                                  dotNetAvailable: dotNet)
         let helpers = preset?.chromiumHelpers ?? []
+        let backend = compat?.backend ?? game.graphics
+        var registry = compat?.registry ?? []
+
+        /// Engine/fix arguments first, then the user's, without repeating ones the user already has.
+        func gameArguments() -> [String] {
+            let extra = (compat?.arguments ?? []).filter { !game.arguments.contains($0) }
+            return extra + game.arguments
+        }
 
         switch game.source {
         case .executable:
             guard let exe = game.executableURL(in: space), FileManager.default.fileExists(atPath: exe.path) else {
                 throw PlanError.missingExecutable(game.title)
             }
-            var args = WineLauncher.arguments(toOpen: exe, extra: game.arguments)
-            // The launcher of a preset space: Steam needs its own flags (and -noverifyfiles once it is ready).
+            var args: [String]
             if let preset, exe.standardizedFileURL.path == preset.executableURL(in: space).standardizedFileURL.path {
-                args += steamReadyFlags(preset, space) + preset.launchArguments
+                // The launcher of a preset space: Steam needs its own flags (and -noverifyfiles once it is ready).
+                args = WineLauncher.arguments(toOpen: exe, extra: game.arguments) + steamReadyFlags(preset, space) + preset.launchArguments
+            } else {
+                args = WineLauncher.arguments(toOpen: exe, extra: gameArguments())
             }
-            return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(),
-                              backend: game.graphics, tweaks: tweaks, chromiumHelpers: helpers)
+            args = CompatResolver.apply(compat?.replacements ?? [], to: args)
+            return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
+                              tweaks: tweaks, chromiumHelpers: helpers, components: compat?.components ?? [],
+                              registry: registry, compat: compat)
 
         case .steam(let appID):
             let steam = AppPresets.steam
             guard steam.isInstalled(in: space) else { throw PlanError.launcherMissing("Steam") }
-            tweaks.dllOverrides = steam.dllOverrides
             let exe = steam.executableURL(in: space)
-            return LaunchPlan(arguments: [exe.path, "-silent"] + steamReadyFlags(steam, space) + steam.launchArguments
-                                + ["-applaunch", appID] + game.arguments,
-                              workingDirectory: exe.deletingLastPathComponent(), backend: game.graphics,
-                              tweaks: tweaks, chromiumHelpers: steam.chromiumHelpers)
+            // A running Steam starts the game with its own environment, so DLL settings also go into the
+            // registry per program, which reaches the game however it starts.
+            if let overrides = compat?.dllOverrides, !overrides.isEmpty {
+                registry += RegistryFile.appDefaults(exeNames: names, overrides: overrides)
+            }
+            let args = [exe.path, "-silent"] + steamReadyFlags(steam, space) + steam.launchArguments
+                + ["-applaunch", appID] + CompatResolver.apply(compat?.replacements ?? [], to: gameArguments())
+            let needsFresh = !(compat?.environment.isEmpty ?? true) || !game.environment.isEmpty
+                || game.launchOptions.profile.effective(on: engine) != .recommended
+                || engine.resolve(backend) != engine.defaultBackend
+            return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
+                              tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides + overrides.filter { !steam.dllOverrides.contains($0) },
+                                                   environment: environment, verboseLogs: verboseLogs, dotNetAvailable: dotNet),
+                              chromiumHelpers: steam.chromiumHelpers, components: compat?.components ?? [],
+                              registry: registry, compat: compat, needsFreshLauncher: needsFresh)
 
         case .epic(_, let uri):
             let epic = AppPresets.epic
             guard epic.isInstalled(in: space) else { throw PlanError.launcherMissing("Epic Games Launcher") }
             let exe = epic.executableURL(in: space)
             return LaunchPlan(arguments: [exe.path] + epic.launchArguments + [uri],
-                              workingDirectory: exe.deletingLastPathComponent(), backend: game.graphics,
-                              tweaks: tweaks, chromiumHelpers: epic.chromiumHelpers)
+                              workingDirectory: exe.deletingLastPathComponent(), backend: backend,
+                              tweaks: tweaks, chromiumHelpers: epic.chromiumHelpers, components: compat?.components ?? [],
+                              registry: registry, compat: compat)
         }
+    }
+
+    /// The programs a game starts, for settings Wine keeps per program. Searching a Steam game's folder is slow, so it only
+    /// happens when there are known fixes that may need the names.
+    static func programNames(of game: Game, in space: Space, fixes: [GameFix], given: [String]?) -> [String] {
+        if let given { return given }
+        switch game.source {
+        case .executable: return game.executableURL(in: space).map { [$0.lastPathComponent] } ?? []
+        case .steam(let appID): return fixes.isEmpty ? [] : SteamLibrary.programNames(appID: appID, in: space)
+        case .epic: return []
+        }
+    }
+
+    /// True when the space has .NET, so Wine must be allowed to load it: Wine Mono, Microsoft's .NET 4 runtime, or a
+    /// `dotnet…` component G-Player installed.
+    static func hasDotNet(_ space: Space) -> Bool {
+        let fm = FileManager.default
+        return fm.fileExists(atPath: space.driveC.appendingPathComponent("windows/mono").path)
+            || fm.fileExists(atPath: space.driveC.appendingPathComponent("windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll").path)
+            || RuntimeInstaller.recorded(in: space).contains { $0.hasPrefix("dotnet") }
     }
 
     /// `-noverifyfiles` keeps Steam from restoring its helper; only safe once the client is fully downloaded.

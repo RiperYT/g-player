@@ -1,0 +1,116 @@
+#!/bin/sh
+# cabextract for macOS, built on /usr/bin/bsdtar (libarchive reads CAB). Only what winetricks calls:
+#
+#   cabextract [-q] [-L] [-d DIR | --directory=DIR] [-F PATTERN | --filter=PATTERN] [-v] FILE...
+#
+# Like the real cabextract: options may come after the file names; FILE may be a self-extracting .exe (every
+# cabinet inside it is read, libarchive alone can't); -F is a case-insensitive shell pattern for the whole
+# name; -L lowercases the extracted names; DIR is created. A pattern that matches nothing is not an error.
+# Not supported: listing, testing, piping, cabinets split over several files.
+set -u
+
+BSDTAR=/usr/bin/bsdtar
+dir=.
+lower=0
+filter=
+files=
+status=0
+
+die() { echo "cabextract: $*" >&2; exit 1; }
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        -q|--quiet) ;;
+        -L|--lowercase) lower=1 ;;
+        -d|--directory) [ $# -ge 2 ] || die "option $1 needs a folder"; dir=$2; shift ;;
+        --directory=*) dir=${1#*=} ;;
+        -F|--filter) [ $# -ge 2 ] || die "option $1 needs a pattern"; filter=$2; shift ;;
+        --filter=*) filter=${1#*=} ;;
+        -v|--version) echo "cabextract version 1.11 (G-Player shim for macOS)"; exit 0 ;;
+        --) shift; while [ $# -gt 0 ]; do files="$files$1
+"; shift; done; break ;;
+        -?*) die "unsupported option $1" ;;
+        *) files="$files$1
+" ;;
+    esac
+    shift
+done
+
+[ -n "$files" ] || die "no cabinet files given"
+[ -x "$BSDTAR" ] || die "$BSDTAR not found"
+lfilter=$(printf '%s' "$filter" | tr 'A-Z' 'a-z')
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/cabextract.XXXXXX") || die "can't make a temporary folder"
+trap 'rm -rf "$work"' EXIT
+mkdir -p "$dir" || die "can't create $dir"
+
+# Byte offsets (and sizes) of every cabinet in $1, one "offset size" per line: the file itself, or the
+# cabinets embedded in a self-extracting .exe. A header is "MSCF", four zero bytes, the size, and version 1.x.
+find_cabinets() {
+    total=$(wc -c < "$1" | tr -d ' ')
+    next=0
+    LC_ALL=C grep -obUa 'MSCF' "$1" 2>/dev/null | while IFS=: read -r off _; do
+        [ "$off" -ge "$next" ] || continue
+        set -- "$1" $(od -An -v -tu1 -j "$off" -N 26 "$1" 2>/dev/null)
+        [ $# -eq 27 ] || continue
+        [ "$6$7$8$9" = 0000 ] || continue
+        [ "${27}" = 1 ] || continue
+        size=$(( ${10} + ${11} * 256 + ${12} * 65536 + ${13} * 16777216 ))
+        [ "$size" -ge 36 ] && [ $(( off + size )) -le "$total" ] || continue
+        echo "$off $size"
+        next=$(( off + size ))
+    done
+}
+
+# Names inside cabinet $1 that match the filter, one per line.
+matching_names() {
+    "$BSDTAR" -tf "$1" 2>/dev/null | while IFS= read -r name; do
+        case $name in */) continue ;; esac
+        if [ -z "$filter" ]; then
+            printf '%s\n' "$name"
+        else
+            lname=$(printf '%s' "$name" | tr 'A-Z' 'a-z')
+            case $lname in $lfilter) printf '%s\n' "$name" ;; esac
+        fi
+    done
+}
+
+# Extracts the matching files of cabinet $1 into $dir.
+extract_cabinet() {
+    cab=$1
+    stage="$work/stage"
+    rm -rf "$stage"; mkdir -p "$stage"
+    if [ -z "$filter" ]; then
+        "$BSDTAR" -xf "$cab" -C "$stage" || return 1
+    else
+        matching_names "$cab" | sed 's/[][*?\\]/\\&/g' > "$work/names"
+        [ -s "$work/names" ] || return 0
+        "$BSDTAR" -xf "$cab" -C "$stage" -T "$work/names" || return 1
+    fi
+    (cd "$stage" && find . -type f) > "$work/extracted"
+    while IFS= read -r path; do
+        rel=${path#./}
+        [ "$lower" = 1 ] && rel=$(printf '%s' "$rel" | tr 'A-Z' 'a-z')
+        mkdir -p "$dir/$(dirname "$rel")" && mv -f "$stage/${path#./}" "$dir/$rel" || return 1
+    done < "$work/extracted"
+}
+
+n=0
+printf '%s' "$files" > "$work/files"
+while IFS= read -r file; do
+    [ -f "$file" ] || { echo "cabextract: $file: no such file" >&2; status=1; continue; }
+    cabinets=$(find_cabinets "$file")
+    [ -n "$cabinets" ] || { echo "cabextract: $file: no valid cabinets found" >&2; status=1; continue; }
+    size_of_file=$(wc -c < "$file" | tr -d ' ')
+    for entry in $(printf '%s' "$cabinets" | tr ' ' ','); do
+        off=${entry%,*}; size=${entry#*,}
+        if [ "$off" = 0 ] && [ "$size" = "$size_of_file" ]; then
+            cab=$file
+        else
+            n=$((n + 1)); cab="$work/cab.$n"
+            tail -c +$((off + 1)) "$file" | head -c "$size" > "$cab"
+        fi
+        extract_cabinet "$cab" || { echo "cabextract: $file: couldn't read the cabinet at byte $off" >&2; status=1; }
+    done
+done < "$work/files"
+exit $status

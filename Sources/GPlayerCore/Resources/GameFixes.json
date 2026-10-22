@@ -1,0 +1,3902 @@
+{
+  "fixes": [
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "gplayer-overcooked",
+      "macStatus": "broken",
+      "notes": "32-bit Unity 5.5 game. DXVK can't create a 32-bit DirectX 11 device and WineD3D hangs on Wine 11 for macOS; it also crashes on Apple's Game Porting Toolkit. Tested 2026-10-21 on an M5 Mac with macOS 26.4.",
+      "registry": [],
+      "replacements": [],
+      "source": "g-player",
+      "steamAppIDs": [
+        "448510"
+      ],
+      "title": "Overcooked",
+      "verifiedOnMac": true
+    },
+    {
+      "arguments": [
+        "-NoStartup"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1017900",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1017900"
+      ],
+      "title": "Age of Empires: DE",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "lucida",
+        "courier",
+        "verdana",
+        "trebuchet",
+        "arial",
+        "tahoma"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-10220",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "10220"
+      ],
+      "title": "Postal III",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1030830",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1030830"
+      ],
+      "title": "Mafia II Definitive Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc42",
+        "l3codecx",
+        "corefonts",
+        "winxp"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-105450",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "105450"
+      ],
+      "title": "Age Of Empire 3: Complete Collection",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "WINE_NO_OPEN_FILE_SEARCH": "pso2_bin/data"
+      },
+      "exeNames": [],
+      "id": "steam-1056640",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1056640"
+      ],
+      "title": "Phantasy Star Online 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "xactengine3_7": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1062040",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1062040"
+      ],
+      "title": "Dragon Star Varnir",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-108710",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "108710"
+      ],
+      "title": "Alan Wake",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "DOTNET_BUNDLE_EXTRACT_BASE_DIR": ""
+      },
+      "exeNames": [],
+      "id": "steam-1097150",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1097150"
+      ],
+      "title": "Fall Guys",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "WINE_DISABLE_SFN": "1"
+      },
+      "exeNames": [],
+      "id": "steam-1105510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1105510"
+      ],
+      "title": "Yakuza 5",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-dx11"
+      ],
+      "components": [
+        "d3dx9_43",
+        "d3dcompiler_43",
+        "d3dx11_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-110800",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "110800"
+      ],
+      "title": "L.A. Noire",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet35sp1",
+        "dotnet40",
+        "win10"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1112400",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1112400"
+      ],
+      "title": "Project Torque",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-vomstyle=layer"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1144400",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1144400"
+      ],
+      "title": "Senren*Banka",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1151640",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1151640"
+      ],
+      "title": "Horizon Zero Dawn",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-fullscreen -vulkan"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1174180",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1174180"
+      ],
+      "title": "Red Dead Redemption 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47",
+        "vcrun2013",
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1175730",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1175730"
+      ],
+      "title": "Tree Of Savior",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1222370",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "Necromunda.exe",
+          "to": "Necromunda/Binaries/Win64/Necromunda-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1222370"
+      ],
+      "title": "Necromunda: Hired Gun",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "OPENSSL_ia32cap": ":~0x20000000"
+      },
+      "exeNames": [],
+      "id": "steam-1222700",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1222700"
+      ],
+      "title": "A Way Out",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1239520",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1239520"
+      ],
+      "title": "Madden NFL 21",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1240440",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1240440"
+      ],
+      "title": "Halo Infinite",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-FastLaunch"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1250410",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1250410"
+      ],
+      "title": "Flight Simulator 2020",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "allfonts",
+        "dotnet462"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1259970",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1259970"
+      ],
+      "title": "Pes 2021",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1277510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1277510"
+      ],
+      "title": "Re:ZERO -Starting Life in Another World- The Prophecy of the Throne",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-12810",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "12810"
+      ],
+      "title": "Overlord II",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xliveless"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-12840",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "12840"
+      ],
+      "title": "Dirt 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc140"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1284410",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1284410"
+      ],
+      "title": "GWENT: The Witcher Card Game",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "vulkan-1": "b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1286880",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1286880"
+      ],
+      "title": "Ship Graveyard Simulator",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1293830",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1293830"
+      ],
+      "title": "Forza Horizon 4",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dsound"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1346400",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1346400"
+      ],
+      "title": "Battle Engine Aquila",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-eac-untrusted --bundle-dir ../bundle --ini settings"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1361210",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "launcher/Launcher.exe",
+          "to": "binaries/Darktide.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1361210"
+      ],
+      "title": "Warhammer 40,000: Darktide",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2017"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1361510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1361510"
+      ],
+      "title": "Teenage Mutant Ninja Turtles Shredders Revenge",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1392960",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1392960"
+      ],
+      "title": "STORY OF SEASONS: Pioneers of Olive Town",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx11_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1434950",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1434950"
+      ],
+      "title": "HighFleet",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1449110",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1449110"
+      ],
+      "title": "The Outer Worlds 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "dinput": "n,b",
+        "winmm": "n,b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1500540",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1500540"
+      ],
+      "title": "Hardwar",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dsound",
+        "d3dx9",
+        "arial",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-15130",
+      "registry": [
+        {
+          "key": "HKLM\\Software\\Wow6432Node\\Ubisoft\\Beyond Good & Evil",
+          "name": "InstallLanguage",
+          "type": "REG_DWORD",
+          "value": "1"
+        }
+      ],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "15130"
+      ],
+      "title": "Beyond Good and Evil",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_47",
+        "msxml3"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1532190",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1532190"
+      ],
+      "title": "Halo CE mod tools",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1544020",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1544020"
+      ],
+      "title": "The Callisto Protocol",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1557480",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1557480"
+      ],
+      "title": "Project MIKHAIL: A Muv-Luv War Story",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc90"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-15750",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "15750"
+      ],
+      "title": "Oddworld: Stranger's Wrath HD",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_47",
+        "msxml3"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1613450",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1613450"
+      ],
+      "title": "Halo 2 mod tools",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-vomstyle=layer"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1662840",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1662840"
+      ],
+      "title": "Parquet",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "vulkan-1": "b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1664350",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1664350"
+      ],
+      "title": "Ship Graveyard Simulator Prologue",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-16700",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "16700"
+      ],
+      "title": "Stronghold Crusader Extreme HD",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "winxp"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-16730",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "16730"
+      ],
+      "title": "Legendary",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ucrtbase2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1677280",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1677280"
+      ],
+      "title": "Company Of Heroes 3",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "oleaut32",
+        "msxml3",
+        "corefonts"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-16810",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "16810"
+      ],
+      "title": "Civilization IV: Colonization",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_47",
+        "msxml3"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1695791",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1695791"
+      ],
+      "title": "Halo 3 mod tools",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet35",
+        "dotnet45"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1695793",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1695793"
+      ],
+      "title": "the Halo Reach mod tools Foundation gamemode",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_47",
+        "msxml3"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1695794",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1695794"
+      ],
+      "title": "Halo 3: ODST mod tools",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc140"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1711950",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1711950"
+      ],
+      "title": "GWENT: Rogue Mage",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1715130",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1715130"
+      ],
+      "title": "Crysis Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1795390",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "CarnageCross/CarnageCross",
+          "to": "CarnageCross/CarnageCross/Binaries/Win64/CarnageCross-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1795390"
+      ],
+      "title": "Carnage Cross",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet48"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1876280",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1876280"
+      ],
+      "title": "PAIcom",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xact",
+        "d3dx9"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-1930",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "1930"
+      ],
+      "title": "Two Worlds Epic Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dx9_43",
+        "mdx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-200940",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "200940"
+      ],
+      "title": "Sonic CD",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dmband",
+        "dmime",
+        "dmloader",
+        "dmsynth",
+        "dmstyle",
+        "dmusic",
+        "dsound",
+        "dswave",
+        "directplay"
+      ],
+      "dllOverrides": {
+        "streamci": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-201480",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "201480"
+      ],
+      "title": "Serious Sam: The Random Encounter",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-205650",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "205650"
+      ],
+      "title": "The Testament of Sherlock Holmes",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "libglesv2": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-206480",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "206480"
+      ],
+      "title": "Dungeons & Dragons Online",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "/dx11"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-206500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "206500"
+      ],
+      "title": "AirMech Strike",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "WINE_BLOCK_HOSTS": "modules-cdn.eac-prod.on.epicgames.com"
+      },
+      "exeNames": [],
+      "id": "steam-2074920",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2074920"
+      ],
+      "title": "The First Descendant",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-208650",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "208650"
+      ],
+      "title": "Batman Arkham Knight",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "vcrun2008"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-2111630",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2111630"
+      ],
+      "title": "JR East Train Simulator",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "libglesv2": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-212500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "212500"
+      ],
+      "title": "The Lord of the Rings Online",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnetdesktop10"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-2129370",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2129370"
+      ],
+      "title": "S&box Editor",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_41"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-213330",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "213330"
+      ],
+      "title": "LEGO Batman 2: DC Super Heroes",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "winhttp": "n,b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-2135150",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2135150"
+      ],
+      "title": "Elin",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_41"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-214510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "214510"
+      ],
+      "title": "LEGO The Lord of the Rings",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_42",
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-214950",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "214950"
+      ],
+      "title": "Total War: Rome II",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_43",
+        "d3dx11_43",
+        "d3dcompiler_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-215280",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "215280"
+      ],
+      "title": "Secret World Legends",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-21680",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "21680"
+      ],
+      "title": "Bionic Commander Rearmed",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-219990",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "219990"
+      ],
+      "title": "Grim Dawn",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-2231380",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2231380"
+      ],
+      "title": "Tom Clancy's Ghost Recon Breakpoint",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx11_43",
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {
+        "wbemprox": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-223750",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "223750"
+      ],
+      "title": "DCS World Steam Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-225640",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "225640"
+      ],
+      "title": "Sacred 2 Gold",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "corefonts"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-227320",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "227320"
+      ],
+      "title": "You Need a Budget 4",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "usp10",
+        "vcrun2008",
+        "vcrun2015",
+        "d3dx9",
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {
+        "SDNXLFonts": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-228260",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "228260"
+      ],
+      "title": "Fallen Enchantress: Legendary Heroes",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-230410",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "230410"
+      ],
+      "title": "Warframe",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ucrtbase2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-231430",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "231430"
+      ],
+      "title": "Company Of Heroes 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_43",
+        "xact"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-231990",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "231990"
+      ],
+      "title": "Spider-Man: Shattered Dimensions",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-23300",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "23300"
+      ],
+      "title": "Yosumin",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dx9_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-240600",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "240600"
+      ],
+      "title": "MotorGP",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "usp10",
+        "vcrun2008",
+        "vcrun2015",
+        "d3dx9",
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {
+        "SDNXLFonts": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-241990",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "241990"
+      ],
+      "title": "Sorcerer King",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet48",
+        "d3dx11_43",
+        "d3dcompiler_47",
+        "win10"
+      ],
+      "dllOverrides": {
+        "dwrite": "n,b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-244210",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "244210"
+      ],
+      "title": "Assetto Corsa",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-245050",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "245050"
+      ],
+      "title": "SpellForce",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-245450",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "245450"
+      ],
+      "title": "Wizardry 8",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2010",
+        "dsound"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-252430",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "252430"
+      ],
+      "title": "Dusty Revenge: Co-Op Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "eossdk"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-252950",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "252950"
+      ],
+      "title": "Rocket League",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xna40"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-253430",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "253430"
+      ],
+      "title": "CastleMiner Z",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "verdana"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-254840",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "254840"
+      ],
+      "title": "Ground Control 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_42",
+        "d3dx9_43",
+        "xact"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-256330",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "256330"
+      ],
+      "title": "WRC 4",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "corefonts"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-261510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "261510"
+      ],
+      "title": "Tesla Effect",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-NoSplash"
+      ],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-261640",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "Launcher.exe",
+          "to": "BorderlandsPreSequel.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "261640"
+      ],
+      "title": "Borderlands: The Pre-Sequel",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-266840",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "Launcher.exe",
+          "to": "aomx.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "266840"
+      ],
+      "title": "Age of Mythology: Extended Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "win7"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-268050",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "268050"
+      ],
+      "title": "The Evil Within",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet20",
+        "dotnet40"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-269330",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "269330"
+      ],
+      "title": "Chronology",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-2699660",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "2699660"
+      ],
+      "title": "PowerWash Adventure",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-VS0 -CS0"
+      ],
+      "components": [
+        "winxp"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-281280",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "281280"
+      ],
+      "title": "Mashed",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-283310",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "283310"
+      ],
+      "title": "Soulbringer",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9_43",
+        "d3dcompiler_43",
+        "d3dx11_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-284160",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "284160"
+      ],
+      "title": "BeamNG.drive",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "ddraw": "n",
+        "dinput": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-287310",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "287310"
+      ],
+      "title": "Re-Volt",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "crypt32",
+        "directmusic",
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-287450",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "patriots.exe",
+          "to": "riseofnations.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "287450"
+      ],
+      "title": "Rise of Nations: Extended Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-useembedded"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-289130",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "289130"
+      ],
+      "title": "Endless Legend",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-292030",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "292030"
+      ],
+      "title": "The Witcher 3: Wild Hunt",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-298030",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "298030"
+      ],
+      "title": "Total Annihilation",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-298110",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "298110"
+      ],
+      "title": "FarCry 4",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xact_x64"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-307780",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "307780"
+      ],
+      "title": "Mortal Kombat X",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "libglesv2": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-311240",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "311240"
+      ],
+      "title": "Zero Escape: Zero Time Dilemma",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "corefonts"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-312450",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "312450"
+      ],
+      "title": "Order of Battle: World War II",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-skipdrivercheck -noHDR"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-312670",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "StrangeBrigade.exe",
+          "to": "StrangeBrigade_Vulkan.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "312670"
+      ],
+      "title": "Strange Brigade",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-312780",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "312780"
+      ],
+      "title": "Way of the Samurai 4",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "openal"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-321040",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "321040"
+      ],
+      "title": "Dirt 3 Complete Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-33230",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "33230"
+      ],
+      "title": "Assassin's Creed 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dotnet48"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-33390",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "33390"
+      ],
+      "title": "Zeit²",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-333980",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "333980"
+      ],
+      "title": "Akiba's Trip: Undead & Undressed",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-34330",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "34330"
+      ],
+      "title": "Total War: Shogun 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "openal"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-35000",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "35000"
+      ],
+      "title": "Mini Ninjas",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "sourcehansans",
+        "fakechinese",
+        "corefonts"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-3513350",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "3513350"
+      ],
+      "title": "Wuthering Waves",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ucrtbase2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-3556750",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "3556750"
+      ],
+      "title": "Warhammer 40,000: Dawn of War - Definitive Edition",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "icodecs",
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-356500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "356500"
+      ],
+      "title": "STAR WARS Galactic Battlegrounds Saga",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-359550",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "359550"
+      ],
+      "title": "Rainbow Six Siege",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_46"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-366250",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "366250"
+      ],
+      "title": "Metal Slug",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "hidewineexports=enable",
+        "dotnet48"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-3669060",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "3669060"
+      ],
+      "title": "Blade & Soul NEO",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "SDL_JOYSTICK_HIDAPI": "0"
+      },
+      "exeNames": [],
+      "id": "steam-367500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "367500"
+      ],
+      "title": "Dragon's Dogma: Dark Arisen",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "win7"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-3681810",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "3681810"
+      ],
+      "title": "Blue Protocol: Star Resonance",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-368500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "368500"
+      ],
+      "title": "Assassin's Creed: Syndicate",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47",
+        "vcrun2013",
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-372000",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "372000"
+      ],
+      "title": "Tree Of Savior",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-375900",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "375900"
+      ],
+      "title": "Trackmania Turbo",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dxof"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-390710",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "390710"
+      ],
+      "title": "SUGURI 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "Zonematch=true"
+      ],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-39190",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "39190"
+      ],
+      "title": "Dungeon Siege",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-39200",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "39200"
+      ],
+      "title": "Dungeon Siege II",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-39540",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "39540"
+      ],
+      "title": "SpellForce",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-39550",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "39550"
+      ],
+      "title": "SpellForce",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47",
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-397540",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "397540"
+      ],
+      "title": "Borderlands 3",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47",
+        "xact"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-40800",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "40800"
+      ],
+      "title": "Super Meat Boy",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-40950",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "40950"
+      ],
+      "title": "Stronghold HD",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-40970",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "40970"
+      ],
+      "title": "Stronghold Crusader HD",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-409710",
+      "registry": [
+        {
+          "key": "HKLM\\System\\CurrentControlSet\\Services\\winebus",
+          "name": "DisableHidraw",
+          "type": "REG_DWORD",
+          "value": "1"
+        }
+      ],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "409710"
+      ],
+      "title": "BioShock 2 Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-409720",
+      "registry": [
+        {
+          "key": "HKLM\\System\\CurrentControlSet\\Services\\winebus",
+          "name": "DisableHidraw",
+          "type": "REG_DWORD",
+          "value": "1"
+        }
+      ],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "409720"
+      ],
+      "title": "BioShock 2 Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ole32"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-410900",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "410900"
+      ],
+      "title": "Forts",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-onethread"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-424840",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "424840"
+      ],
+      "title": "Little Nightmares",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-428660",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "MoonMan.exe",
+          "to": "MoonMan/Binaries/Win64/MoonMan-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "428660"
+      ],
+      "title": "Deliver us the Moon fix",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_42",
+        "d3dx9_31",
+        "d3dx9_42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-42890",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "42890"
+      ],
+      "title": "Sword of the Stars",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-43110",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "43110"
+      ],
+      "title": "Metro 2033",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-BattlEye"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-440900",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "FuncomLauncher.exe",
+          "to": "../ConanSandbox/Binaries/Win64/ConanSandbox_BE.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "440900"
+      ],
+      "title": "Conan Exiles",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-44690",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "44690"
+      ],
+      "title": "GT Legends",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-eac_launcher -nosplash"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-447040",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "447040"
+      ],
+      "title": "Watch_Dogs 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-4560",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "4560"
+      ],
+      "title": "Transformers: War for Cybertron",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xliveless"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-45750",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "45750"
+      ],
+      "title": "Lost Planet 2 (2010)",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-460930",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "460930"
+      ],
+      "title": "Ghost Recon WIldlands",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "win7"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-465280",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "465280"
+      ],
+      "title": "Yesterday Origins",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_46"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-465840",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "465840"
+      ],
+      "title": "The Last Blade",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dx9"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-4730",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "4730"
+      ],
+      "title": "Outrun 2006: Coast 2 Coast",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-playoffline"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-48190",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "48190"
+      ],
+      "title": "Assassin's Creed: Brotherhood",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-NoSplash"
+      ],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-49520",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "Launcher.exe",
+          "to": "Borderlands2.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "49520"
+      ],
+      "title": "Borderlands 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47",
+        "win7"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-495420",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "495420"
+      ],
+      "title": "State of Decay 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "xna31"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-49900",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "49900"
+      ],
+      "title": "Plain Sight",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_42",
+        "d3dcompiler_43",
+        "d3dcompiler_46",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-50620",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "50620"
+      ],
+      "title": "Darksiders",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "dcomp": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-506510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "506510"
+      ],
+      "title": "Shadows of Adam",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "ddraw": "n,b",
+        "winmm": "n,b"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-559620",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "559620"
+      ],
+      "title": "Outlaws + A Handful of Missions",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2017"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-570940",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "570940"
+      ],
+      "title": "Dark Souls Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {
+        "mprapi": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-593600",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "593600"
+      ],
+      "title": "PixARK",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-601510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "601510"
+      ],
+      "title": "Yu-Gi-Oh Duel Links",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "icodecs"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-61500",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "61500"
+      ],
+      "title": "Age of Wonders",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "icodecs"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-6270",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "6270"
+      ],
+      "title": "Ducati World Championship",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-627270",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "627270"
+      ],
+      "title": "Injustice 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "AlterEgo.ebr"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {
+        "SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS": "0"
+      },
+      "exeNames": [],
+      "id": "steam-63110",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "AlterEgo.exe",
+          "to": "./RunDev.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "63110"
+      ],
+      "title": "Alter Ego",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-eac-nop-loaded"
+      ],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-633230",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "NARUTO.exe",
+          "to": "NARUTO/Binaries/Win64/NARUTO-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "633230"
+      ],
+      "title": "Naruto To Boruto",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dx9_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-63700",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "63700"
+      ],
+      "title": "BIT.TRIP BEAT",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "openal",
+        "d3dcompiler_43",
+        "d3dx9_43"
+      ],
+      "dllOverrides": {
+        "d3dcompiler_43": "n",
+        "d3dx9_43": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-63710",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "63710"
+      ],
+      "title": "BIT.TRIP RUNNER",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "gdiplus"
+      ],
+      "dllOverrides": {},
+      "environment": {
+        "WINE_MONO_HIDETYPES": "1"
+      },
+      "exeNames": [],
+      "id": "steam-644930",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "644930"
+      ],
+      "title": "They Are Billions",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directplay"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-65530",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "65530"
+      ],
+      "title": "SpellForce",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-658150",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "658150"
+      ],
+      "title": "Skeleton Boomerang",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-eac-nop-loaded"
+      ],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-678950",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "DBFighterZ.exe",
+          "to": "RED/Binaries/Win64/RED-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "678950"
+      ],
+      "title": "DRAGON BALL FighterZ",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dsound"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-6920",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "6920"
+      ],
+      "title": "Deus Ex: Invisible War",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-700600",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "eg2.exe",
+          "to": "../bin/evilgenius_vulkan.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "700600"
+      ],
+      "title": "Evil Genius 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dmime",
+        "dmloader",
+        "dmsynth",
+        "dmusic",
+        "dsound",
+        "dswave"
+      ],
+      "dllOverrides": {
+        "streamci": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-70400",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "70400"
+      ],
+      "title": "Recettear: An Item Shop's Tale",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dmime",
+        "dmloader",
+        "dmsynth",
+        "dmusic",
+        "dsound",
+        "dswave"
+      ],
+      "dllOverrides": {
+        "streamci": "n"
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-70420",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "70420"
+      ],
+      "title": "Chantelise - A Tale of Two Sisters",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "directmusic"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-70650",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "70650"
+      ],
+      "title": "Worms: Blast",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-729040",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "Launcher.exe",
+          "to": "BorderlandsGOTY.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "729040"
+      ],
+      "title": "Borderlands GOTY",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "dgvoodoo2"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-730830",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "730830"
+      ],
+      "title": "Escape From Monkey Island",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-750920",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "750920"
+      ],
+      "title": "Shadow of the Tomb Raider",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-7510",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "launcher\\.exe$",
+          "to": "xblades.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "7510"
+      ],
+      "title": "X-Blades",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-7670",
+      "registry": [
+        {
+          "key": "HKLM\\System\\CurrentControlSet\\Services\\winebus",
+          "name": "DisableHidraw",
+          "type": "REG_DWORD",
+          "value": "1"
+        }
+      ],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "7670"
+      ],
+      "title": "BioShock 2 Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-773370",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "773370"
+      ],
+      "title": "Exo One",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "+com_skipSignInManager 1"
+      ],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-782330",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "782330"
+      ],
+      "title": "DOOM Eternal",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "physx"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-7850",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "7850"
+      ],
+      "title": "Cryostasis",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-813780",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "813780"
+      ],
+      "title": "Age of Empires II: DE",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-eac-nop-loaded"
+      ],
+      "components": [
+        "hidewineexports=enable"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-816020",
+      "registry": [],
+      "replacements": [
+        {
+          "from": "JUMP_FORCE.exe",
+          "to": "JUMP_FORCE/Binaries/Win64/JUMP_FORCE-Win64-Shipping.exe"
+        }
+      ],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "816020"
+      ],
+      "title": "JUMP FORCE",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [
+        "-borderless"
+      ],
+      "components": [
+        "d3dcompiler_43",
+        "d3dcompiler_47",
+        "d3dx10"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-8190",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "8190"
+      ],
+      "title": "Just Cause 2",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-8850",
+      "registry": [
+        {
+          "key": "HKLM\\System\\CurrentControlSet\\Services\\winebus",
+          "name": "DisableHidraw",
+          "type": "REG_DWORD",
+          "value": "1"
+        }
+      ],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "8850"
+      ],
+      "title": "BioShock 2 Remastered",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_43",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-893180",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "893180"
+      ],
+      "title": "Catherine Classic",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-895870",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "895870"
+      ],
+      "title": "Project Wingman",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-906510",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "906510"
+      ],
+      "title": "Conception PLUS: Maidens of the Twelve Stars",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "mfc42"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-910830",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "910830"
+      ],
+      "title": "Rebel Galaxy Outlaw",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "ubisoftconnect"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-916440",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "916440"
+      ],
+      "title": "Anno 1800",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2022"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-963930",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "963930"
+      ],
+      "title": "Contractors VR",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "segoe_script"
+      ],
+      "dllOverrides": {
+        "d3d9": ""
+      },
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-968370",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "968370"
+      ],
+      "title": "The Blind Prophet",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-976310",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "976310"
+      ],
+      "title": "Mortal Kombat 11",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-976730",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "976730"
+      ],
+      "title": "Halo:MCC",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-9900",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "9900"
+      ],
+      "title": "Star Trek Online launcher",
+      "verifiedOnMac": false
+    },
+    {
+      "arguments": [],
+      "components": [
+        "vcrun2019",
+        "d3dcompiler_47"
+      ],
+      "dllOverrides": {},
+      "environment": {},
+      "exeNames": [],
+      "id": "steam-997070",
+      "registry": [],
+      "replacements": [],
+      "source": "umu-protonfixes@f494092",
+      "steamAppIDs": [
+        "997070"
+      ],
+      "title": "Marvel's Avengers",
+      "verifiedOnMac": false
+    }
+  ],
+  "sources": [
+    {
+      "commit": "f4940924eefd2c973f5ec57dac26aa3dcefb33ca",
+      "license": "BSD-2-Clause",
+      "name": "umu-protonfixes",
+      "url": "https://github.com/Open-Wine-Components/umu-protonfixes"
+    },
+    {
+      "license": "Apache-2.0",
+      "name": "g-player"
+    }
+  ],
+  "version": 1
+}

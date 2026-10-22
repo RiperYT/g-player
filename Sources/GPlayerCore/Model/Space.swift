@@ -22,6 +22,9 @@ public struct Space: Codable, Identifiable, Hashable, Sendable {
     /// Index into `SpaceColor.palette`.
     public var colorIndex: Int
     public var createdAt: Date
+    /// External spaces only: whether the user lets G-Player install Windows components and write per-game settings
+    /// into it. Nil until asked. Spaces G-Player created are always changed as needed.
+    public var allowsChanges: Bool?
 
     public init(id: UUID = UUID(), name: String, path: String, engineID: String, origin: Origin,
                 originNote: String? = nil, presetID: String? = nil, colorIndex: Int = 0, createdAt: Date = Date()) {
@@ -31,6 +34,8 @@ public struct Space: Codable, Identifiable, Hashable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
     public var driveC: URL { url.appendingPathComponent("drive_c", isDirectory: true) }
+    /// True when G-Player may install components and write settings into this space.
+    public var mayChange: Bool { origin == .managed || allowsChanges == true }
     public var exists: Bool { FileManager.default.fileExists(atPath: driveC.appendingPathComponent("windows").path) }
 
     /// Maps a Windows path (`C:\Games\x.exe`, `Z:\Users\…`) to the Mac.

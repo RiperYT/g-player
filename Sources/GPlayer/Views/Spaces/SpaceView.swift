@@ -15,11 +15,13 @@ struct SpaceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 header
+                if model.needsAppleToolkit(space) { ToolkitOffBanner() }
                 if let preset = AppPresets.preset(space.presetID), !preset.isInstalled(in: space) {
                     presetMissing(preset)
                 }
                 if !games.isEmpty { GameGrid(title: "In this space", games: games.sorted { $0.title < $1.title }) }
                 if !newFound(all).isEmpty { foundPrograms(newFound(all)) }
+                ComponentsSection(space: space)
                 if games.isEmpty && newFound(all).isEmpty {
                     if hiddenCount > 0 {
                         HiddenOnlyNote(count: hiddenCount)
@@ -79,9 +81,9 @@ struct SpaceView: View {
             PathRow(url: space.url)
             HStack(spacing: 18) {
                 Picker("Engine", selection: Binding(get: { space.engineID }, set: { if $0 != space.engineID { pendingEngine = $0 } })) {
-                    ForEach(EngineCatalog.all) { info in
+                    ForEach(model.engineChoices(for: space)) { info in
                         Text("\(info.name) \(info.kind == .gptk ? "(D3DMetal)" : info.version)")
-                            + Text(model.isInstalled(info) ? "" : "  · not installed").foregroundStyle(.secondary)
+                            + Text(model.engineNote(info)).foregroundStyle(.secondary)
                     }
                 }
                 .fixedSize()
@@ -114,6 +116,8 @@ struct SpaceView: View {
             }
             Spacer()
             Button("Install \(preset.name)") { Task { await model.installPreset(preset) } }.buttonStyle(.borderedProminent)
+                .disabled(model.installingSpaces.contains(space.id))
+                .help(model.installingSpaces.contains(space.id) ? "Waits for the installs in this space to finish." : "")
         }
         .padding(16)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -168,6 +172,26 @@ struct SpaceView: View {
     }
 }
 
+/// A space that runs on Apple's toolkit while it is turned off in Settings.
+private struct ToolkitOffBanner: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.title3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Needs Apple's Game Porting Toolkit, which is turned off").font(.callout.weight(.semibold))
+                Text("Programs in this space won't start until you turn it on, or switch the space to another engine. Apple's license allows the toolkit for developing, testing and evaluating games; G-Player only uses the copy you installed.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button("Turn On") { model.useAppleToolkit = true }
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
 /// Shown instead of "Nothing here yet" when every game in the space is hidden.
 private struct HiddenOnlyNote: View {
     @Environment(AppModel.self) private var model
@@ -199,7 +223,7 @@ struct NewSpaceSheet: View {
             Form {
                 TextField("Name", text: $name, prompt: Text("e.g. Main or Witcher 3"))
                 Picker("Engine", selection: $engineID) {
-                    ForEach(EngineCatalog.all) { info in
+                    ForEach(model.availableEngines) { info in
                         Text("\(info.name) · \(info.summary)").tag(info.id)
                     }
                 }

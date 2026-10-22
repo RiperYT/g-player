@@ -34,8 +34,10 @@ public struct RegistryValue: Codable, Sendable, Hashable {
     /// `REG_SZ` or `REG_DWORD`.
     public var type: String
     public var value: String
-    public init(key: String, name: String, type: String = "REG_SZ", value: String) {
-        self.key = key; self.name = name; self.type = type; self.value = value
+    /// True removes the value (`"name"=-` in a .reg file); `type` and `value` are then ignored. Nil means set it.
+    public var delete: Bool?
+    public init(key: String, name: String, type: String = "REG_SZ", value: String, delete: Bool? = nil) {
+        self.key = key; self.name = name; self.type = type; self.value = value; self.delete = delete
     }
 }
 
@@ -117,6 +119,9 @@ public enum KnownEngine: String, Codable, Sendable, Hashable, CaseIterable {
 
 /// What a game is, worked out from its files. Cached on the game; recomputed when its program changes.
 public struct GameAnalysis: Codable, Sendable, Hashable {
+    /// Bumped when the analyzer learns something new, so older cached results are worked out again.
+    public static let currentVersion = 2
+
     /// Engine name as the detection rules call it ("Unity", "Unreal", "Godot"…), if any.
     public var engineName: String?
     public var engine: KnownEngine?
@@ -127,25 +132,67 @@ public struct GameAnalysis: Codable, Sendable, Hashable {
     public var graphics: [GraphicsAPI]
     public var architecture: PEArchitecture?
     public var isDotNet: Bool
+    /// Absolute path of the .exe that was analysed. A different program means the result is stale.
+    public var programPath: String?
+    /// `currentVersion` when this result was made. Nil for results made before versions existed.
+    public var version: Int?
 
     public init(engineName: String? = nil, engine: KnownEngine? = nil, antiCheat: [String] = [], launchers: [String] = [],
-                graphics: [GraphicsAPI] = [], architecture: PEArchitecture? = nil, isDotNet: Bool = false) {
+                graphics: [GraphicsAPI] = [], architecture: PEArchitecture? = nil, isDotNet: Bool = false,
+                programPath: String? = nil, version: Int? = nil) {
         self.engineName = engineName; self.engine = engine; self.antiCheat = antiCheat; self.launchers = launchers
         self.graphics = graphics; self.architecture = architecture; self.isDotNet = isDotNet
+        self.programPath = programPath; self.version = version
     }
 
-    /// The newest Direct3D the program uses, if any.
+    /// Every field is optional on disk, so a library written by an older or newer G-Player still opens.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        engineName = c.value(.engineName, default: nil)
+        engine = c.value(.engine, default: nil)
+        antiCheat = c.value(.antiCheat, default: [])
+        launchers = c.value(.launchers, default: [])
+        graphics = c.value(.graphics, default: [])
+        architecture = c.value(.architecture, default: nil)
+        isDotNet = c.value(.isDotNet, default: false)
+        programPath = c.value(.programPath, default: nil)
+        version = c.value(.version, default: nil)
+    }
+
+    /// The newest Direct3D the program imports, if any.
     public var newestDirect3D: GraphicsAPI? { graphics.filter { $0 <= .d3d12 && $0 != .opengl }.max() }
+
+    /// The Direct3D the game most likely uses. Unity and Unreal load Direct3D at run time, so their imports
+    /// show none (often only OpenGL); their Windows default is DirectX 11 unless a DirectX 12 runtime ships.
+    public var likelyDirect3D: GraphicsAPI? {
+        newestDirect3D ?? ((engine == .unity || engine == .unreal) ? .d3d11 : nil)
+    }
+
+    /// The graphics to name in the UI: the likely Direct3D, else whatever else it uses.
+    public var graphicsLabel: String? { likelyDirect3D?.displayName ?? graphics.max()?.displayName }
+}
+
+extension KeyedDecodingContainer {
+    /// The value for `key`, or `fallback` when it is missing or can't be read (a field added or changed by
+    /// another version must never stop a whole library file from loading).
+    func value<T: Decodable>(_ key: Key, default fallback: @autoclosure () -> T) -> T {
+        if let value = try? decodeIfPresent(T.self, forKey: key) { return value }
+        return fallback()
+    }
 }
 
 /// Files that ship inside GPlayerCore/Resources: in the app bundle, or next to the sources in development.
 public enum CoreResources {
     public static func url(_ name: String) -> URL? {
         let fm = FileManager.default
+        #if DEBUG
+        // Lets development builds read resources from a working copy. Release builds ignore the variable,
+        // so nothing in the environment can swap the files the app trusts (the shims run during installs).
         if let dir = ProcessInfo.processInfo.environment["GPLAYER_RESOURCES"] {
             let u = URL(fileURLWithPath: dir).appendingPathComponent(name)
             if fm.fileExists(atPath: u.path) { return u }
         }
+        #endif
         if let base = Bundle.main.resourceURL?.appendingPathComponent(name), fm.fileExists(atPath: base.path) { return base }
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Resources").appendingPathComponent(name)

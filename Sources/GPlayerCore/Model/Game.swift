@@ -40,6 +40,12 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
     public var hidden: Bool?
     /// The program's own icon, read from its .exe, as a PNG file name inside the library's Covers folder.
     public var iconFile: String?
+    /// Profile and plain-word options (window, Retina, frame rate, fixes). Nil means the defaults.
+    public var options: LaunchOptions?
+    /// What the game is (engine, DirectX, anti-cheat), cached. Nil until analysed.
+    public var analysis: GameAnalysis?
+
+    public var launchOptions: LaunchOptions { options ?? .default }
 
     public init(id: UUID = UUID(), title: String, kind: Kind = .game, spaceID: UUID, source: Source = .executable,
                 executablePath: String? = nil, arguments: [String] = [], graphics: GraphicsBackend = .auto,

@@ -55,7 +55,7 @@ public struct EngineManager: Sendable {
     /// Downloads, verifies and unpacks an engine. `progress` gets 0…1.
     public func install(_ info: EngineInfo, progress: @escaping @Sendable (Double, String) -> Void) async throws -> Engine {
         guard !info.downloads.isEmpty else {
-            throw ShellError.failed("\(info.name) is installed with Homebrew: \(EngineCatalog.gptkHomebrewCommand)")
+            throw ShellError.failed("G-Player doesn't download \(info.name). Install it yourself from Apple if its license fits your use.")
         }
         try paths.createFolders()
         let target = folder(for: info)

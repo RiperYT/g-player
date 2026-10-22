@@ -119,20 +119,31 @@ public enum GameImporter {
 }
 
 extension WineLauncher {
-    /// Starts a program and waits for its Wine process to exit.
+    /// Starts a program and waits for its Wine process to exit. With a `timeout` (seconds) the program is stopped
+    /// when it runs longer and `Supervised.TimedOut` is thrown. When the calling task is cancelled the program is
+    /// stopped too, and `CancellationError` is thrown; the rest of the space is left running.
     public static func runAndWait(engine: Engine, space: Space, arguments: [String], workingDirectory: URL?,
                                   backend: GraphicsBackend = .auto, tweaks: LaunchTweaks = LaunchTweaks(),
-                                  logsFolder: URL, logName: String,
+                                  logsFolder: URL, logName: String, timeout: TimeInterval? = nil,
                                   started: @escaping @Sendable (RunningProgram) -> Void = { _ in }) async throws -> Int32 {
-        try await withCheckedThrowingContinuation { continuation in
-            do {
-                let program = try start(engine: engine, space: space, arguments: arguments,
-                                        workingDirectory: workingDirectory, backend: backend, tweaks: tweaks,
-                                        logsFolder: logsFolder, logName: logName) { status in
-                    continuation.resume(returning: status)
-                }
-                started(program)
-            } catch { continuation.resume(throwing: error) }
+        let running = ProgramBox()
+        return try await Supervised.run(timeout: timeout, stop: { running.stop() }) { finish in
+            let program = try start(engine: engine, space: space, arguments: arguments,
+                                    workingDirectory: workingDirectory, backend: backend, tweaks: tweaks,
+                                    logsFolder: logsFolder, logName: logName, onExit: finish)
+            running.program = program
+            started(program)
         }
     }
+}
+
+/// Holds the program a supervised run started, so that stopping it can find it.
+private final class ProgramBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: RunningProgram?
+    var program: RunningProgram? {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
+    }
+    func stop() { if let process = program?.process { Supervised.terminate(process) } }
 }

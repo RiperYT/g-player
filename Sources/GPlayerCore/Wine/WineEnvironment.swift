@@ -5,8 +5,12 @@ public struct LaunchTweaks: Sendable, Hashable {
     public var dllOverrides: [String] = []
     public var environment: [String: String] = [:]
     public var verboseLogs = false
-    public init(dllOverrides: [String] = [], environment: [String: String] = [:], verboseLogs: Bool = false) {
+    /// The space has .NET (Wine Mono or Microsoft's), so Wine may load it. Off keeps Wine from offering to download Mono.
+    public var dotNetAvailable: Bool = false
+    public init(dllOverrides: [String] = [], environment: [String: String] = [:], verboseLogs: Bool = false,
+                dotNetAvailable: Bool = false) {
         self.dllOverrides = dllOverrides; self.environment = environment; self.verboseLogs = verboseLogs
+        self.dotNetAvailable = dotNetAvailable
     }
 }
 
@@ -22,13 +26,15 @@ public enum WineEnvironment {
         for key in inherited { if let v = base[key] { env[key] = v } }
         env["PATH"] = engine.wineRoot.appendingPathComponent("bin").path + ":/usr/bin:/bin:/usr/sbin:/sbin"
         env["WINEPREFIX"] = space.path
-        env["WINEDEBUG"] = tweaks.verboseLogs ? "err+all,warn+module" : "-all"
+        // Missing-DLL errors stay on so a failed launch can say what's missing (LogDiagnosis); the rest is quiet.
+        env["WINEDEBUG"] = tweaks.verboseLogs ? "err+all,warn+module" : "-all,err+module"
         env["WINEESYNC"] = "1"
         env["WINEMSYNC"] = "1"
         env["ROSETTA_ADVERTISE_AVX"] = "1"
 
-        // No Wine Mono or Gecko downloads popping up; programs that need .NET get it from their installer.
-        var overrides = ["mscoree,mshtml=", "winemenubuilder.exe=d"]
+        // No Wine Mono or Gecko downloads popping up; programs that need .NET get it from their installer. Once the space
+        // has .NET, `mscoree` must stay loadable, or .NET programs would never find it.
+        var overrides = [tweaks.dotNetAvailable ? "mshtml=" : "mscoree,mshtml=", "winemenubuilder.exe=d"]
         let backend = engine.info.resolve(requested)
         switch backend {
         case .dxvk:

@@ -35,35 +35,49 @@ struct GeneralSettings: View {
 struct EngineSettings: View {
     @Environment(AppModel.self) private var model
     var body: some View {
+        @Bindable var model = model
         Form {
-            ForEach(EngineCatalog.all) { info in
-                Section(info.name) {
-                    Text(info.summary).foregroundStyle(.secondary)
-                    LabeledContent("Version", value: info.version)
-                    LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
-                    if model.isInstalled(info) {
-                        LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-                        if info.kind == .wineStaging {
-                            Button("Remove", role: .destructive) { model.removeEngine(info) }
-                        }
-                    } else if info.downloads.isEmpty {
-                        Text("Install it in Terminal with Homebrew:").font(.callout)
-                        HStack {
-                            Text(EngineCatalog.gptkHomebrewCommand).font(Theme.path).textSelection(.enabled)
-                            Button("Copy") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(EngineCatalog.gptkHomebrewCommand, forType: .string)
-                            }
-                        }
-                    } else {
-                        let mb = info.downloads.reduce(0) { $0 + $1.approximateBytes } / 1_000_000
-                        Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
-                            .disabled(model.isEngineBusy)
-                    }
+            let staging = EngineCatalog.wineStaging
+            Section(staging.name) {
+                Text(staging.summary).foregroundStyle(.secondary)
+                LabeledContent("Version", value: staging.version)
+                LabeledContent("Graphics", value: staging.backends.map(\.displayName).joined(separator: ", "))
+                if model.isInstalled(staging) {
+                    LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                    Button("Remove", role: .destructive) { model.removeEngine(staging) }
+                } else {
+                    let mb = staging.downloads.reduce(0) { $0 + $1.approximateBytes } / 1_000_000
+                    Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(staging) } }
+                        .disabled(model.isEngineBusy)
                 }
             }
+            AppleToolkitSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Apple's toolkit: opt-in, never shipped or downloaded by G-Player.
+struct AppleToolkitSection: View {
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        @Bindable var model = model
+        let info = EngineCatalog.gptk
+        Section {
+            Toggle("Use Apple's Game Porting Toolkit", isOn: $model.useAppleToolkit)
+            Text("Adds Apple's D3DMetal for DirectX 11 and 12 games. G-Player never includes or downloads Apple's files; it only uses a copy you installed. Apple's license allows the toolkit for developing, testing and evaluating games, so check that it fits how you use it.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if model.useAppleToolkit {
+                if model.isInstalled(info) {
+                    LabeledContent("Status") { Label("Found on this Mac", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                } else {
+                    LabeledContent("Status") { Text("Not found").foregroundStyle(.secondary) }
+                }
+            }
+            Link("About the Game Porting Toolkit", destination: EngineCatalog.gptkInfoURL)
+        } header: {
+            Text("Advanced")
+        }
     }
 }
 

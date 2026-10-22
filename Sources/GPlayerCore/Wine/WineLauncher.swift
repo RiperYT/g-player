@@ -64,9 +64,13 @@ public enum WineLauncher {
     }
 
     /// Waits until every Windows program in the space has quit (installers that hand off to a child process).
-    public static func waitForAll(engine: Engine, space: Space) async {
+    /// With a `timeout` it gives up after that many seconds and returns false; it also returns false when the
+    /// calling task is cancelled. Only the waiting `wineserver -w` is stopped, never the programs or the server.
+    @discardableResult
+    public static func waitForAll(engine: Engine, space: Space, timeout: TimeInterval? = nil) async -> Bool {
         let env = WineEnvironment.make(engine: engine, space: space, backend: .wined3d)
-        _ = try? await Shell.run(Shell.tool("arch"), ["-x86_64", engine.wineserver.path, "-w"], environment: env)
+        return await Supervised.exits(Shell.tool("arch"), ["-x86_64", engine.wineserver.path, "-w"],
+                                      environment: env, timeout: timeout)
     }
 
     /// The command line Wine needs to open a file: `.msi` through msiexec, `.bat` through cmd, the rest directly.
