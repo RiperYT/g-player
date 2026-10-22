@@ -425,8 +425,8 @@ private func makeCab(_ files: [(name: String, data: Data)]) -> Data {
 
     var entries = Data(), body = Data()
     for file in files {
-        entries += le32(file.data.count) + le32(body.count) + le16(0) + le16(0x5821) + le16(0) + le16(0x20)
-            + Data(file.name.utf8) + Data([0])
+        for part in [le32(file.data.count), le32(body.count), le16(0), le16(0x5821), le16(0), le16(0x20),
+                     Data(file.name.utf8), Data([0])] { entries += part }
         body += file.data
     }
     var blocks = Data()
@@ -509,9 +509,15 @@ private func makeCab(_ files: [(name: String, data: Data)]) -> Data {
     @Test func findsEveryCabinetInsideASetupProgram() async throws {
         let tmp = TempFolder()
         // A PE-looking stub, a bogus "MSCF" that isn't a header, a cabinet, padding, a second cabinet, a trailer.
-        let exe = Data("MZ".utf8) + Data(repeating: 0x90, count: 5000) + Data("MSCF-not-a-cabinet".utf8) + Data(repeating: 0, count: 40)
-            + makeCab([("0", Data("ux".utf8)), ("u1", Data("ux1".utf8))]) + Data(repeating: 0xEE, count: 777)
-            + makeCab([("a10", Data("payload".utf8))]) + Data(repeating: 0xEE, count: 99)
+        // Appended step by step: one long `+` chain is too slow for the type checker on CI.
+        var exe = Data("MZ".utf8)
+        exe.append(Data(repeating: 0x90, count: 5000))
+        exe.append(Data("MSCF-not-a-cabinet".utf8))
+        exe.append(Data(repeating: 0, count: 40))
+        exe.append(makeCab([("0", Data("ux".utf8)), ("u1", Data("ux1".utf8))]))
+        exe.append(Data(repeating: 0xEE, count: 777))
+        exe.append(makeCab([("a10", Data("payload".utf8))]))
+        exe.append(Data(repeating: 0xEE, count: 99))
         let file = tmp.file("setup.exe", contents: exe)
         let r = try await run("cabextract", ["-q", "-d", "out", file.path], in: tmp.url)
         #expect(r.succeeded, "\(r.stderr)")
