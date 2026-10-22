@@ -15,13 +15,19 @@ struct AddGameSheet: View {
     @State private var spaceChoice: UUID?          // nil = new space named after the game
     @State private var move = false
     @State private var workMessage = ""
-    @State private var waitingForInstaller = false
-    @State private var installerDone = false
+    /// How far copying or unpacking is (nil when that can't be told), and in words.
+    @State private var workProgress: Double?
+    @State private var workDetail = ""
+    /// The work of the working step, and the installer in it: Cancel stops them.
+    @State private var workTask: Task<Void, Never>?
+    @State private var installer: InstallerRun?
+    /// Cancel works only where stopping is possible (not while Windows is set up in a new space or an engine downloads).
+    @State private var canStop = false
+    @State private var stopping = false
     @State private var candidates: [ExecutableCandidate] = []
     @State private var chosen: URL?
     @State private var targetSpace: Space?
     @State private var dropTargeted = false
-    @State private var workFolder: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -45,7 +51,8 @@ struct AddGameSheet: View {
             spaceChoice = model.spaces.first(where: { $0.presetID == nil && $0.origin == .managed })?.id
             if let initialSource { pick(initialSource) }
         }
-        .onDisappear { if let workFolder { try? FileManager.default.removeItem(at: workFolder) } }
+        // Stops the work. What an archive unpacked for its installer is removed by the work itself, once the installer has quit.
+        .onDisappear { installer?.cancel(); workTask?.cancel() }
     }
 
     // MARK: Steps
@@ -110,14 +117,25 @@ struct AddGameSheet: View {
     private var workingStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                ProgressView().controlSize(.small)
-                Text(workMessage).font(.body)
+                if workProgress == nil { ProgressView().controlSize(.small) }
+                Text(message).font(.body)
             }
-            if waitingForInstaller {
-                Text("Finish the installer in its own window. You can uncheck “Launch game” at the end. G-Player continues when the installer closes.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Button("The Installer Is Done") { installerDone = true }
+            if let workProgress {
+                ProgressView(value: workProgress)
+                Text(workDetail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            } else if !workDetail.isEmpty {
+                Text(workDetail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
+            if let installer { InstallerNote(run: installer) }
+        }
+    }
+
+    /// What the step says: where the installer is, or the work's own message.
+    private var message: String {
+        switch installer?.phase {
+        case .queued: "Waiting for Windows components…"
+        case .finishing: "Looking for what it installed…"
+        default: workMessage
         }
     }
 
@@ -163,8 +181,8 @@ struct AddGameSheet: View {
 
     private var footer: some View {
         HStack {
-            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                .disabled(step == .working && !waitingForInstaller)
+            Button(stopping ? "Stopping…" : "Cancel") { cancel() }.keyboardShortcut(.cancelAction)
+                .disabled(step == .working && (!canStop || stopping))
             Spacer()
             switch step {
             case .choose: EmptyView()
@@ -203,48 +221,87 @@ struct AddGameSheet: View {
     }
 
     private func start() {
-        guard let source, let paths = model.paths else { return }
+        guard let source else { return }
         let name = title.trimmingCharacters(in: .whitespaces)
         step = .working
-        Task {
+        stopping = false
+        workProgress = nil
+        workDetail = ""
+        workTask = Task { await work(source, name: name) }
+    }
+
+    /// Stops what the working step does (copying, unpacking, the installer), then closes. Anywhere else it just closes.
+    private func cancel() {
+        guard step == .working else { dismiss(); return }
+        stopping = true
+        installer?.cancel()
+        workTask?.cancel()
+    }
+
+    private func work(_ source: ImportSource, name: String) async {
+        // What an archive unpacked for its installer to run from: removed once the installer has quit, never while it runs.
+        var unpacked: URL?
+        defer { if let unpacked { try? FileManager.default.removeItem(at: unpacked) }; installer = nil; canStop = false }
+        do {
             var space = model.space(spaceChoice)
             if space == nil {
                 workMessage = "Creating the space “\(name)”…"
                 space = await model.createSpace(name: name)
             }
-            guard let space, let engine = model.engine(for: space) else { step = .details; return }
+            guard let space else { step = .details; return }                // the reason is shown
+            if model.engine(for: space) == nil { workMessage = "Downloading \(EngineCatalog.info(space.engineID)?.name ?? "the engine")…" }
+            guard let engine = await model.engineReady(for: space) else { step = .details; return }
             targetSpace = space
-            do {
-                if mode == .portable {
-                    workMessage = source.url.hasDirectoryPath || Files.isDirectory(source.url) ? "Copying the game…" : "Unpacking the archive…"
-                    let folder = try await GameImporter.copyIntoSpace(source, space: space, title: name, move: move)
-                    candidates = ExecutableScanner.scan(folder, title: name)
-                } else {
-                    workMessage = "Preparing the installer…"
-                    let work = paths.downloads.appendingPathComponent("install-\(UUID().uuidString.prefix(8))")
-                    workFolder = work
-                    let installer = try await GameImporter.installer(for: source, workFolder: work, title: name)
-                    let before = ProgramSnapshot.take(of: space)
-                    workMessage = "Running \(installer.lastPathComponent)…"
-                    waitingForInstaller = true
-                    installerDone = false
-                    _ = try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: installer),
-                                               workingDirectory: installer.deletingLastPathComponent(), backend: .auto,
-                                               logsFolder: paths.logs, logName: "Install \(name)") { _ in
-                        Task { await WineLauncher.waitForAll(engine: engine, space: space)
-                               await MainActor.run { installerDone = true } }
-                    }
-                    while !installerDone { try await Task.sleep(for: .milliseconds(400)) }
-                    waitingForInstaller = false
-                    workMessage = "Looking for what it installed…"
-                    candidates = ProgramSnapshot.newPrograms(in: space, since: before)
-                }
-                chosen = candidates.first?.url
-                step = .pick
-            } catch {
-                waitingForInstaller = false
-                model.errorMessage = error.localizedDescription
-                step = .details
+            canStop = true
+            try Task.checkCancellation()
+            if mode == .portable {
+                let games = space.driveC.appendingPathComponent("Games", isDirectory: true)
+                let plan = try await checkedPlan(source, move: move, destination: games, name: name)
+                workMessage = source.url.hasDirectoryPath || Files.isDirectory(source.url) ? "Copying the game…" : "Unpacking the archive…"
+                let folder = try await GameImporter.copyIntoSpace(source, space: space, title: name, move: move,
+                                                                  totalBytes: plan.totalBytes, progress: showProgress)
+                candidates = await Task.detached { ExecutableScanner.scan(folder, title: name) }.value
+            } else {
+                guard let paths = model.paths else { throw CancellationError() }
+                workMessage = "Preparing the installer…"
+                let folder = paths.downloads.appendingPathComponent("install-\(UUID().uuidString.prefix(8))")
+                var plan = GameImporter.ImportPlan(totalBytes: 0, neededBytes: 0)
+                if case .archive = source { plan = try await checkedPlan(source, move: false, destination: paths.downloads, name: name) }
+                unpacked = folder
+                let setup = try await GameImporter.installer(for: source, workFolder: folder, title: name,
+                                                             totalBytes: plan.totalBytes, progress: showProgress)
+                workProgress = nil; workDetail = ""
+                workMessage = "Running \(setup.lastPathComponent)…"
+                let run = InstallerRun()
+                installer = run
+                candidates = try await model.runInstaller(setup, in: space, engine: engine, title: name, run: run)
+            }
+            chosen = candidates.first?.url
+            workProgress = nil; workDetail = ""
+            step = .pick
+        } catch is CancellationError {
+            dismiss()
+        } catch {
+            model.errorMessage = error.localizedDescription
+            step = .details
+        }
+    }
+
+    /// Looks at what the work will take and refuses it when the disk can't hold it, before anything is written.
+    private func checkedPlan(_ source: ImportSource, move: Bool, destination: URL, name: String) async throws -> GameImporter.ImportPlan {
+        workMessage = "Checking free space…"
+        let plan = await GameImporter.plan(source, move: move, destination: destination)
+        if let problem = GameImporter.spaceProblem(for: plan, destination: destination, title: name) { throw ShellError.failed(problem) }
+        try Task.checkCancellation()
+        return plan
+    }
+
+    /// Progress of copying or unpacking, from the work's own thread.
+    private var showProgress: @Sendable (Int64, Int64) -> Void {
+        { done, total in
+            Task { @MainActor in
+                workProgress = total > 0 ? min(1, Double(done) / Double(total)) : nil
+                workDetail = total > 0 ? "\(done.formattedBytes) of \(total.formattedBytes)" : "\(done.formattedBytes) so far"
             }
         }
     }
@@ -262,5 +319,24 @@ struct AddGameSheet: View {
     private func relative(_ url: URL) -> String {
         guard let space = targetSpace else { return url.path }
         return space.windowsPath(for: url)
+    }
+}
+
+/// What the working step says while an installer waits for its turn and while it runs.
+private struct InstallerNote: View {
+    let run: InstallerRun
+
+    var body: some View {
+        switch run.phase {
+        case .queued:
+            Text("Windows components are installing in this space first. The installer starts when they are done.")
+                .font(.callout).foregroundStyle(.secondary)
+        case .running:
+            Text("Finish the installer in its own window. You can uncheck “Launch game” at the end. G-Player continues when the installer closes.")
+                .font(.callout).foregroundStyle(.secondary)
+            Button("The Installer Is Done") { run.markDone() }
+        case .finishing:
+            EmptyView()
+        }
     }
 }

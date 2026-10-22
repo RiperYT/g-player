@@ -48,6 +48,9 @@ struct EngineSettings: View {
 struct EngineSection: View {
     @Environment(AppModel.self) private var model
     let info: EngineInfo
+    @State private var confirmRemove = false
+    /// The names of the spaces that keep the engine busy, while the refusal is shown.
+    @State private var busySpaces: [String] = []
     var body: some View {
         Section {
             Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -55,11 +58,21 @@ struct EngineSection: View {
             LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
             if model.isInstalled(info) {
                 LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-                Button("Remove", role: .destructive) { model.removeEngine(info) }
+                Button("Remove", role: .destructive) { startRemoval() }
+                    .confirmationDialog("Remove \(info.name)?", isPresented: $confirmRemove, titleVisibility: .visible) {
+                        Button("Remove", role: .destructive) { remove() }
+                    } message: {
+                        Text("Spaces that use it download it again (about \(redownloadMB) MB) the next time they start.")
+                    }
+                    .alert("Can't remove \(info.name)", isPresented: Binding(get: { !busySpaces.isEmpty }, set: { if !$0 { busySpaces = [] } })) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text("It's in use: programs are running or installing in \(list(busySpaces)). Quit them or wait, then try again.")
+                    }
             } else {
                 let mb = info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)) / 1_000_000
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
-                    .disabled(model.isEngineBusy)
+                    .disabled(model.isEngineBusy || model.libraryProblem != nil)
             }
         } header: {
             HStack(spacing: 8) {
@@ -70,6 +83,32 @@ struct EngineSection: View {
                     .background((info.isRecommended ? Color.accentColor : .secondary).opacity(0.12), in: Capsule())
             }
         }
+    }
+
+    /// What a space downloads to use the engine again: its archives, and Wine Staging's too when G-Player Wine is
+    /// the one removed and Staging isn't there.
+    private var redownloadMB: Int64 {
+        let stagingStays = info.id != EngineCatalog.wineStaging.id && model.isInstalled(EngineCatalog.wineStaging)
+        return info.downloadBytes(wineStagingInstalled: stagingStays) / 1_000_000
+    }
+
+    /// Looks first, so a refusal comes before the question.
+    private func startRemoval() {
+        Task {
+            let busy = await model.busySpaces(using: info)
+            if busy.isEmpty { confirmRemove = true } else { busySpaces = busy.map { "“\($0.name)”" } }
+        }
+    }
+
+    private func remove() {
+        Task {
+            let busy = await model.removeEngine(info)             // asks again: things change while the question is open
+            if !busy.isEmpty { busySpaces = busy.map { "“\($0.name)”" } }
+        }
+    }
+
+    private func list(_ names: [String]) -> String {
+        names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.first ?? ""
     }
 }
 

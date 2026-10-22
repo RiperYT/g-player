@@ -4,6 +4,7 @@ import Foundation
 ///
 ///     G-Player/
 ///       library.json      spaces, games, settings that travel with the library
+///       library.json.previous   the file as it was before the last change
 ///       Spaces/<name>/    Wine prefixes G-Player created (drive_c, registry…)
 ///       Engines/<id>/     downloaded Wine engines and DXVK
 ///       Covers/           cover art (custom and cached store art)
@@ -19,6 +20,7 @@ public struct LibraryPaths: Sendable, Equatable {
     }
 
     public var libraryFile: URL { root.appendingPathComponent("library.json") }
+    public var previousFile: URL { root.appendingPathComponent("library.json.previous") }
     public var spaces: URL { root.appendingPathComponent("Spaces", isDirectory: true) }
     public var engines: URL { root.appendingPathComponent("Engines", isDirectory: true) }
     public var covers: URL { root.appendingPathComponent("Covers", isDirectory: true) }

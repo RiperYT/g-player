@@ -61,19 +61,68 @@ public enum GameImporter {
         }
     }
 
-    /// Copies a portable game into `space` (C:\Games\<title>) and returns its folder.
-    public static func copyIntoSpace(_ source: ImportSource, space: Space, title: String, move: Bool = false) async throws -> URL {
+    /// What copying or unpacking `source` into a folder takes (`plan`).
+    public struct ImportPlan: Sendable, Equatable {
+        /// What the work moves, for its progress bar: 0 when that can't be told.
+        public let totalBytes: Int64
+        /// What it needs free on the disk it writes to: nothing for a move within a disk, or a copy on APFS, which clones.
+        public let neededBytes: Int64
+        public init(totalBytes: Int64, neededBytes: Int64) { self.totalBytes = totalBytes; self.neededBytes = neededBytes }
+        /// Kept free besides the work itself: the Mac needs room to work too.
+        public static let reserve: Int64 = 1_000_000_000
+    }
+
+    /// Looks at `source` before it is copied, moved or unpacked into `destination`. Reads the whole folder, so not on the
+    /// main thread.
+    public static func plan(_ source: ImportSource, move: Bool, destination: URL) async -> ImportPlan {
+        switch source {
+        case .program(let url):
+            let size = Files.size(of: url)
+            return ImportPlan(totalBytes: size, neededBytes: size)
+        case .folder(let url):
+            let size = Files.logicalSize(of: url)
+            let writesNothing = DiskSpace.sameVolume(url, destination) && (move || DiskSpace.clonesCopies(on: destination))
+            return ImportPlan(totalBytes: size, neededBytes: writesNothing ? 0 : size)
+        case .archive(let url):
+            let packed = Files.size(of: url)
+            let listed = await ArchiveExtractor.uncompressedBytes(of: url)
+            // Without a listing: archives of games hold about twice what they weigh.
+            return ImportPlan(totalBytes: listed ?? 0, neededBytes: max(listed ?? packed * 2, packed))
+        }
+    }
+
+    /// Why `plan` doesn't fit on the disk that holds `destination`, for the user, or nil when it does.
+    public static func spaceProblem(for plan: ImportPlan, destination: URL, title: String) -> String? {
+        guard plan.neededBytes > 0 else { return nil }
+        return DiskSpace.problem(needing: plan.neededBytes + ImportPlan.reserve, available: DiskSpace.available(at: destination),
+                                 for: "Adding “\(title)”")
+    }
+
+    /// Copies a portable game into `space` (C:\Games\<title>) and returns its folder. `progress` gets the bytes done and
+    /// `totalBytes` (from `plan`). Cancelling the calling task stops it and removes what was copied; `CancellationError`
+    /// is thrown. A move within a disk is a rename and can't be stopped; a move to another disk copies first, then removes
+    /// the original, so stopping it loses nothing.
+    public static func copyIntoSpace(_ source: ImportSource, space: Space, title: String, move: Bool = false,
+                                     totalBytes: Int64 = 0,
+                                     progress: @escaping @Sendable (Int64, Int64) -> Void = { _, _ in }) async throws -> URL {
         let games = space.driveC.appendingPathComponent("Games", isDirectory: true)
         try FileManager.default.createDirectory(at: games, withIntermediateDirectories: true)
         switch source {
         case .archive(let url):
-            return try await ArchiveExtractor.extract(url, into: games, name: title)
+            return try await ArchiveExtractor.extract(url, into: games, name: title, expectedBytes: totalBytes, progress: progress)
         case .folder(let url):
             let target = Files.uniqueURL(in: games, name: Files.safeName(title))
-            try await Task.detached(priority: .userInitiated) {
-                if move { try FileManager.default.moveItem(at: url, to: target) }
-                else { try FileManager.default.copyItem(at: url, to: target) }
-            }.value
+            if move && DiskSpace.sameVolume(url, games) {
+                try FileManager.default.moveItem(at: url, to: target)
+                return target
+            }
+            do {
+                try copyFolder(from: url, to: target, totalBytes: totalBytes, progress: progress)
+            } catch {
+                try? FileManager.default.removeItem(at: target)
+                throw error
+            }
+            if move { try FileManager.default.removeItem(at: url) }
             return target
         case .program(let url):
             let target = Files.uniqueURL(in: games, name: Files.safeName(title))
@@ -83,8 +132,34 @@ public enum GameImporter {
         }
     }
 
-    /// Finds the installer to run: unpacks archives into `workFolder` first.
-    public static func installer(for source: ImportSource, workFolder: URL, title: String) async throws -> URL {
+    /// Copies a folder file by file (a clone on APFS), so there is progress and the calling task can stop it between files.
+    private static func copyFolder(from source: URL, to target: URL, totalBytes: Int64,
+                                   progress: @Sendable (Int64, Int64) -> Void) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: target, withIntermediateDirectories: true)
+        // Walks by path inside the folder: the URLs of a walk of a folder under /var come out as /private/var, which a
+        // link's path then doesn't match (and the link would be skipped).
+        guard let walker = fm.enumerator(atPath: source.path) else { throw ShellError.failed("Couldn't read \(source.lastPathComponent).") }
+        var done: Int64 = 0
+        var reported = Date.distantPast
+        for case let inside as String in walker {
+            try Task.checkCancellation()
+            let item = source.appendingPathComponent(inside), destination = target.appendingPathComponent(inside)
+            let attributes = try fm.attributesOfItem(atPath: item.path)
+            if attributes[.type] as? FileAttributeType == .typeDirectory {
+                try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+                continue
+            }
+            try fm.copyItem(at: item, to: destination)                  // a link is copied as a link
+            done += (attributes[.size] as? NSNumber)?.int64Value ?? 0
+            if Date().timeIntervalSince(reported) >= 0.1 { reported = Date(); progress(done, totalBytes) }
+        }
+        progress(done, totalBytes)
+    }
+
+    /// Finds the installer to run: unpacks archives into `workFolder` first (`progress` and `totalBytes` as in `copyIntoSpace`).
+    public static func installer(for source: ImportSource, workFolder: URL, title: String, totalBytes: Int64 = 0,
+                                 progress: @escaping @Sendable (Int64, Int64) -> Void = { _, _ in }) async throws -> URL {
         switch source {
         case .program(let url):
             return url
@@ -95,7 +170,7 @@ public enum GameImporter {
             }
             throw ShellError.failed("No installer (setup.exe, install.exe or .msi) found in \(url.lastPathComponent).")
         case .archive(let url):
-            let folder = try await ArchiveExtractor.extract(url, into: workFolder, name: title)
+            let folder = try await ArchiveExtractor.extract(url, into: workFolder, name: title, expectedBytes: totalBytes, progress: progress)
             return try await installer(for: .folder(folder), workFolder: workFolder, title: title)
         }
     }

@@ -41,6 +41,30 @@ import Testing
         #expect(PrefixPath.libraryRootProblem(LibraryPaths.defaultRoot) == nil)
     }
 
+    @Test func aLibraryFromBeforeTheLimitIsToldWhyAndHowToMoveIt() throws {
+        let root = URL(fileURLWithPath: path(ofLength: PrefixPath.maxLibraryRootLength + 6, prefix: "/Volumes/Games/") + "/G-Player")
+        let n = PrefixPath.length(of: LibraryPaths(root: root).root.path)
+        let message = try #require(PrefixPath.existingLibraryProblem(root))
+        // Where the limit comes from, what it means for what is there, and the way out: quit, move, Locate….
+        #expect(message.contains("\(n) characters") && message.contains("limit is \(PrefixPath.maxLibraryRootLength)"))
+        #expect(message.contains("260") && message.contains("Wine"))
+        #expect(message.contains("already in the library keep working"))
+        #expect(message.contains("quit G-Player") && message.contains("move the folder “G-Player”") && message.contains("Locate…"))
+        // Not a request to choose a folder: there is nowhere to choose one.
+        #expect(!message.contains("Choose a folder"))
+        #expect(PrefixPath.existingLibraryProblem(LibraryPaths.defaultRoot) == nil)
+        let atTheLimit = URL(fileURLWithPath: path(ofLength: PrefixPath.maxLibraryRootLength))
+        #expect(PrefixPath.existingLibraryProblem(atTheLimit) == nil)
+    }
+
+    @Test func noSpaceIsMadeInThatLibraryAndNothingIsWritten() throws {
+        let root = URL(fileURLWithPath: path(ofLength: PrefixPath.maxLibraryRootLength + 1, prefix: "/tmp/gplayer-tests-"))
+        let manager = SpaceManager(paths: LibraryPaths(root: root))
+        let error = try #require(throws: ShellError.self) { try manager.folder(forNew: "Main") }
+        #expect(error.localizedDescription == PrefixPath.existingLibraryProblem(root))
+        #expect(!FileManager.default.fileExists(atPath: root.path))                     // nothing was written
+    }
+
     @Test func aLongSpaceNameIsCutSoThePathStaysWithinTheLimit() throws {
         let root = URL(fileURLWithPath: "/tmp/gplayer-tests-\(UUID().uuidString.prefix(8))", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }

@@ -25,6 +25,20 @@ public enum Files {
         return total
     }
 
+    /// Total of the sizes of the files in a folder (what the files hold, not the room they take), following no symlinks.
+    public static func logicalSize(of url: URL) -> Int64 {
+        let keys: Set<URLResourceKey> = [.fileSizeKey, .isSymbolicLinkKey]
+        guard let walker = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys),
+                                                          options: [], errorHandler: { _, _ in true }) else { return 0 }
+        var total: Int64 = 0
+        for case let file as URL in walker {
+            guard let values = try? file.resourceValues(forKeys: keys) else { continue }
+            if values.isSymbolicLink == true { walker.skipDescendants(); continue }
+            total += Int64(values.fileSize ?? 0)
+        }
+        return total
+    }
+
     public static func size(of url: URL) -> Int64 {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0) } ?? 0
     }

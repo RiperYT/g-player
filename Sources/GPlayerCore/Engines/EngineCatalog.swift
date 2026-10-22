@@ -29,6 +29,9 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// What the build is made from, when its own number says too little: G-Player Wine's "11.0" next to Wine
     /// Staging's "11.18" would look older than it is.
     public var basedOn: String? = nil
+    /// The room the unpacked engine takes on disk, measured and rounded up. Installing needs this plus the biggest
+    /// archive (`EngineCatalog.diskBytes`).
+    public var installedBytes: Int64 = 0
 
     /// The name with its version, for rows and pickers: "Wine Staging 11.18", "G-Player Wine (Wine 11 from CrossOver 26.3)".
     public var displayName: String { basedOn.map { "\(name) (\($0))" } ?? "\(name) \(version)" }
@@ -40,7 +43,8 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// This engine with only the backends in `ready` (`Engine.readyBackends`), for decisions about what can run now.
     public func limited(to ready: [GraphicsBackend]) -> EngineInfo {
         EngineInfo(id: id, name: name, version: version, kind: kind, summary: summary,
-                   backends: backends.filter(ready.contains), downloads: downloads, basedOn: basedOn)
+                   backends: backends.filter(ready.contains), downloads: downloads, basedOn: basedOn,
+                   installedBytes: installedBytes)
     }
     public func resolve(_ backend: GraphicsBackend) -> GraphicsBackend {
         backend == .auto || !backends.contains(backend) ? defaultBackend : backend
@@ -71,7 +75,8 @@ public enum EngineCatalog {
                 sha256: "acd1520ad105d8ef124a09c8e11a259a5dc8bdc565ad18e0e52693f9807b2477",
                 approximateBytes: 3_900_000,
                 role: .dxvk),
-        ])
+        ],
+        installedBytes: 750_000_000)
 
     /// G-Player Wine: Wine 11 built by G-Player from CodeWeavers' CrossOver 26.3 source (scripts/build-engine-cx.sh,
     /// tools/wine-patches/cx-*.patch), with DXMT and MoltenVK 1.4.2, plus Gcenx's runtime libraries and DXVK.
@@ -104,7 +109,8 @@ public enum EngineCatalog {
                 approximateBytes: 3_900_000,
                 role: .dxvk),
         ],
-        basedOn: "Wine 11 from CrossOver 26.3")
+        basedOn: "Wine 11 from CrossOver 26.3",
+        installedBytes: 1_650_000_000)
 
     /// Apple's Game Porting Toolkit (wine 7.7 + D3DMetal), only when the user installed it themselves.
     /// G-Player never ships, downloads or installs Apple's files: Apple's license allows the toolkit for
@@ -157,6 +163,17 @@ public enum EngineCatalog {
             have.insert(info.id)
         }
         return total
+    }
+
+    /// The free disk space installing `infos` one after the other needs: what they take once unpacked, and room for the
+    /// biggest archive, which is there while it unpacks and deleted after.
+    public static func diskBytes(installing infos: [EngineInfo]) -> Int64 {
+        infos.reduce(0) { $0 + $1.installedBytes } + (infos.flatMap(\.downloads).map(\.approximateBytes).max() ?? 0)
+    }
+
+    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 2.7 GB for both).
+    public static func firstRunDiskBytes(installed: [EngineInfo]) -> Int64 {
+        diskBytes(installing: firstRunInstalls.filter { first in !installed.contains { $0.id == first.id } })
     }
 
     /// Apple's page about the toolkit and its license.

@@ -51,6 +51,33 @@ public enum Shell {
         }
     }
 
+    /// Like `run`, for work that can be stopped: when the calling task is cancelled the process is stopped and
+    /// `CancellationError` is thrown (unpacking a big archive, say, which `run` would let finish).
+    public static func runStoppable(_ executable: URL, _ arguments: [String]) async throws -> ProcessResult {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        let out = Pipe(), err = Pipe()
+        process.standardOutput = out
+        process.standardError = err
+        process.standardInput = FileHandle.nullDevice
+        let outBox = DataBox(), errBox = DataBox()
+        out.fileHandleForReading.readabilityHandler = { h in outBox.append(h.availableData) }
+        err.fileHandleForReading.readabilityHandler = { h in errBox.append(h.availableData) }
+        let status = try await Supervised.run(timeout: nil, stop: { Supervised.terminate(process) }) { finish in
+            process.terminationHandler = { p in
+                out.fileHandleForReading.readabilityHandler = nil
+                err.fileHandleForReading.readabilityHandler = nil
+                outBox.append(out.fileHandleForReading.readDataToEndOfFile())
+                errBox.append(err.fileHandleForReading.readDataToEndOfFile())
+                finish(p.terminationStatus)
+            }
+            try process.run()
+        }
+        return ProcessResult(status: status, stdout: String(decoding: outBox.data, as: UTF8.self),
+                             stderr: String(decoding: errBox.data, as: UTF8.self))
+    }
+
     /// `/usr/bin/<tool>` or `/bin/<tool>`.
     public static func tool(_ name: String) -> URL {
         for dir in ["/usr/bin", "/bin", "/usr/sbin"] {

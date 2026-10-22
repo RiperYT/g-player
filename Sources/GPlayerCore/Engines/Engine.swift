@@ -107,41 +107,47 @@ public struct EngineManager: Sendable {
         return down.contains(code)
     }
 
-    /// Downloads, verifies and unpacks an engine. `progress` gets 0…1.
+    /// Why `infos` can't be installed one after the other on this disk (not enough room), for the user, or nil.
+    public func diskProblem(installing infos: [EngineInfo]) -> String? {
+        guard !infos.isEmpty else { return nil }
+        let names = infos.map(\.name).joined(separator: " and ")
+        return DiskSpace.problem(needing: EngineCatalog.diskBytes(installing: infos), available: DiskSpace.available(at: paths.root),
+                                 for: "Installing \(names)")
+    }
+
+    /// Downloads, verifies and unpacks an engine. `progress` gets 0…1 and what to say ("Downloading 41 of 98 MB"). A download
+    /// that stops (Stop, a quit, a dropped connection) keeps what came and goes on from there the next time.
     public func install(_ info: EngineInfo, progress: @escaping @Sendable (Double, String) -> Void) async throws -> Engine {
         guard !info.downloads.isEmpty else {
             throw ShellError.failed("G-Player doesn't download \(info.name). Install it yourself from Apple if its license fits your use.")
         }
+        if let problem = diskProblem(installing: [info]) { throw ShellError.failed(problem) }
         try paths.createFolders()
         let target = folder(for: info)
         let staging = paths.engines.appendingPathComponent(".\(info.id)-\(UUID().uuidString.prefix(8))", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: staging) }
 
-        let total = Double(info.downloads.reduce(0) { $0 + $1.approximateBytes })
-        var done = 0.0
+        // What is downloaded: the runtime libraries aren't when an installed Wine Staging has them.
+        let stagingInstalled = engine(EngineCatalog.wineStaging) != nil
+        let totalBytes = info.downloadBytes(wineStagingInstalled: stagingInstalled)
+        var done: Int64 = 0
         for item in info.downloads {
             // The runtime libraries are in an installed Wine Staging already, same build: no need to download them.
             if item.role == .runtimeLibraries, let installed = engine(EngineCatalog.wineStaging) {
                 try copyRuntimeLibraries(from: installed.wineRoot.appendingPathComponent("lib"), into: staging.appendingPathComponent("wine/lib"))
-                done += Double(item.approximateBytes)
                 continue
             }
             let file = downloadFile(item, of: info)
             if !(FileManager.default.fileExists(atPath: file.path) && (try? Files.sha256(of: file)) == item.sha256) {
                 let base = done
-                try await FileDownloader.download(item.url, to: file) { fraction in
-                    progress(min(0.95, (base + fraction * Double(item.approximateBytes)) / total), "Downloading \(item.fileName)")
-                }
-                progress(min(0.95, (base + Double(item.approximateBytes)) / total), "Checking \(item.fileName)")
-                let sum = try Files.sha256(of: file)
-                guard sum == item.sha256 else {
-                    try? FileManager.default.removeItem(at: file)
-                    throw ShellError.failed("\(item.fileName) didn't match its checksum. Try again.")
+                try await fetch(item, to: file) { received, note in
+                    let fraction = totalBytes > 0 ? Double(base + received) / Double(totalBytes) : 0
+                    progress(min(0.95, fraction), note ?? DownloadResume.message(received: base + received, total: totalBytes))
                 }
             }
-            done += Double(item.approximateBytes)
-            progress(min(0.97, done / total), "Unpacking \(item.fileName)")
+            done += item.approximateBytes
+            progress(min(0.97, totalBytes > 0 ? Double(done) / Double(totalBytes) : 0.97), "Unpacking \(item.fileName)")
             switch item.role {
             case .engine: try await unpack(file, into: staging, isDXVK: false)
             case .dxvk: try await unpack(file, into: staging, isDXVK: true)
@@ -157,6 +163,7 @@ public struct EngineManager: Sendable {
             try? FileManager.default.removeItem(at: file)
         }
         await Files.clearQuarantine(staging)
+        try Task.checkCancellation()
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: staging, to: target)
         try? FileManager.default.removeItem(at: downloadFolder(for: info))
@@ -164,6 +171,62 @@ public struct EngineManager: Sendable {
         guard let engine = engine(info) else { throw ShellError.failed("\(info.name) was unpacked but can't be found.") }
         EngineFixes.apply(to: engine)
         return engine
+    }
+
+    /// Downloads one pinned file and checks it. A connection that drops after it delivered something is tried again where it
+    /// stopped (`DownloadResume.retryDelays`), and so is a download that was stopped earlier: what came is kept in a `.part`
+    /// file. A file made of several tries that fails its checksum is downloaded once more from the start.
+    /// `report` gets the bytes the file has, and a note to show in place of the usual progress text.
+    func fetch(_ item: PinnedDownload, to file: URL, configuration: URLSessionConfiguration = .default,
+               delays: [TimeInterval] = DownloadResume.retryDelays,
+               report: @escaping @Sendable (_ received: Int64, _ note: String?) -> Void) async throws {
+        let partial = FileDownloader.partialFile(for: file)
+        var failures = 0
+        var hasReceivedData = false
+        var glued = Files.size(of: partial) > 0                 // what is there came from an earlier try
+        while true {
+            let before = Files.size(of: partial)
+            do {
+                try await FileDownloader.download(item.url, to: file, resume: true, configuration: configuration) { done, _ in
+                    report(done, nil)
+                }
+            } catch {
+                let grew = Files.size(of: partial) > before
+                if grew { hasReceivedData = true; failures = 0 }
+                guard let wait = DownloadResume.retryDelay(after: error, failures: failures, hasReceivedData: hasReceivedData,
+                                                           delays: delays) else { throw error }
+                if !grew { failures += 1 }
+                glued = true
+                report(Files.size(of: partial), "The connection dropped. Trying again…")
+                try await Task.sleep(for: .seconds(wait))
+                continue
+            }
+            report(item.approximateBytes, "Checking \(item.fileName)")
+            if try Files.sha256(of: file) == item.sha256 { return }
+            try? FileManager.default.removeItem(at: file)
+            guard glued else { throw ShellError.failed("\(item.fileName) didn't match its checksum. Try again.") }
+            glued = false                                       // a part that went stale: once more, from the start
+        }
+    }
+
+    /// Clears what an install that never ended left in the library: its hidden staging folder in Engines (`.<id>-<8 letters>`),
+    /// and the downloads of an engine that is installed. A download of an engine that isn't installed stays to be gone on
+    /// with, unless nothing touched it for `partialLifetime`. Call it only while no install runs.
+    public func cleanLeftovers(now: Date = Date(), partialLifetime: TimeInterval = 7 * 24 * 3600) {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: paths.engines.path)) ?? [] where name.hasPrefix(".") {
+            let isStaging = EngineCatalog.all.contains { name.hasPrefix(".\($0.id)-") && name.count == $0.id.count + 10 }
+            if isStaging { try? fm.removeItem(at: paths.engines.appendingPathComponent(name)) }
+        }
+        for info in EngineCatalog.all where !info.downloads.isEmpty {
+            let downloads = downloadFolder(for: info)
+            guard fm.fileExists(atPath: downloads.path) else { continue }
+            if isInstalled(info) { try? fm.removeItem(at: downloads); continue }
+            for file in (try? fm.contentsOfDirectory(at: downloads, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
+                let touched = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                if let touched, now.timeIntervalSince(touched) > partialLifetime { try? fm.removeItem(at: file) }
+            }
+        }
     }
 
     /// Copies the dylibs of Gcenx's build (FreeType, GnuTLS, SDL2, the Vulkan loader and what they use) into
@@ -190,7 +253,7 @@ public struct EngineManager: Sendable {
     private func unpack(_ archive: URL, into folder: URL, isDXVK: Bool) async throws {
         let dest = isDXVK ? folder.appendingPathComponent("dxvk-unpack") : folder
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
-        let r = try await Shell.run(Shell.tool("tar"), ["-xf", archive.path, "-C", dest.path])
+        let r = try await Shell.runStoppable(Shell.tool("tar"), ["-xf", archive.path, "-C", dest.path])
         guard r.succeeded else { throw ShellError.failed("Couldn't unpack \(archive.lastPathComponent): \(r.stderr)") }
         if isDXVK {
             // The archive holds one top folder with x64/ and x32/.
@@ -204,5 +267,6 @@ public struct EngineManager: Sendable {
     public func remove(_ info: EngineInfo) throws {
         guard info.kind != .gptk else { return }
         try FileManager.default.removeItem(at: folder(for: info))
+        try? FileManager.default.removeItem(at: downloadFolder(for: info))      // a part of it that was left
     }
 }

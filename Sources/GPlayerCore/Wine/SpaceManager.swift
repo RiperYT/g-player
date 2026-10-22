@@ -18,9 +18,10 @@ public struct SpaceManager: Sendable {
     }
 
     /// Where a new space named `name` goes: a folder in Spaces, its name cut so the path stays within `PrefixPath`.
-    /// Throws, with nothing written, when the library folder's path is too long for any space to work.
+    /// Throws, with nothing written, when the library folder's path is too long for any space to work (only a library
+    /// from before the limit can be: onboarding refuses such a folder). The spaces it already has aren't touched.
     public func folder(forNew name: String) throws -> URL {
-        if let problem = PrefixPath.libraryRootProblem(paths.root) { throw ShellError.failed(problem) }
+        if let problem = PrefixPath.existingLibraryProblem(paths.root) { throw ShellError.failed(problem) }
         let limit = PrefixPath.folderNameLimit(in: paths.spaces)
         let folder = Files.uniqueURL(in: paths.spaces, name: Files.safeName(name, maxLength: limit))
         if let problem = PrefixPath.problem(forPrefix: folder) { throw ShellError.failed(problem) }
