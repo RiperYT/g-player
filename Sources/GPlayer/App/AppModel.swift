@@ -142,6 +142,7 @@ final class AppModel {
             state = try LibraryStore(paths: paths).load()
             migrateAppleToolkitSetting()
             migrateManualGraphics()
+            applyEngineFixes()
         } catch {
             errorMessage = "Couldn't read the library: \(error.localizedDescription)"
         }
@@ -188,6 +189,14 @@ final class AppModel {
     func engineNote(_ info: EngineInfo) -> String {
         if info.kind == .gptk && !useAppleToolkit { return "  · turned off" }
         return isInstalled(info) ? "" : "  · not installed"
+    }
+
+    /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away).
+    private func applyEngineFixes() {
+        guard let manager = engineManager else { return }
+        Task.detached(priority: .utility) {
+            for info in EngineCatalog.all { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+        }
     }
 
     /// The engines a space can switch to: the available ones, plus the one it uses now.

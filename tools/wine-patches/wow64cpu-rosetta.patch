@@ -1,0 +1,169 @@
+--- a/dlls/wow64cpu/cpu.c
++++ b/dlls/wow64cpu/cpu.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <stdarg.h>
++#include <string.h>
+ 
+ #include "ntstatus.h"
+ #include "windef.h"
+@@ -39,10 +40,36 @@
+     DWORD addr;
+     WORD  cs;
+ };
++/* Rosetta 2 workaround (after CodeWeavers' CW HACK 20760): a far call into 64-bit code, which then drops the
++ * return address the call pushed and jumps on. Under Rosetta 2 a far jump between 32- and 64-bit code sometimes
++ * doesn't switch modes. */
++struct thunk_32to64_rosetta
++{
++    BYTE  lcall;      /* call far, absolute indirect */
++    BYTE  modrm;      /* address=disp32, opcode=3 */
++    DWORD op;
++    DWORD addr;
++    WORD  cs;
++    BYTE  add;        /* add $0x08,%esp */
++    BYTE  add_modrm;
++    BYTE  add_op;
++    BYTE  jmp;        /* jmp *0(%rip) */
++    BYTE  jmp_modrm;
++    DWORD jmp_op;
++    ULONG64 jmp_addr;
++};
+ struct thunk_opcodes
+ {
+-    struct thunk_32to64 syscall_thunk;
+-    struct thunk_32to64 unix_thunk;
++    union
++    {
++        struct thunk_32to64 syscall_thunk;
++        struct thunk_32to64_rosetta syscall_thunk_rosetta;
++    };
++    union
++    {
++        struct thunk_32to64 unix_thunk;
++        struct thunk_32to64_rosetta unix_thunk_rosetta;
++    };
+ };
+ #pragma pack(pop)
+ 
+@@ -57,6 +84,17 @@
+ 
+ void **__wine_unix_call_dispatcher = NULL;
+ 
++/* True when running under Rosetta 2, which reports itself as a "VirtualApple" processor. */
++BOOL use_rosetta_workaround = FALSE;
++
++static BOOL is_rosetta(void)
++{
++    char buffer[64];
++    if (NtQuerySystemInformation( SystemProcessorBrandString, buffer, sizeof(buffer), NULL )) return FALSE;
++    buffer[sizeof(buffer) - 1] = 0;
++    return strstr( buffer, "VirtualApple" ) != NULL;
++}
++
+ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
+ {
+     if (reason == DLL_PROCESS_ATTACH) LdrDisableThreadCalloutsForDll( inst );
+@@ -210,7 +248,16 @@
+                    "movl %edx,4(%rsp)\n\t"
+                    "movl 0xc4(%r13),%r14d\n\t"  /* context->Esp */
+                    "xchgq %r14,%rsp\n\t"
++                   "cmpl $0," __ASM_NAME("use_rosetta_workaround") "(%rip)\n\t"
++                   "jne 1f\n\t"
+                    "ljmp *(%r14)\n"
++                   /* Rosetta 2: lretq to the 32-bit cs:eip the far pointer at (%r14) holds */
++                   "1:\tsubq $0x10,%rsp\n\t"
++                   "movl 4(%r14),%edx\n\t"
++                   "movq %rdx,0x8(%rsp)\n\t"
++                   "movl 0(%r14),%edx\n\t"
++                   "movq %rdx,(%rsp)\n\t"
++                   "lretq\n"
+                    ".Lsyscall_32to64_return:\n\t"
+                    "movq %rsp,%r14\n\t"
+                    "movl 0xa8(%r13),%edx\n\t"   /* context->Edx */
+@@ -270,7 +317,15 @@
+                    "movl %edx,4(%rsp)\n\t"
+                    "movl 0xc4(%r13),%r14d\n\t"  /* context->Esp */
+                    "xchgq %r14,%rsp\n\t"
+-                   "ljmp *(%r14)" )
++                   "cmpl $0," __ASM_NAME("use_rosetta_workaround") "(%rip)\n\t"
++                   "jne 1f\n\t"
++                   "ljmp *(%r14)\n"
++                   "1:\tsubq $0x10,%rsp\n\t"
++                   "movl 4(%r14),%edx\n\t"
++                   "movq %rdx,0x8(%rsp)\n\t"
++                   "movl 0(%r14),%edx\n\t"
++                   "movq %rdx,(%rsp)\n\t"
++                   "lretq" )
+ 
+ 
+ /**********************************************************************
+@@ -298,6 +353,23 @@
+                    "jmp syscall_32to64_return\n" )
+ 
+ 
++/* lcall into the next bytes as 64-bit code, drop what the lcall pushed, jump to the 64-bit entry point. */
++static void init_rosetta_thunk( struct thunk_32to64_rosetta *thunk, void *entry )
++{
++    thunk->lcall     = 0xff;
++    thunk->modrm     = 0x1d;
++    thunk->op        = PtrToUlong( &thunk->addr );
++    thunk->addr      = PtrToUlong( &thunk->add );
++    thunk->cs        = cs64_sel;
++    thunk->add       = 0x83;
++    thunk->add_modrm = 0xc4;
++    thunk->add_op    = 0x08;
++    thunk->jmp       = 0xff;
++    thunk->jmp_modrm = 0x25;
++    thunk->jmp_op    = 0;
++    thunk->jmp_addr  = (ULONG_PTR)entry;
++}
++
+ /**********************************************************************
+  *           BTCpuProcessInit  (wow64cpu.@)
+  */
+@@ -320,6 +392,7 @@
+     }
+ 
+     wow64info->CpuFlags |= WOW64_CPUFLAGS_MSFT64;
++    use_rosetta_workaround = is_rosetta();
+ 
+     LdrGetDllHandle( NULL, 0, &str, &module );
+     p__wine_unix_call_dispatcher = RtlFindExportedRoutineByName( module, "__wine_unix_call_dispatcher" );
+@@ -335,17 +408,25 @@
+     cs32_sel = context_i386.SegCs;
+     ss32_sel = context_i386.SegSs;
+ 
+-    thunk->syscall_thunk.ljmp  = 0xff;
+-    thunk->syscall_thunk.modrm = 0x2d;
+-    thunk->syscall_thunk.op    = PtrToUlong( &thunk->syscall_thunk.addr );
+-    thunk->syscall_thunk.addr  = PtrToUlong( syscall_32to64 );
+-    thunk->syscall_thunk.cs    = cs64_sel;
++    if (use_rosetta_workaround)
++    {
++        init_rosetta_thunk( &thunk->syscall_thunk_rosetta, syscall_32to64 );
++        init_rosetta_thunk( &thunk->unix_thunk_rosetta, unix_call_32to64 );
++    }
++    else
++    {
++        thunk->syscall_thunk.ljmp  = 0xff;
++        thunk->syscall_thunk.modrm = 0x2d;
++        thunk->syscall_thunk.op    = PtrToUlong( &thunk->syscall_thunk.addr );
++        thunk->syscall_thunk.addr  = PtrToUlong( syscall_32to64 );
++        thunk->syscall_thunk.cs    = cs64_sel;
+ 
+-    thunk->unix_thunk.ljmp  = 0xff;
+-    thunk->unix_thunk.modrm = 0x2d;
+-    thunk->unix_thunk.op    = PtrToUlong( &thunk->unix_thunk.addr );
+-    thunk->unix_thunk.addr  = PtrToUlong( unix_call_32to64 );
+-    thunk->unix_thunk.cs    = cs64_sel;
++        thunk->unix_thunk.ljmp  = 0xff;
++        thunk->unix_thunk.modrm = 0x2d;
++        thunk->unix_thunk.op    = PtrToUlong( &thunk->unix_thunk.addr );
++        thunk->unix_thunk.addr  = PtrToUlong( unix_call_32to64 );
++        thunk->unix_thunk.cs    = cs64_sel;
++    }
+ 
+     NtProtectVirtualMemory( GetCurrentProcess(), (void **)&thunk, &size, PAGE_EXECUTE_READ, &old_prot );
+     return STATUS_SUCCESS;

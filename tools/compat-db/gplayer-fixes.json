@@ -3,11 +3,24 @@
     {
       "id": "gplayer-overcooked",
       "title": "Overcooked",
-      "steamAppIDs": ["448510"],
+      "steamAppIDs": [
+        "448510"
+      ],
       "macStatus": "broken",
       "verifiedOnMac": true,
       "source": "g-player",
-      "notes": "32-bit Unity 5.5 game. DXVK can't create a 32-bit DirectX 11 device and WineD3D hangs on Wine 11 for macOS; it also crashes on Apple's Game Porting Toolkit. Tested 2026-10-21 on an M5 Mac with macOS 26.4."
+      "notes": "32-bit Unity 5.5 game. With G-Player's Rosetta fix for 32-bit programs it gets past the start, then crashes in its own code (read of address 0x10C) on WineD3D; DXVK can't create a 32-bit DirectX 11 device, and it also crashes on Apple's Game Porting Toolkit. Tested 2026-10-22 on an M5 Mac with macOS 26.4."
+    },
+    {
+      "id": "gplayer-cossacks-3",
+      "title": "Cossacks 3",
+      "steamAppIDs": [
+        "333420"
+      ],
+      "macStatus": "broken",
+      "verifiedOnMac": true,
+      "source": "g-player",
+      "notes": "32-bit OpenGL game that asks for OpenGL 4.4 with the compatibility profile. macOS offers OpenGL 4.1 core at most, so it stops with \"Your video card does not support hardware acceleration\". CrossOver lists it as not running on a Mac too. Tested 2026-10-22 on an M5 Mac with macOS 26.4."
     }
   ]
 }

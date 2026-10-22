@@ -89,6 +89,7 @@ public struct EngineManager: Sendable {
         try FileManager.default.moveItem(at: staging, to: target)
         progress(1, "Ready")
         guard let engine = engine(info) else { throw ShellError.failed("\(info.name) was unpacked but can't be found.") }
+        EngineFixes.apply(to: engine)
         return engine
     }
 

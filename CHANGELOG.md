@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1] - 2026-10-22
+
+- **32-bit Windows programs no longer crash under Rosetta 2.** Wine 11's switch between 32- and 64-bit code
+  sometimes fails on Apple Silicon (WineHQ bug 60494), which killed 32-bit games at start. G-Player now puts a
+  fixed `wow64cpu.dll` into Wine Staging 11.18, built from Wine's source with the approach CrossOver uses; the patch
+  and its build script are in `tools/wine-patches` and `scripts/build-wow64cpu.sh`. The original file is kept as
+  `wow64cpu.dll.gcenx`.
+- **Running programs are seen even when G-Player didn't start them.** Steam opened by a game launch, a game Steam
+  started, or anything still open after G-Player restarts now shows as Running with a Stop button. Stopping a
+  Steam game leaves Steam open. The check that keeps installers out of busy spaces uses the same list, so it now
+  also sees games started by Steam.
+- Cossacks 3 is marked as not running on a Mac (it needs OpenGL 4.4 with the compatibility profile; macOS has 4.1
+  core at most). The Overcooked note is updated.
+
 ## [0.3.0] - 2026-10-22
 
 Compatibility layers: G-Player now works out what a game needs and sets it up, so you don't have to touch Wine.

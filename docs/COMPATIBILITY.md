@@ -128,6 +128,15 @@ Windows component (with a button that installs it and plays again), graphics tha
 button that tries Compatible), anti-cheat, or a crash. G-Player's own header at the top of the log (the paths and
 title you chose) is left out of the reading, so a game folder called "BattlEye" doesn't look like a failure.
 
+## Fixes in the engine itself
+
+Some problems sit in Wine, not in the game. G-Player keeps a small set of fixes built from Wine's source
+(`tools/wine-patches`) and puts them into the Wine it downloaded, only over the exact file they were made for:
+
+- `wow64cpu.dll` (Wine Staging 11.18): under Rosetta 2, Wine's far jumps between 32- and 64-bit code sometimes
+  don't switch the CPU mode, and 32-bit programs die in a cascade of access violations (WineHQ 60494). The fixed
+  file uses a far call and `lretq` instead, as CrossOver does. The original is kept as `wow64cpu.dll.gcenx`.
+
 ## Spaces from other apps
 
 A CrossOver or Whisky bottle, or a prefix you made by hand, is used in place. G-Player changes nothing in it until you
