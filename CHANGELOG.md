@@ -1,7 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.2] - 2026-10-23
 
+- Safer edges found in review: Start Empty keeps the previous copy as `library.json.before-empty-<date>`; Locate… moves
+  only the spaces G-Player made; Add Game checks the disk first, makes one space and reuses it on retry, removes a space
+  it made and left empty, and Cancel works while an engine downloads; adding a game waits for setup however it is started
+  (⌘N, a space's page, the Dock, Open With); shut down, restart and log out are never held up by the quit question;
+  stopping the first run's download keeps Main and Steam waiting and says so; G-Player cleans up its own temporary
+  downloads and unpacked installers at start; a download that is already complete is verified, not repeated; Rosetta's
+  install can be cancelled; "Waiting for…" names what is running.
 - **A library that can't be read is never replaced.** If `library.json` is damaged, or the library folder isn't there
   (a disk that isn't connected, a moved folder), G-Player copies the file to `library.json.broken-<date>`, writes
   nothing, and asks: Try Again, Locate…, Use Previous Copy or Start Empty. Saving keeps the file it replaces as
