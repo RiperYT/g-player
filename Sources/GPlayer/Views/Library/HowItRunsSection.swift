@@ -16,6 +16,7 @@ struct HowItRunsSection: View {
             Text("How it runs").sectionTitle()
             if let diagnoses = model.diagnoses[game.id], !diagnoses.isEmpty {
                 ForEach(diagnoses) { DiagnosisBanner(game: game, diagnosis: $0) }
+                TryOtherGraphicsButton(game: game)
             }
             if model.changesRefused(for: game) { RefusedChangesNote(space: space) }
             AnalysisLine(game: game)
@@ -23,6 +24,7 @@ struct HowItRunsSection: View {
                 ForEach(preview.blockers + preview.warnings) { NoteRow(note: $0) }
             }
             ProfilePicker(game: game, options: options)
+            AutomaticGraphicsRow(game: game)
             OptionToggles(game: game, options: options, fixCount: model.fixes(for: game).filter { $0.macStatus != .broken }.count)
             if let applied = preview?.notes.filter({ $0.kind == .applied }), !applied.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -107,6 +109,28 @@ private struct ProfilePicker: View {
             .pickerStyle(.segmented).labelsHidden()
             Label(shown.summary, systemImage: shown.symbol)
                 .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// "Graphics: DXMT — picked automatically, worked last time", with a way to forget what was learned.
+private struct AutomaticGraphicsRow: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+
+    var body: some View {
+        if let choice = model.graphicsChoice(for: game) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Label("Graphics: " + choice.summary, systemImage: "display")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if choice.hasLearned {
+                    Button("Start Over") { model.forgetGraphics(for: game) }
+                        .buttonStyle(.link).controlSize(.small).font(.caption)
+                        .help("Forget which graphics worked and which didn't, and start with the best again")
+                }
+            }
         }
     }
 }
@@ -216,6 +240,21 @@ struct RemedyButton: View {
     }
 }
 
+/// After a failure no log explained (the game closed in seconds, or never opened), a way to try other graphics: the user's
+/// word that they are to blame. Nothing shows when there is nothing else to try.
+private struct TryOtherGraphicsButton: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+    var then: () -> Void = {}
+
+    var body: some View {
+        if let next = model.graphicsOffer(for: game) {
+            Button("Try Other Graphics") { model.tryOtherGraphicsAfterFailure(game); then() }
+                .help("Plays the game again with \(next.displayName).")
+        }
+    }
+}
+
 /// After a launch the user just made fails: what happened and what to try, in front of everything.
 struct FailedLaunchSheet: View {
     @Environment(AppModel.self) private var model
@@ -239,6 +278,7 @@ struct FailedLaunchSheet: View {
                 Button("Show in Library") { model.selectedGameID = game.id; dismiss() }
                 Spacer()
                 Button("Close", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                TryOtherGraphicsButton(game: game) { dismiss() }
                 if let first = found.first(where: { $0.remedy != .none }) {
                     RemedyButton(game: game, diagnosis: first, large: false) { dismiss() }
                         .keyboardShortcut(.defaultAction)

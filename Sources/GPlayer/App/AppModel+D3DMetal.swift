@@ -129,13 +129,17 @@ extension AppModel {
                 }
                 return
             }
+            // Closing Steam already waited for the rest of the space, so it isn't waited for twice.
+            var spaceEmpty = false
             if await Self.isSteamRunning(in: space) {
-                guard await quitSteam(in: space) else {
+                let quit = await quitSteam(in: space)
+                guard quit.gone else {
                     errorMessage = "Steam didn't quit, so “\(space.name)” stays on its engine for now. Quit Steam and try again."
                     return
                 }
+                spaceEmpty = quit == .spaceEmpty
             }
-            if let old = engine(for: space), !(await WineLauncher.waitForAll(engine: old, space: space, timeout: 30)) {
+            if !spaceEmpty, let old = engine(for: space), !(await WineLauncher.waitForAll(engine: old, space: space, timeout: 30)) {
                 errorMessage = "Programs in “\(space.name)” are still open, so it stays on its engine for now. Close them and try again."
                 return
             }

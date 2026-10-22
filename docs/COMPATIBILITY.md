@@ -105,10 +105,13 @@ The data stays as the source wrote it. What G-Player can do with it is decided w
   says so, and a fix that had nothing else to do isn't counted as applied.
 
 For Steam games, DLL settings and Windows versions are also written per program (`AppDefaults`), so they reach
-the game even when an already running Steam starts it. Environment variables, and the Compatible and Custom
-profiles, reach the game only if Steam is started for that launch, because a running Steam starts games with the
-environment it got; such a launch is marked so the app can ask to restart Steam first. Registry values that a
-launch set for a program and that a later launch no longer wants are removed again (`RegistryFile.removals`).
+the game even when an already running Steam starts it. The graphics backend and environment variables reach the game
+only through the Steam it was started with, because a running Steam starts games with what it got. G-Player remembers
+what it started each Steam with (`LauncherSettings`: the backend and the profile's, a fix's and the game's own
+variables) and marks a launch that needs other settings, so the app asks to restart Steam first. A profile makes no
+difference by itself: Compatible and Custom ask only when they bring another backend or other variables. Steam started
+some other way is not known, and is taken for a plain one. Registry values that a launch set for a program and that a
+later launch no longer wants are removed again (`RegistryFile.removals`).
 
 ## 5. Profiles, switches and a second opinion
 
@@ -154,6 +157,49 @@ and Microsoft's Visual C++ runtime in a space wins over Wine's builtin (some gam
 Its archive holds no third-party runtime libraries: G-Player copies FreeType, GnuTLS and SDL2 from Gcenx's Wine Staging
 download on the user's Mac. Game videos that go through Media Foundation need GStreamer, which this build doesn't use yet.
 
+## Automatic graphics
+
+Nobody has to know what DXVK or DXMT is. With the Recommended or Fast profile and no backend chosen under Advanced,
+graphics are automatic, and `CompatResolver.graphicsCandidates` lists the backends worth trying for the game, best first:
+the first is what Automatic has always picked, so a game that works changes nothing.
+
+| Game | Candidates, in order (only those the engine can run now) |
+|---|---|
+| 64-bit DirectX 10/11 | D3DMetal (not 32-bit), DXMT, DXVK |
+| DirectX 12 | D3DMetal; for Unity and Unreal, which start in DirectX 11 when asked, also DXMT and DXVK (not for an Unreal game built for DirectX 12 alone) |
+| 32-bit DirectX 10/11 | DXVK, DXMT |
+| DirectX 9 and older, OpenGL, Vulkan, unknown | today's choice only: G-Player swaps `d3d11`, `d3d10core` and `dxgi`, so no other backend would change anything |
+
+WineD3D is never one of the others: it can't give DirectX 10 or 11 on Apple's OpenGL 4.1.
+
+The game remembers what it learned (`Game.autoGraphics`: the backend that worked, the ones that failed, and the engine they
+were learned on; it is ignored on any other engine). `CompatResolver.graphicsChoice` takes the backend that worked while it
+is still a candidate, else the first candidate that hasn't failed, else today's choice. A game with one candidate learns
+nothing. Choosing graphics by hand, or another profile, clears it. G-Player learns only from launches it started itself
+on automatic graphics, in a space it may change, with graphics that are really what the game runs with (not a Steam that
+was already open with settings G-Player doesn't know).
+
+The rules for what G-Player does by itself are in `GraphicsRetry` (core, tested); the app carries them out:
+
+- **On a log's evidence, by itself.** A launch whose log (Wine's, the game's, or Unity's own Player.log, which counts only if
+  its first lines name the game's folder) shows the graphics failing or a crash, that ended within about 30 seconds,
+  with another backend to try, is played again with the next one, saying so in the sidebar. The note has Stop, and so does the game's button; either ends the
+  tries. The failed backend is written down once the new launch has started, not before. A launch that would have to ask
+  something (a blocker, an outside space, a Steam with other games open) isn't made, and the failure is shown instead.
+  A Steam game gets Steam closed first, without a question, only when nothing else in its space is open, starting or
+  being installed; other launches through that Steam are refused while it restarts.
+- **Never on a guess.** A game that closes within seconds, or never opens, may be a player quitting, a slow first start of
+  Steam or a program handing over to the real one; trouble in a log after a longer run may be a crash at exit or a
+  DirectX 12 failure line followed by a working DirectX 11 fallback. These are shown as the usual failure, with "Try
+  Other Graphics" when there is another backend: the click is the user's word, and then the same retry runs.
+- **When nothing is left**, the usual failure message shows, with the graphics that were tried.
+- **A game that runs for a minute** saves its backend as the one that worked.
+- **"Picture Missing? Try Other Graphics"** on a running game that G-Player started on automatic graphics, since a black or
+  frozen window can't be told from one that works. It asks first (the game closes, and Steam too for a Steam game), then
+  writes the backend down as not working, stops that game's programs, and plays it again with the next one.
+
+How it runs says which graphics are used and why, with "Start Over" to forget what was learned.
+
 ## Fixes in the engine itself
 
 Some problems sit in Wine, not in the game. G-Player keeps a small set of fixed files and puts them into the Wine
@@ -175,6 +221,14 @@ support it"). G-Player tells them apart by the shader files the game ships: name
 `GlobalShaderCache-PCD3D_SM6.bin` in the `.pak` index, with no `PCD3D_SM5` ones. Such a game gets no `-dx11` and a
 "Needs DirectX 12" note: it runs on Apple's D3DMetal, in a space on Apple's toolkit. An encrypted pak index names
 nothing, and then the game keeps the fallback.
+
+G-Player Wine's ntdll (CrossOver 26.3.0's, with Alexander Theißen's change, `tools/wine-patches/cx-nx-compat.patch`): Wine
+turned no-execute off for a whole 32-bit process as soon as one DLL in it lacked the `NX_COMPAT` flag, which old Microsoft
+DLLs (xinput1_3, d3dx9, XACT, OpenAL32: what the common Windows components add) do, and Metal on macOS 26 then failed
+every frame, so a 32-bit Unity game showed a black window. The fixed ntdll decides from the main program alone, as Windows
+does; details are in `tools/wine-patches/README.md`. `EngineFixes` puts it into G-Player Wine 26.3.0-1 only over the exact
+files that release ships. If a game needs the old behaviour, `WINE_DISABLE_NX_COMPAT=0` in the game's own environment
+variables (the `environment` of its library entry; the app has no field for it yet) gives it back for that game.
 
 32-bit DirectX 10/11 needs DXVK: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1, so the Compatible
 profile warns about it.

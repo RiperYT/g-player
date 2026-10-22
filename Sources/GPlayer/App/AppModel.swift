@@ -83,7 +83,7 @@ final class AppModel {
     var filesSpaceID: UUID?
     private(set) var running: [UUID: RunningProgram] = [:]
     /// Every launch until it ends, for the diagnosis afterwards.
-    private var launches: [UUID: LaunchRecord] = [:]
+    var launches: [UUID: LaunchRecord] = [:]
     /// What went wrong in a game's last launch, if anything.
     var diagnoses: [UUID: [Diagnosis]] = [:]
     /// A launch waiting for the user to confirm despite a blocker (anti-cheat, known broken).
@@ -426,6 +426,7 @@ final class AppModel {
     /// Works with Apple's toolkit turned off too, so a space that uses it can always be stopped.
     func stopAll(in space: Space) {
         guard let engine = engineManager?.engine(id: space.engineID) else { return }
+        for g in state.games(in: space) { autoLaunches[g.id] = nil }      // stopped on purpose: not a failure to learn from
         Task {
             await WineLauncher.killAll(engine: engine, space: space)
             await MainActor.run { for g in state.games(in: space) { running[g.id] = nil }; refreshPrograms() }
@@ -659,6 +660,7 @@ final class AppModel {
         g.executablePath = Game.storedPath(for: url, in: space)
         g.iconFile = nil
         g.analysis = nil                                    // another program: look at it again
+        g.autoGraphics = nil                                // and what was learned was about the old one
         update(g)
         if let oldIcon { deleteIcon(oldIcon) }
         iconAttempts.remove(g.id)
@@ -678,14 +680,28 @@ final class AppModel {
 
     /// The running Windows programs of each library entry, from the last look at the process table.
     private(set) var gamePrograms: [UUID: [WineProcess]] = [:]
-    /// The backend each space's Steam was started with by G-Player, while that Steam runs.
-    private var launcherBackends: [UUID: GraphicsBackend] = [:]
+    /// The settings each space's Steam was started with by G-Player, while that Steam runs.
+    private var launcherSettings: [UUID: KnownLauncher] = [:]
     /// Store games until their program shows up (Steam takes a while to start a game), so Play isn't offered twice.
     private(set) var startingUntil: [UUID: Date] = [:]
     /// Store games G-Player started in the last minutes, and when each was first seen running: a game Steam starts
     /// writes no log G-Player can read, so coming and going within seconds is how it tells "closed right away".
-    private var storeLaunches: [UUID: Date] = [:]
-    private var firstSeen: [UUID: Date] = [:]
+    var storeLaunches: [UUID: Date] = [:]
+    var firstSeen: [UUID: Date] = [:]
+    /// Launches whose graphics Automatic picked and G-Player can learn from, until the game is gone. See `AppModel+Graphics`.
+    var autoLaunches: [UUID: AutoLaunch] = [:]
+    /// Launches that failed without a log saying why, while the failure is shown: the user may ask for other graphics.
+    var failedAutoLaunches: [UUID: AutoLaunch] = [:]
+    /// Games G-Player is starting again with other graphics, and the work of that.
+    var retryTasks: [UUID: GraphicsRetryTask] = [:]
+    /// Games whose automatic retries the user stopped, until the user starts them again.
+    var stoppedRetries = Set<UUID>()
+    /// Spaces where a retry is restarting Steam, and the game it is for: other launches through that Steam wait.
+    var steamRestarts: [UUID: UUID] = [:]
+    /// Spaces whose Steam G-Player is quitting.
+    var closingSteam = Set<UUID>()
+    /// The "picture missing" request waiting for the user's yes.
+    var pendingOtherGraphics: OtherGraphicsRequest?
     /// Spaces whose launcher was just started: watched closely, as it may update itself and drop the helper wrapper.
     private var helperWatchUntil: [UUID: Date] = [:]
     /// When helpers running without the wrapper were first seen, per space.
@@ -697,6 +713,7 @@ final class AppModel {
         guard !lookingAtPrograms, !state.spaces.isEmpty else { return }
         lookingAtPrograms = true
         let entries = state.games.compactMap { g in space(g.spaceID).map { (game: g, space: $0) } }
+        let looked = Date()
         Task {
             let (all, found) = await Task.detached(priority: .utility) { () -> ([WineProcess], [UUID: [WineProcess]]) in
                 let all = WineProcesses.snapshot()
@@ -704,8 +721,10 @@ final class AppModel {
             }.value
             lookingAtPrograms = false
             if found != gamePrograms { gamePrograms = found }
-            for id in launcherBackends.keys where !(space(id).map { WineProcesses.isSteamRunning(in: $0, processes: all) } ?? false) {
-                launcherBackends[id] = nil
+            // A look made before a record, or that misses Steam once, doesn't erase it (`KnownLauncher.look`).
+            for (id, var known) in launcherSettings {
+                let steamRunning = space(id).map { WineProcesses.isSteamRunning(in: $0, processes: all) } ?? false
+                launcherSettings[id] = known.look(steamRunning: steamRunning, at: looked) ? known : nil
             }
             if d3dMetalWaiting, !state.spaces.contains(where: { $0.engineID == EngineCatalog.crossover.id
                                                               && WineProcesses.isRunning(in: $0, processes: all) }) {
@@ -713,6 +732,7 @@ final class AppModel {
                 syncD3DMetal()
             }
             noticeStoreGames(found)
+            noticeWorkingGames(found)
             guardHelperWrappers(all)
         }
     }
@@ -744,6 +764,7 @@ final class AppModel {
         for id in found.keys where firstSeen[id] == nil { firstSeen[id] = now }
         for (id, seen) in firstSeen where found[id] == nil {
             firstSeen[id] = nil
+            settleIfWorked(id, since: seen, now: now)
             if let launched = storeLaunches.removeValue(forKey: id), now.timeIntervalSince(launched) < 300,
                now.timeIntervalSince(seen) < 45 {
                 diagnoseStoreGame(id, seconds: now.timeIntervalSince(seen), opened: true, launched: launched)
@@ -761,9 +782,13 @@ final class AppModel {
     private func diagnoseStoreGame(_ id: UUID, seconds: Double, opened: Bool, launched: Date) {
         guard let game = game(id), let space = space(game.spaceID), let paths else { return }
         let profile = game.launchOptions.profile
+        let auto = launchToJudge(id)
+        let gameFolder = RunningGames.key(for: game, in: space).folder
         Task {
             let (installed, unityLog) = await Task.detached { () -> (Set<String>, String?) in
-                let log = LogDiagnosis.unityLog(in: space, since: launched.addingTimeInterval(-5)).map { LogDiagnosis.tail(of: $0) }
+                // Only this game's own Player.log: another Unity game in the space writes one too.
+                let log = LogDiagnosis.unityLog(in: space, gameFolder: gameFolder, since: launched.addingTimeInterval(-5))
+                    .map { LogDiagnosis.tail(of: $0) }
                 return (RuntimeInstaller(paths: paths).installed(in: space), log)
             }.value
             var found: [Diagnosis] = []
@@ -780,7 +805,7 @@ final class AppModel {
                 }
                 found = [d]
             }
-            report(found, for: id)
+            if let shown = learnFromEnd(found, ran: seconds, auto: auto, for: id) { report(shown, for: id) }
         }
     }
 
@@ -827,55 +852,98 @@ final class AppModel {
         }
     }
 
-    private func launch(_ game: Game, skipping skipped: Set<PlayCheck>) async {
+    /// - Parameter retry: set when this is another try with other graphics (`AppModel+Graphics`). An automatic one never
+    ///   asks or shows a dialog: a launch that would is not made.
+    /// - Returns: true when the program was started. False when the launch needs the user's answer first (a dialog is
+    ///   shown), was not made, or failed (the error is shown).
+    @discardableResult
+    func launch(_ game: Game, skipping skipped: Set<PlayCheck>, retry: GraphicsRetryLaunch? = nil) async -> Bool {
         guard let paths, let space = space(game.spaceID),
-              let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return }
+              let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        // A restart of Steam made for this launch is over when it is.
+        defer { if steamRestarts[space.id] == game.id { steamRestarts[space.id] = nil } }
+        if retry?.automatic != true { stoppedRetries.remove(game.id) }
         do {
             var current = self.game(game.id) ?? game
+            // Planned with what the retry will have learned; written to the game once the program has started.
+            if let learned = retry?.learned { current.autoGraphics = learned }
+            let startsSteam = space.presetID == AppPresets.steam.id && (current.kind == .app || current.storeKey != nil)
+            if startsSteam, closingSteam.contains(space.id) || (steamRestarts[space.id].map { $0 != game.id } ?? false) {
+                // A game started now would be handed to the Steam that is quitting.
+                errorMessage = "Steam is restarting. Try again in a moment."
+                return false
+            }
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
             let fixes = current.kind == .game ? self.fixes(for: current) : []
             let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine)
-            let startsSteam = space.presetID == AppPresets.steam.id && (current.kind == .app || current.storeKey != nil)
-            let steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
-            let launcherBackend = steamWasRunning ? launcherBackends[space.id] : nil
+            var steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
+            let launcher = steamWasRunning ? launcherSettings[space.id]?.settings : nil
             // Planning reads the game's folder (program names, .NET), so it runs off the main thread.
             let plan = try await Task.detached(priority: .userInitiated) {
                 try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
-                                       launcherBackend: launcherBackend)
+                                       launcher: launcher)
             }.value
             if let blockers = plan.compat?.blockers, !blockers.isEmpty, !skipped.contains(.blockers),
                !acknowledgedBlockers.contains(game.id) {
-                blockedLaunch = BlockedLaunch(gameID: game.id, notes: blockers, skipped: skipped)
-                return
+                if retry?.automatic != true { blockedLaunch = BlockedLaunch(gameID: game.id, notes: blockers, skipped: skipped) }
+                return false
             }
             if plan.needsFreshLauncher, !skipped.contains(.runningSteam), case .steam = current.source,
                await Self.isSteamRunning(in: space) {
-                steamRestart = SteamRestart(gameID: game.id, skipped: skipped)
-                return
+                if retry != nil, mayRestartSteamSilently(for: current, in: space) {
+                    // Another try with other graphics needs a Steam that starts with them: closed without asking, since
+                    // nothing else is open in it. Stopped (or Steam not quitting) means no launch.
+                    steamRestarts[space.id] = game.id
+                    guard !retryStopped(retry, game.id), (await quitSteam(in: space)).gone, !retryStopped(retry, game.id) else {
+                        if retry?.automatic != true, !retryStopped(retry, game.id) {
+                            errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press Play again."
+                        }
+                        return false
+                    }
+                    steamWasRunning = false
+                } else if retry?.automatic == true {
+                    return false
+                } else {
+                    steamRestart = SteamRestart(gameID: game.id, skipped: skipped)
+                    return false
+                }
             }
             if plan.writesToSpace(engine: engine.info.limited(to: ready)), space.origin == .external,
                self.space(space.id)?.allowsChanges == nil {
+                guard retry?.automatic != true else { return false }
                 // Asked once per space; either answer starts the game.
                 askToChange(space) { [weak self] _ in
                     if let g = self?.game(game.id) { self?.play(g, skipping: skipped) }
                 }
-                return
+                return false
             }
+            if retryStopped(retry, game.id) { return false }
             diagnoses[game.id] = nil
+            failedAutoLaunches[game.id] = nil
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
             let started = await enqueue(in: space.id, isInstall: false) {
-                await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths)
+                await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry)
             }.value
             let program = try started.get()
             // Steam started now runs with this launch's settings, and games it starts later inherit them.
-            if startsSteam && !steamWasRunning { launcherBackends[space.id] = engine.resolve(plan.backend) }
+            if startsSteam && !steamWasRunning { launcherSettings[space.id] = plan.launcherSettings.map { KnownLauncher(settings: $0) } }
             if launches[game.id]?.program.isRunning != true {
                 launches[game.id] = LaunchRecord(program: program, profile: current.launchOptions.profile,
                                                  diagnose: current.kind == .game && current.storeKey == nil)
             }
+            var isSteamGame = false
+            if case .steam = current.source { isSteamGame = true }
+            autoLaunches[game.id] = autoLaunch(for: current, in: space, backend: plan.backend, retried: retry != nil,
+                                              steam: GraphicsRetry.steamAtLaunch(
+                isSteamGame: isSteamGame, wasRunning: steamWasRunning, knownSettings: launcher,
+                needsFreshLauncher: plan.needsFreshLauncher))
             // The game may have changed while Wine was starting (hidden, new icon), so write to the current one.
-            if var latest = self.game(game.id) { latest.lastPlayedAt = Date(); update(latest) }
+            if var latest = self.game(game.id) {
+                latest.lastPlayedAt = Date()
+                if let learned = retry?.learned, latest.graphicsAreAutomatic { latest.autoGraphics = learned }
+                update(latest)
+            }
             // A launcher started again hands over to the open one and quits; the open one stays the running one.
             if case .executable = game.source, running[game.id]?.isRunning != true { running[game.id] = program }
             // A program that died before it was recorded: its exit came first and found nothing to clear.
@@ -888,15 +956,21 @@ final class AppModel {
                 firstSeen[game.id] = nil
             }
             Task { try? await Task.sleep(for: .seconds(5)); refreshPrograms() }
+            return true
+        } catch is CancellationError {
+            return false                                    // stopped while it waited: nothing was started
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     /// Components, registry, Steam's wrapper and DXVK (only where G-Player may change the space), then Wine.
     /// Runs from the space's queue.
     private func prepareAndStart(_ game: Game, plan: LaunchPlan, in space: Space, engine: Engine,
-                                 paths: LibraryPaths) async -> Result<RunningProgram, Error> {
+                                 paths: LibraryPaths, retry: GraphicsRetryLaunch?) async -> Result<RunningProgram, Error> {
+        // A try with other graphics that was stopped while it waited for the queue starts nothing.
+        if retryStopped(retry, game.id) { return .failure(CancellationError()) }
         // Read now: the answer may have changed while this waited.
         if self.space(space.id)?.mayChange == true {
             let wanted = plan.components.filter { !(skippedComponents[space.id]?.contains($0) ?? false) }
@@ -914,6 +988,8 @@ final class AppModel {
             }
             if !plan.registry.isEmpty { await applyRegistryNow(plan.registry, for: game.id, in: space, engine: engine) }
         }
+        // Installing components and writing settings can take minutes: a Stop since then still prevents the start.
+        if retryStopped(retry, game.id) { return .failure(CancellationError()) }
         let helpers = plan.chromiumHelpers, backend = plan.backend
         let allowed = self.space(space.id)?.mayChange == true
         let gameID = game.id, logName = game.title
@@ -949,12 +1025,15 @@ final class AppModel {
             let profile = record.profile
             let paths = self.paths
             let gameSpace = game(gameID).flatMap { self.space($0.spaceID) }
+            let auto = launchToJudge(gameID)
             Task.detached(priority: .utility) {
                 var installed: Set<String> = []
                 if let paths, let gameSpace { installed = RuntimeInstaller(paths: paths).installed(in: gameSpace) }
                 let found = LogDiagnosis.diagnose(log: LogDiagnosis.tail(of: log), exitStatus: status,
                                                   seconds: seconds, profile: profile, installed: installed)
-                await MainActor.run { self.report(found, for: gameID) }
+                await MainActor.run {
+                    if let shown = self.learnFromEnd(found, ran: seconds, auto: auto, for: gameID) { self.report(shown, for: gameID) }
+                }
             }
         }
         if launches[gameID]?.program.isRunning == false { launches[gameID] = nil }
@@ -967,6 +1046,11 @@ final class AppModel {
     /// space, as the games' own helpers (launchers, crash reporters) may have other names.
     func stop(_ game: Game) {
         guard let space = space(game.spaceID) else { return }
+        // Stop also ends the tries with other graphics. One that hasn't started the game yet is all there is to stop then.
+        let tryingNow = retryTasks[game.id] != nil
+        if isRetrying(game) { cancelRetry(game.id) }
+        autoLaunches[game.id] = nil                         // stopped on purpose: not a failure to learn from
+        if tryingNow && !isRunning(game) { return }
         running[game.id]?.terminate()
         startingUntil[game.id] = nil
         if case .steam = game.source {
@@ -985,7 +1069,7 @@ final class AppModel {
 
     /// Stops one game's programs and nothing else in the space. The programs are looked up again first, so a pid
     /// reused since the last look is never hit; whatever hasn't quit after five seconds is killed.
-    private func stopPrograms(of game: Game, in space: Space) {
+    func stopPrograms(of game: Game, in space: Space) {
         let key = RunningGames.key(for: game, in: space)
         Task.detached(priority: .userInitiated) {
             func current() -> [WineProcess] {

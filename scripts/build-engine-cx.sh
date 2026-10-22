@@ -10,7 +10,8 @@
 # `__wine_unix_call` export and its libd3dshared loader), and CrossOver's Wine has the Rosetta 2 far-jump fix.
 #
 # Every download is pinned by SHA-256. Wine is compiled here from CodeWeavers' published source with G-Player's
-# patches in tools/wine-patches/cx-*.patch (one so far: the Mac user's name instead of "crossover").
+# patches in tools/wine-patches/cx-*.patch (the Mac user's name instead of "crossover"; no-execute decided by the
+# program alone, see tools/wine-patches/README.md).
 # No Apple software is part of this build or of the engine: G-Player copies D3DMetal from the user's own Game
 # Porting Toolkit at run time (D3DMetalStore). Wine links against the x86_64 runtime libraries of Gcenx's Wine
 # Staging 11.18 (FreeType, GnuTLS, SDL2); they are not in the archive: G-Player copies them from Gcenx's own download

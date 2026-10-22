@@ -56,6 +56,14 @@ struct MainView: View {
         } message: { blocked in
             Text(blocked.notes.map { [$0.title, $0.detail].compactMap { $0 }.joined(separator: ". ") }.joined(separator: "\n\n"))
         }
+        .alert("Close the game and try other graphics?", isPresented: Binding(get: { model.pendingOtherGraphics != nil },
+                                                                              set: { if !$0 { model.pendingOtherGraphics = nil } }),
+               presenting: model.pendingOtherGraphics) { request in
+            Button("Close and Try Again") { model.tryOtherGraphics(request) }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text(model.otherGraphicsMessage(for: request))
+        }
         .alert("Move this space to G-Player Wine?", isPresented: Binding(get: { model.engineMove != nil },
                                                                         set: { if !$0 { model.engineMove = nil } }),
                presenting: model.engineMove) { move in

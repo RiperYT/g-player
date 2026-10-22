@@ -146,14 +146,14 @@ import Testing
         let ready: [GraphicsBackend] = [.dxvk, .d3dmetal, .dxmt, .wined3d]
         // Steam on D3DMetal by default there, like the game; on DXVK (started for a 32-bit game) it restarts.
         #expect(!(try LaunchPlanner.plan(for: g, in: s, ready: ready).needsFreshLauncher))
-        #expect(try LaunchPlanner.plan(for: g, in: s, ready: ready, launcherBackend: .dxvk).needsFreshLauncher)
-        #expect(!(try LaunchPlanner.plan(for: g, in: s, ready: ready, launcherBackend: .d3dmetal).needsFreshLauncher))
+        #expect(try LaunchPlanner.plan(for: g, in: s, ready: ready, launcher: LauncherSettings(backend: .dxvk)).needsFreshLauncher)
+        #expect(!(try LaunchPlanner.plan(for: g, in: s, ready: ready, launcher: LauncherSettings(backend: .d3dmetal)).needsFreshLauncher))
         let launcher = Game(title: "Steam", kind: .app, spaceID: s.id, executablePath: "drive_c/Program Files (x86)/Steam/steam.exe")
         #expect(try LaunchPlanner.plan(for: launcher, in: s, ready: ready).backend == .d3dmetal)
         #expect(try LaunchPlanner.plan(for: launcher, in: s, ready: [.dxvk, .dxmt, .wined3d]).backend == .auto)
         var old = g
         old.analysis = GameAnalysis(graphics: [.d3d11], architecture: .x86)
-        #expect(try LaunchPlanner.plan(for: old, in: s, ready: ready, launcherBackend: .d3dmetal).needsFreshLauncher)
+        #expect(try LaunchPlanner.plan(for: old, in: s, ready: ready, launcher: LauncherSettings(backend: .d3dmetal)).needsFreshLauncher)
         #expect(LaunchPlan(arguments: [], backend: .dxmt, tweaks: LaunchTweaks(), chromiumHelpers: [])
                     .writesToSpace(engine: EngineCatalog.crossover.limited(to: ready)))
     }

@@ -109,11 +109,15 @@ public enum CompatResolver {
         public var isStoreGame: Bool
         /// File names of the programs the game starts (`Game.exe`), for settings that Wine keeps per program.
         public var programNames: [String]
+        /// What was learned about the game's graphics. Counts only for automatic graphics (see `graphicsChoice`).
+        public var autoGraphics: AutoGraphics?
 
         public init(engine: EngineInfo, analysis: GameAnalysis?, fixes: [GameFix], options: LaunchOptions,
-                    userBackend: GraphicsBackend = .auto, isStoreGame: Bool = false, programNames: [String] = []) {
+                    userBackend: GraphicsBackend = .auto, isStoreGame: Bool = false, programNames: [String] = [],
+                    autoGraphics: AutoGraphics? = nil) {
             self.engine = engine; self.analysis = analysis; self.fixes = fixes; self.options = options
             self.userBackend = userBackend; self.isStoreGame = isStoreGame; self.programNames = programNames
+            self.autoGraphics = autoGraphics
         }
     }
 
@@ -161,21 +165,13 @@ public enum CompatResolver {
             plan.notes.append(CompatNote(.blocker, "Known not to work on a Mac", fix.notes))
         }
 
-        // Graphics backend per profile. Fast only gets here on an engine with D3DMetal.
-        // D3DMetal runs 64-bit programs only.
-        let supportsMetal = input.engine.backends.contains(.d3dmetal) && !(a.architecture == .x86 && !a.isDotNet)
+        // Graphics backend per profile. Fast only gets here on an engine with D3DMetal. Automatic (Recommended and Fast)
+        // is `graphicsChoice`: what G-Player has always picked, unless it learned something about this game.
+        let supportsMetal = supportsD3DMetal(input.engine, a)
         let newest = a.likelyDirect3D
-        // On G-Player Wine D3DMetal takes 64-bit DirectX 10–12 in Recommended too: Apple's path to Metal is the most
-        // direct one. DirectX 9, OpenGL and Vulkan stay on Wine's own (D3DMetal has no Direct3D 9).
-        let direct3D10to12 = newest.map { $0 >= .d3d10 && $0 <= .d3d12 } ?? false
-        let metalByDefault = input.engine.kind == .crossover && direct3D10to12
         switch profile {
         case .recommended, .fast:
-            if supportsMetal && (newest == .d3d12 || metalByDefault || (profile == .fast && (direct3D10to12 || input.engine.kind == .gptk))) {
-                plan.backend = .d3dmetal
-            } else {
-                plan.backend = input.engine.backends.first { $0 != .d3dmetal || supportsMetal } ?? .wined3d
-            }
+            plan.backend = graphicsChoice(input).backend
         case .compatible:
             plan.backend = .wined3d
             plan.environment["WINEESYNC"] = "0"

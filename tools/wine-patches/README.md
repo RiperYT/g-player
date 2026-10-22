@@ -32,3 +32,21 @@ the same profile folder, saves and Steam login (Wine's DPAPI is keyed on the use
 
 - Applied to the extracted source before `configure`; the exact patched tree is published with the engine's release
   (`g-player-engine-cx26.3.0-<revision>-wine-source.tar.xz`), with this patch and the script inside the engine too.
+
+## cx-nx-compat.patch
+
+For G-Player Wine. Alexander Theißen's change to Wine's ntdll (athei/wine commit
+`539aa62220ad23a390ce9f2a1c99ee5d3831907b`, LGPL like the rest of Wine), unchanged. Wine turned no-execute off for a
+whole 32-bit process as soon as any DLL in it lacked the `NX_COMPAT` flag, which makes every readable mapping
+executable. Old Microsoft DLLs don't have the flag (xinput1_3, d3dx9_24–31, the XACT and X3DAudio DLLs, OpenAL32 —
+the common Windows components put them into a space), and on macOS 26 Metal then fails every command buffer with
+"Insufficient Memory": a 32-bit Unity game showed a black window on DXVK and on DXMT. Windows decides from the main
+program only; the patch does the same, and under Rosetta keeps no-execute permanently on (a writable and executable
+page costs Rosetta a round trip on first touch). `WINE_DISABLE_NX_COMPAT=0` gives back the Windows behaviour.
+
+- Applied with the other `cx-*.patch` files by `scripts/build-engine-cx.sh`; G-Player Wine 26.3.0-1 was built
+  before it, so `EngineFixes.ntdllNoExec` puts the three rebuilt files into that engine (`ntdll.so` and the
+  x86_64 and i386 `ntdll.dll`), only over the exact files its release ships.
+- The bundled files are `Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll*`. Built in the engine's own build tree
+  (the same tree and toolchain give byte-identical unpatched files), so the source is the engine's published source
+  tarball plus this patch.

@@ -28,6 +28,9 @@ public enum LogDiagnosis {
         "initializeenginegraphics failed", "failed to initialize player", "unable to create direct3d device",
         "dx11 feature level 10.0 is required", "a d3d11-compatible gpu", "failed to create the d3d device",
         "could not create direct3d", "vkcreateinstance failed", "unable to initialize vulkan",
+        // Unity's Player.log, when its graphics don't start: "d3d11: failed to create device (80004005)" and the line
+        // after it (the first one is also written with "and context", which the entry above has).
+        "d3d11: failed to create device", "failed to initialize graphics",
     ]
     static let antiCheatFailures = ["easyanticheat", "easy anti-cheat", "battleye", "be_service", "vanguard"]
 
@@ -98,9 +101,11 @@ public enum LogDiagnosis {
         return results
     }
 
-    /// The newest Unity `Player.log` in the space written since `since`: a Unity game started by Steam writes its
-    /// log there (AppData/LocalLow/<company>/<product>), while its console output goes to Steam.
-    public static func unityLog(in space: Space, since: Date) -> URL? {
+    /// The newest Unity `Player.log` in the space written since `since` by the game in `gameFolder`: a Unity game started by
+    /// Steam writes its log there (AppData/LocalLow/<company>/<product>), while its console output goes to Steam. Other
+    /// Unity games write there too, so a log counts only if its first lines name the game's folder. Nil without a folder.
+    public static func unityLog(in space: Space, gameFolder: URL?, since: Date) -> URL? {
+        guard let gameFolder else { return nil }
         let fm = FileManager.default
         let users = space.driveC.appendingPathComponent("users", isDirectory: true)
         var best: (URL, Date)?
@@ -110,12 +115,30 @@ public enum LogDiagnosis {
                 for product in (try? fm.contentsOfDirectory(at: company, includingPropertiesForKeys: nil)) ?? [] {
                     let log = product.appendingPathComponent("Player.log")
                     guard let date = (try? fm.attributesOfItem(atPath: log.path))?[.modificationDate] as? Date,
-                          date >= since, date > (best?.1 ?? .distantPast) else { continue }
+                          date >= since, date > (best?.1 ?? .distantPast),
+                          unityLog(head(of: log), belongsToGameIn: gameFolder, in: space) else { continue }
                     best = (log, date)
                 }
             }
         }
         return best?.0
+    }
+
+    /// True when the start of a Unity `Player.log` names the folder of the game in `folder`: "Mono path[0] =
+    /// 'C:/…/Game/Game_Data/Managed'", or any other path under it (IL2CPP games have no Mono path, but name their data
+    /// folder just as well). A folder whose name only starts the same ("Game 2") doesn't count.
+    public static func unityLog(_ head: String, belongsToGameIn folder: URL, in space: Space) -> Bool {
+        func slashed(_ text: String) -> String { text.replacingOccurrences(of: "\\", with: "/").lowercased() }
+        var path = slashed(space.windowsPath(for: folder))
+        while path.hasSuffix("/") { path.removeLast() }
+        return !path.isEmpty && slashed(head).contains(path + "/")
+    }
+
+    /// The first 16 KB of a file: where Unity writes the paths it was started with.
+    static func head(of url: URL, bytes: Int = 16_384) -> String {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return "" }
+        defer { try? h.close() }
+        return String(decoding: (try? h.read(upToCount: bytes)) ?? Data(), as: UTF8.self)
     }
 
     /// A game that quit within seconds without a log that says why (a store game's output goes to its launcher, so
@@ -124,6 +147,17 @@ public enum LogDiagnosis {
         Diagnosis(kind: .closedRightAway, title: "The game closed right away",
                   detail: "It quit after \(max(1, Int(seconds))) seconds without saying why.",
                   remedy: nextStep(profile: profile, installed: installed))
+    }
+
+    /// `found` with the graphics that were tried said in the first diagnosis, for a launch that ran out of backends.
+    /// Nothing is added when only one was tried: there is nothing to tell then.
+    public static func mentioning(tried: [GraphicsBackend], in found: [Diagnosis]) -> [Diagnosis] {
+        guard tried.count > 1, let first = found.first else { return found }
+        var result = found
+        result[0] = Diagnosis(kind: first.kind, title: first.title,
+                              detail: first.detail + " Graphics tried: \(CompatResolver.list(tried.map(\.displayName))).",
+                              remedy: first.remedy)
+        return result
     }
 
     /// What to try when nothing says what went wrong: the common runtimes first (they are cheap and often the cause),

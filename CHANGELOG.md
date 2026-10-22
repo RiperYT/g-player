@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+- **Automatic graphics.** With the Recommended or Fast profile, a game that fails because its graphics don't start (or crash)
+  is played again with the next backend that makes sense for it (D3DMetal, DXMT, DXVK on G-Player Wine), and the game
+  remembers which one worked, per game and per engine. G-Player acts by itself only on evidence in a log. A game that
+  closes in seconds or never opens gets a "Try Other Graphics" button instead, and a game that runs but shows nothing has
+  "Picture Missing? Try Other Graphics", which asks first. How it runs says which graphics are used and why, with "Start
+  Over". Choosing graphics by hand, or another profile, forgets what was learned.
+- Steam restarts: G-Player knows which settings it started Steam with, so a game's profile no longer asks for a restart
+  each time, and closing Steam waits until the rest of its space has quit (a Steam started into the leftovers never got
+  going). A Steam that G-Player closes for another try with other graphics isn't asked about when nothing else is open
+  in it.
+- Unity games: "Failed to initialize graphics" and "d3d11: failed to create device" in a game's own Player.log count as
+  graphics that didn't start, and only the game's own log is read.
+- **32-bit games no longer show a black window on G-Player Wine.** Wine turned no-execute off for a whole 32-bit
+  program as soon as it loaded one old Microsoft DLL without the NX flag (xinput1_3, d3dx9, XACT, OpenAL — the common
+  Windows components install them), and Metal on macOS 26 then failed every frame with "Insufficient Memory", on DXVK
+  and DXMT alike. G-Player Wine's ntdll now decides from the program alone, as Windows does, and keeps no-execute on
+  under Rosetta (Alexander Theißen's Wine patch, `tools/wine-patches/cx-nx-compat.patch`). The three rebuilt files go
+  into the installed engine like the other engine fixes, only over the exact files its release ships. Checked with a
+  32-bit Unity 2022 game on DXMT and DXVK.
+
 ## [0.4.0] - 2026-10-22
 
 - **G-Player Wine: DirectX 12 with Steam open.** A new engine, Wine 11 that G-Player builds from CodeWeavers' CrossOver

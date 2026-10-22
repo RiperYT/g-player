@@ -33,7 +33,27 @@ public enum EngineFixes {
         fixedSHA256: "aef00b13bcc808adf15b85bef9ae67393d92be7ed5dfe41cad16fa809e4a4c5f",
         resource: "engine-fixes/libMoltenVK.dylib")
 
-    public static let all = [wow64cpu, moltenVK]
+    /// G-Player Wine's ntdll with tools/wine-patches/cx-nx-compat.patch. Wine made every readable page executable for
+    /// a whole 32-bit process as soon as any DLL in it lacked the NX flag (old Microsoft DLLs such as xinput1_3 or
+    /// d3dx9_30 don't have it), and Metal on macOS 26 then fails every frame with "Insufficient Memory": DXVK and DXMT
+    /// both showed a black window. The patched ntdll decides from the program alone, as Windows does, and keeps
+    /// no-execute on under Rosetta. Three files, built from the same source as the engine (scripts/build-engine-cx.sh).
+    public static let ntdllNoExec = [
+        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-unix/ntdll.so",
+                originalSHA256: "ff9596b1a376f634b04be5ee9aa2b74520f8742a9534fee8228ffdd5ddcab50b",
+                fixedSHA256: "e007f39cb2145966eb895002587c8732fb7be6ea90411d2b497edfeab7b36673",
+                resource: "engine-fixes/cx-ntdll.so"),
+        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-windows/ntdll.dll",
+                originalSHA256: "2d2b919c595771278823051ab6d8aaccc27381e93570bdaaf432241a8daaf072",
+                fixedSHA256: "f2a0de442f64d5c2ff188ce82a3f1d683d7f5a454b43958d5429200a7071cb7f",
+                resource: "engine-fixes/cx-ntdll-x86_64.dll"),
+        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/i386-windows/ntdll.dll",
+                originalSHA256: "100234e83cca543a356d148c84303c0bb430b9218b352185e9b209c5c9ecaa2d",
+                fixedSHA256: "c740fc89435451fed7d53a45a4769b56bada96189ea04d253125a057ec730aed",
+                resource: "engine-fixes/cx-ntdll-i386.dll"),
+    ]
+
+    public static let all = [wow64cpu, moltenVK] + ntdllNoExec
 
     public enum Outcome: Equatable, Sendable {
         /// The fixed file was put in place; the original is kept next to it as `<name>.gcenx`.

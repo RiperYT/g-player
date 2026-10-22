@@ -140,16 +140,18 @@ import Testing
         #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(windowMode: .windowed, retina: true)), in: s).needsFreshLauncher == false)
     }
 
-    @Test func environmentProfilesAndBackendsNeedAFreshSteam() throws {
+    @Test func environmentAndBackendsNeedAFreshSteam() throws {
         let tmp = TempFolder()
         let s = steamSpace(tmp)
-        for profile in [LaunchProfile.compatible, .custom] {
-            let plan = try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: profile)), in: s)
-            #expect(plan.needsFreshLauncher, "\(profile)")
-        }
-        // The profile's own environment.
+        // The profile's own environment and backend.
         let compatible = try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .compatible)), in: s)
+        #expect(compatible.needsFreshLauncher)
         #expect(compatible.backend == .wined3d && compatible.compat?.environment["WINEESYNC"] == "0")
+        // A profile is no difference by itself: Custom with nothing chosen starts Steam the way it already is.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .custom)), in: s).needsFreshLauncher == false)
+        var chosen = steamGame(s, LaunchOptions(profile: .custom))
+        chosen.graphics = .wined3d
+        #expect(try LaunchPlanner.plan(for: chosen, in: s).needsFreshLauncher)
         // A fix's environment, the frame rate overlay, and the game's own variables.
         let env = GameFix(id: "steam-1", steamAppIDs: ["1"], environment: ["DXVK_HUD": "0"], source: "t")
         #expect(try LaunchPlanner.plan(for: steamGame(s), in: s, fixes: [env]).needsFreshLauncher)
@@ -165,7 +167,71 @@ import Testing
         let plan = try LaunchPlanner.plan(for: steamGame(s), in: s)
         #expect(plan.backend == .d3dmetal)
         #expect(plan.needsFreshLauncher == false)
-        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .fast)), in: s).needsFreshLauncher == true)   // a profile other than Recommended
+        // Fast is D3DMetal here too: the same Steam serves it.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, LaunchOptions(profile: .fast)), in: s).needsFreshLauncher == false)
+    }
+
+    // MARK: What a running Steam was started with
+
+    /// A 32-bit Unity game, as the Compatible profile gets it: Wine's own renderer and no esync or msync.
+    private func compatibleUnityGame(_ s: Space) -> Game {
+        var g = steamGame(s, LaunchOptions(profile: .compatible))
+        g.analysis = GameAnalysis(engine: .unity, graphics: [.d3d11], architecture: .x86)
+        return g
+    }
+
+    @Test func aSteamStartedForTheGameDoesNotNeedRestartingForIt() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let g = compatibleUnityGame(s)
+        let plan = try LaunchPlanner.plan(for: g, in: s)
+        let settings = try #require(plan.launcherSettings)
+        #expect(plan.needsFreshLauncher)                                       // a Steam that is plain
+        #expect(settings.backend == .wined3d && settings.environment == ["WINEESYNC": "0", "WINEMSYNC": "0"])
+        // The Steam that G-Player started for this very game runs with exactly these settings.
+        #expect(try LaunchPlanner.plan(for: g, in: s, launcher: settings).needsFreshLauncher == false)
+        // A Steam that is not known (started outside G-Player) is taken for a plain one.
+        #expect(try LaunchPlanner.plan(for: g, in: s, launcher: nil).needsFreshLauncher)
+        // One setting off is enough to start it again.
+        #expect(try LaunchPlanner.plan(for: g, in: s, launcher: LauncherSettings(backend: .wined3d)).needsFreshLauncher)
+        #expect(try LaunchPlanner.plan(for: g, in: s, launcher: LauncherSettings(backend: .dxvk, environment: settings.environment)).needsFreshLauncher)
+    }
+
+    @Test func aRecommendedGameFitsAPlainSteam() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let plan = try LaunchPlanner.plan(for: steamGame(s), in: s)
+        #expect(plan.needsFreshLauncher == false)
+        #expect(plan.launcherSettings == LauncherSettings(backend: .dxvk))
+        let plain = LauncherSettings(backend: .dxvk, environment: [:])
+        #expect(try LaunchPlanner.plan(for: steamGame(s), in: s, launcher: plain).needsFreshLauncher == false)
+        // The game's own variables count, the preset's own do not.
+        let own = try LaunchPlanner.plan(for: steamGame(s, environment: ["WINEDEBUG": "+all"]), in: s)
+        #expect(own.launcherSettings?.environment == ["WINEDEBUG": "+all"])
+        #expect(own.tweaks.environment["WINEDEBUG"] == "+all")
+    }
+
+    @Test func steamItselfCarriesItsOwnSettings() throws {
+        let tmp = TempFolder()
+        let s = steamSpace(tmp)
+        let path = "drive_c/Program Files (x86)/Steam/steam.exe"
+        var steam = Game(title: "Steam", kind: .app, spaceID: s.id, executablePath: path, environment: ["WINEDEBUG": "+all"])
+        let withEnvironment = try LaunchPlanner.plan(for: steam, in: s)
+        #expect(withEnvironment.launcherSettings == LauncherSettings(backend: .dxvk, environment: ["WINEDEBUG": "+all"]))
+        // A game with the same variables needs nothing more from the Steam the user opened by hand.
+        #expect(try LaunchPlanner.plan(for: steamGame(s, environment: ["WINEDEBUG": "+all"]), in: s,
+                                       launcher: withEnvironment.launcherSettings).needsFreshLauncher == false)
+        steam.environment = [:]
+        #expect(try LaunchPlanner.plan(for: steam, in: s).launcherSettings == LauncherSettings(backend: .dxvk))
+        // On G-Player Wine it runs with D3DMetal, which is what a plain Steam is there.
+        var crossover = s
+        crossover.engineID = EngineCatalog.crossover.id
+        let ready: [GraphicsBackend] = [.dxvk, .d3dmetal, .dxmt, .wined3d]
+        #expect(try LaunchPlanner.plan(for: steam, in: crossover, ready: ready).launcherSettings == LauncherSettings(backend: .d3dmetal))
+        // Programs that aren't Steam start nothing.
+        let exe = tmp.file("Steam/drive_c/Games/g.exe")
+        let other = Game(title: "G", spaceID: s.id, executablePath: Game.storedPath(for: exe, in: s))
+        #expect(try LaunchPlanner.plan(for: other, in: s).launcherSettings == nil)
     }
 
     @Test func onlySteamGamesAskForAFreshLauncher() throws {

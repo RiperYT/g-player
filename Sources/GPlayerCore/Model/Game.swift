@@ -44,8 +44,17 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
     public var options: LaunchOptions?
     /// What the game is (engine, DirectX, anti-cheat), cached. Nil until analysed.
     public var analysis: GameAnalysis?
+    /// What G-Player learned about the game's graphics while Automatic chose them. Nil until it learned something, and
+    /// optional so older library files still load.
+    public var autoGraphics: AutoGraphics?
 
     public var launchOptions: LaunchOptions { options ?? .default }
+
+    /// The graphics are Automatic: the Recommended or Fast profile with no backend chosen by hand. Only then does
+    /// G-Player try other backends by itself and remember what worked. Compatible and Custom are the user's own choice.
+    public var graphicsAreAutomatic: Bool {
+        kind == .game && graphics == .auto && (launchOptions.profile == .recommended || launchOptions.profile == .fast)
+    }
 
     public init(id: UUID = UUID(), title: String, kind: Kind = .game, spaceID: UUID, source: Source = .executable,
                 executablePath: String? = nil, arguments: [String] = [], graphics: GraphicsBackend = .auto,
@@ -56,6 +65,31 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
         self.environment = environment; self.coverFile = coverFile; self.addedAt = addedAt
         self.lastPlayedAt = lastPlayedAt; self.secondsPlayed = secondsPlayed; self.hidden = hidden
         self.iconFile = iconFile
+    }
+
+    /// Reads every field as the synthesized decoder would, except `autoGraphics`: what G-Player learned is a convenience,
+    /// so a value there that can't be read means nothing was learned, and never costs the game. (A field added to `Game`
+    /// has to be read here too; `GameDecodingTests` fails when one is left out.)
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        spaceID = try c.decode(UUID.self, forKey: .spaceID)
+        source = try c.decode(Source.self, forKey: .source)
+        executablePath = try c.decodeIfPresent(String.self, forKey: .executablePath)
+        arguments = try c.decode([String].self, forKey: .arguments)
+        graphics = try c.decode(GraphicsBackend.self, forKey: .graphics)
+        environment = try c.decode([String: String].self, forKey: .environment)
+        coverFile = try c.decodeIfPresent(String.self, forKey: .coverFile)
+        addedAt = try c.decode(Date.self, forKey: .addedAt)
+        lastPlayedAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayedAt)
+        secondsPlayed = try c.decode(Double.self, forKey: .secondsPlayed)
+        hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden)
+        iconFile = try c.decodeIfPresent(String.self, forKey: .iconFile)
+        options = try c.decodeIfPresent(LaunchOptions.self, forKey: .options)
+        analysis = try c.decodeIfPresent(GameAnalysis.self, forKey: .analysis)
+        autoGraphics = c.value(.autoGraphics, default: nil)
     }
 
     public var isHidden: Bool { hidden == true }

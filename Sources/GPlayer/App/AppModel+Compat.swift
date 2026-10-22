@@ -13,6 +13,18 @@ enum ComponentInstall {
     case notAllowed
 }
 
+/// How closing Steam ended.
+enum SteamQuit {
+    /// Steam didn't quit in time.
+    case failed
+    /// Steam quit, and the rest of its space (its web helpers, Wine's services) with it.
+    case spaceEmpty
+    /// Steam quit, but something else keeps the space open.
+    case spaceBusy
+
+    var gone: Bool { self != .failed }
+}
+
 /// Checks a launch can skip because the user already answered them.
 enum PlayCheck: Hashable {
     /// "Play Anyway" despite anti-cheat or a known failure.
@@ -107,15 +119,19 @@ extension AppModel {
     /// are read from disk once per change of engines (`engineInfo`).
     func compatPreview(for game: Game) -> CompatPlan? {
         guard game.kind == .game, let space = space(game.spaceID) else { return nil }
-        let engine = engineInfo(for: space)
-        return CompatResolver.resolve(.init(engine: engine, analysis: game.analysis, fixes: fixes(for: game),
-                                            options: game.launchOptions, userBackend: game.graphics,
-                                            isStoreGame: game.storeKey != nil,
-                                            programNames: programName(of: game).map { [$0] } ?? []))
+        return CompatResolver.resolve(compatInput(for: game, in: space))
+    }
+
+    func compatInput(for game: Game, in space: Space) -> CompatResolver.Input {
+        .init(engine: engineInfo(for: space), analysis: game.analysis, fixes: fixes(for: game),
+              options: game.launchOptions, userBackend: game.graphics, isStoreGame: game.storeKey != nil,
+              programNames: programName(of: game).map { [$0] } ?? [], autoGraphics: game.autoGraphics)
     }
 
     func setOptions(_ options: LaunchOptions, for game: Game) {
         guard var g = self.game(game.id) else { return }
+        // Another profile is another way to run the game: what was learned under the old one no longer applies.
+        if options.profile != g.launchOptions.profile { g.autoGraphics = nil }
         g.options = options
         update(g)
         diagnoses[game.id] = nil
@@ -125,6 +141,7 @@ extension AppModel {
     func setGraphics(_ backend: GraphicsBackend, for game: Game) {
         guard var g = self.game(game.id) else { return }
         g.graphics = backend
+        g.autoGraphics = nil                                // a choice made by hand ends what Automatic learned
         if g.kind == .game { var o = g.launchOptions; o.profile = .custom; g.options = o }
         update(g)
     }
@@ -364,7 +381,7 @@ extension AppModel {
         Task {
             let quit = await quitSteam(in: space)
             preparing.remove(game.id)
-            guard quit else {
+            guard quit.gone else {
                 errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press the button again."
                 return
             }
@@ -372,9 +389,12 @@ extension AppModel {
         }
     }
 
-    /// Asks Steam to quit and waits for it, up to a minute. True when it is gone.
-    func quitSteam(in space: Space) async -> Bool {
-        guard let paths, let engine = engine(for: space) else { return false }
+    /// Asks Steam to quit and waits for it, up to a minute, then for the rest of the space to quit (20 seconds at most), and
+    /// says how far it got. While it quits, games that close with it aren't failures to learn from.
+    func quitSteam(in space: Space) async -> SteamQuit {
+        guard let paths, let engine = engine(for: space) else { return .failed }
+        closingSteam.insert(space.id)
+        defer { closingSteam.remove(space.id) }
         let activity = begin("Closing Steam", "Waiting for Steam to quit")
         defer { end(activity) }
         let steam = AppPresets.steam
@@ -384,10 +404,17 @@ extension AppModel {
                                     tweaks: LaunchTweaks(dllOverrides: steam.dllOverrides, environment: steam.environment),
                                     logsFolder: paths.logs, logName: "Steam shutdown")
         for _ in 0..<40 {
-            try? await Task.sleep(for: .seconds(1.5))
-            if !(await Self.isSteamRunning(in: space)) { return true }
+            // Stopped (a try with other graphics that was ended): Steam was asked to quit, but nothing waits for it.
+            do { try await Task.sleep(for: .seconds(1.5)) } catch { return .failed }
+            if !(await Self.isSteamRunning(in: space)) {
+                // Closed on purpose: nothing that closed with it is a failure to learn from.
+                for g in state.games(in: space) { autoLaunches[g.id] = nil }
+                // steam.exe is gone seconds before its web helpers (the window) and Wine's services are, and a Steam
+                // started into those never gets going: the old window stays up and ignores clicks.
+                return await WineLauncher.waitForAll(engine: engine, space: space, timeout: 20) ? .spaceEmpty : .spaceBusy
+            }
         }
-        return false
+        return .failed
     }
 
     // MARK: Steam
@@ -399,7 +426,7 @@ extension AppModel {
         Task {
             let quit = await quitSteam(in: space)
             preparing.remove(game.id)
-            guard quit else {
+            guard quit.gone else {
                 errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press Play again."
                 return
             }

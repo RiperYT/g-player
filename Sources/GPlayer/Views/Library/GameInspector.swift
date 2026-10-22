@@ -29,23 +29,11 @@ struct GameInspector: View {
                     .textFieldStyle(.plain).font(.title2.weight(.semibold))
                     .onSubmit { rename() }
 
-                Button { model.isRunning(game) ? model.stop(game) : model.play(game) } label: {
-                    if model.isPreparing(game) {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text(model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…")
-                        }
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label(model.isRunning(game) ? "Stop" : "Play",
-                              systemImage: model.isRunning(game) ? "stop.fill" : "play.fill")
-                            .frame(maxWidth: .infinity)
-                    }
+                PlayStopButton(game: game)
+
+                if model.isRunning(game), !model.isPreparing(game), let other = model.otherGraphics(for: game) {
+                    PictureMissingButton(game: game, other: other)
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large)
-                .disabled(model.isPreparing(game))
-                .help(model.isRunning(game) ? model.stopHelp(game) : "")
-                .keyboardShortcut(.return, modifiers: [])
 
                 facts(space)
 
@@ -188,5 +176,83 @@ struct GameInspector: View {
             .labelsHidden()
             Text(info.resolve(game.graphics).summary).font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Play, or Stop while the game runs. While G-Player is making another try with other graphics, Stop prevents it. Once
+/// the game has been started again and hasn't shown up, it can't be called back: the button says what it still can do,
+/// which is to stop the tries.
+private struct PlayStopButton: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+
+    var body: some View {
+        let retry = model.retryState(for: game)
+        let running = model.isRunning(game)
+        Button(action: act) { label(retry: retry, running: running) }
+            .buttonStyle(.borderedProminent).controlSize(.large)
+            .disabled(model.isPreparing(game) && (retry == .none || retry == .stopping))
+            .help(help(retry: retry, running: running))
+            .keyboardShortcut(.return, modifiers: [])
+    }
+
+    private func act() {
+        switch model.retryState(for: game) {
+        case .starting: model.stopTryingOtherGraphics(game)
+        case .trying: model.stop(game)
+        case .stopping: break
+        case .none: model.isRunning(game) ? model.stop(game) : model.play(game)
+        }
+    }
+
+    @ViewBuilder private func label(retry: RetryState, running: Bool) -> some View {
+        switch retry {
+        case .stopping:
+            busy("Stopping…")
+        case .starting:
+            Label("Stop Trying Other Graphics", systemImage: "stop.fill").frame(maxWidth: .infinity)
+        case .trying:
+            Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity)
+        case .none:
+            if model.isPreparing(game) {
+                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…")
+            } else {
+                Label(running ? "Stop" : "Play", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func busy(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(text)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func help(retry: RetryState, running: Bool) -> String {
+        switch retry {
+        case .trying: "Stops trying other graphics. Nothing more is started."
+        case .starting: "The game is already starting and opens in a moment. This only stops G-Player from trying other graphics for it."
+        case .stopping, .none: running ? model.stopHelp(game) : ""
+        }
+    }
+}
+
+/// A game that runs but shows nothing can't be told from one that works. This closes it, after asking, and plays it again
+/// with the next graphics Automatic has to offer.
+private struct PictureMissingButton: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+    let other: GraphicsBackend
+
+    var body: some View {
+        Button { model.askOtherGraphics(game) } label: {
+            Label("Picture Missing? Try Other Graphics", systemImage: "arrow.triangle.2.circlepath")
+                .lineLimit(1).minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered).controlSize(.regular)
+        .help("Closes the game and starts it again with \(other.displayName).")
     }
 }

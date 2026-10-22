@@ -12,10 +12,12 @@ struct LiveInstallTests {
     @Test func theInstalledEngineGetsItsFixes() throws {
         let paths = LibraryPaths(root: LibraryPaths.defaultRoot)
         let engine = try #require(EngineManager(paths: paths).engine(EngineCatalog.wineStaging))
+        // Fixes for another engine (G-Player Wine's) are not this one's.
+        let fixes = EngineFixes.all.filter { $0.engineID == engine.info.id }
         let outcomes = EngineFixes.apply(to: engine)
-        #expect(outcomes.count == EngineFixes.all.count)
+        #expect(!fixes.isEmpty && outcomes.count == fixes.count)
         #expect(outcomes.allSatisfy { $0 == .applied || $0 == .alreadyApplied }, "\(outcomes)")
-        for fix in EngineFixes.all {
+        for fix in fixes {
             let file = engine.wineRoot.appendingPathComponent(fix.path)
             #expect(try Files.sha256(of: file) == fix.fixedSHA256, "\(fix.path)")
             #expect(try Files.sha256(of: file.appendingPathExtension("gcenx")) == fix.originalSHA256, "\(fix.path)")
