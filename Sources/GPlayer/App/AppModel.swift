@@ -540,18 +540,24 @@ final class AppModel {
             self?.stoppedEngines.insert(info.id)
             self?.engineInstalls[info.id]?.cancel()
         }
+        let log = InstallLog(title: "\(updating ? "Update" : "Install") \(info.name) \(info.id)")
+        let logs = manager.paths.logs
         do {
             let engine = try await manager.install(info) { [weak self] fraction, message in
+                log.record(message)
                 Task { @MainActor in self?.progress(activity, fraction, message) }
             }
+            log.write(outcome: "Ready", to: logs)
             engineVersion += 1
             if info.kind == .crossover { await prepareD3DMetal() }     // D3DMetal only while Apple's toolkit is on
             if onboardingDone, !firstRunSpaces.isEmpty { resumeFirstRunSpaces() }     // spaces that waited for an engine
             migrateEngines()                                        // spaces on a retired engine can move now
             return engine
         } catch is CancellationError {
+            log.write(outcome: "Stopped", to: logs)
             return nil
         } catch {
+            log.write(outcome: InstallLog.failure(error), to: logs)
             engineFailures[info.id] = error
             if updating { engineUpdateFailures[info.id] = error.localizedDescription }       // no alert: a line says so
             else { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
