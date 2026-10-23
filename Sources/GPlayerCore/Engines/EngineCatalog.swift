@@ -32,6 +32,12 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// The room the unpacked engine takes on disk, measured and rounded up. Installing needs this plus the biggest
     /// archive (`EngineCatalog.diskBytes`).
     public var installedBytes: Int64 = 0
+    /// The id of the engine that took this one's place, once G-Player retired it. A retired engine still runs the spaces that
+    /// are on it and is looked after while it is installed, but is never offered, installed or used for a new space: spaces
+    /// move to its replacement (`EngineMigration`).
+    public var replacedBy: String? = nil
+
+    public var isRetired: Bool { replacedBy != nil }
 
     /// The name with its version, for rows and pickers: "Wine Staging 11.18", "G-Player Wine (Wine 11 from CrossOver 26.3)".
     public var displayName: String { basedOn.map { "\(name) (\($0))" } ?? "\(name) \(version)" }
@@ -44,7 +50,7 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     public func limited(to ready: [GraphicsBackend]) -> EngineInfo {
         EngineInfo(id: id, name: name, version: version, kind: kind, summary: summary,
                    backends: backends.filter(ready.contains), downloads: downloads, basedOn: basedOn,
-                   installedBytes: installedBytes)
+                   installedBytes: installedBytes, replacedBy: replacedBy)
     }
     public func resolve(_ backend: GraphicsBackend) -> GraphicsBackend {
         backend == .auto || !backends.contains(backend) ? defaultBackend : backend
@@ -91,8 +97,9 @@ public enum EngineCatalog {
     /// CrossOver's tree has the hooks Apple's D3DMetal needs, so with D3DMetal copied from the user's own Game Porting
     /// Toolkit (`D3DMetalStore`) DirectX 12 games run in the same space as Steam. Without D3DMetal it still runs
     /// DXVK, DXMT and WineD3D. "CrossOver" is CodeWeavers' trademark; it only says where the source comes from.
+    /// This is revision 2; revision 1 is `crossoverRevision1`.
     public static let crossover = EngineInfo(
-        id: "wine-cx-26.3.0-1",
+        id: "wine-cx-26.3.0-2",
         name: "G-Player Wine",
         version: "11.0",
         kind: .crossover,
@@ -102,8 +109,8 @@ public enum EngineCatalog {
         backends: [.dxvk, .d3dmetal, .dxmt, .wined3d],
         downloads: [
             PinnedDownload(
-                url: URL(string: "https://github.com/RiperYT/g-player/releases/download/engine-cx26.3.0-1/g-player-engine-cx26.3.0-1.tar.xz")!,
-                fileName: "g-player-engine-cx26.3.0-1.tar.xz",
+                url: URL(string: "https://github.com/RiperYT/g-player/releases/download/engine-cx26.3.0-2/g-player-engine-cx26.3.0-2.tar.xz")!,
+                fileName: "g-player-engine-cx26.3.0-2.tar.xz",
                 sha256: CrossOverEnginePin.sha256,
                 approximateBytes: CrossOverEnginePin.bytes),
             PinnedDownload(
@@ -120,6 +127,29 @@ public enum EngineCatalog {
         basedOn: "Wine 11 from CrossOver 26.3",
         installedBytes: 1_650_000_000)
 
+    /// G-Player Wine revision 1, retired. Spaces made while it was the engine keep running on it until `EngineMigration`
+    /// moves them to revision 2, which has the same Wine and the two fixes `EngineFixes` still puts into this one built in.
+    /// Its pins stay so that an installed copy is found, fixed and used, offline too; it is never installed again.
+    public static let crossoverRevision1 = EngineInfo(
+        id: "wine-cx-26.3.0-1",
+        name: crossover.name,
+        version: crossover.version,
+        kind: .crossover,
+        summary: crossover.summary,
+        backends: crossover.backends,
+        downloads: [
+            PinnedDownload(
+                url: URL(string: "https://github.com/RiperYT/g-player/releases/download/engine-cx26.3.0-1/g-player-engine-cx26.3.0-1.tar.xz")!,
+                fileName: "g-player-engine-cx26.3.0-1.tar.xz",
+                sha256: CrossOverEnginePin.revision1SHA256,
+                approximateBytes: CrossOverEnginePin.revision1Bytes),
+            crossover.downloads[1],                             // the same runtime libraries and DXVK
+            crossover.downloads[2],
+        ],
+        basedOn: crossover.basedOn,
+        installedBytes: 1_650_000_000,
+        replacedBy: crossover.id)
+
     /// Apple's Game Porting Toolkit (wine 7.7 + D3DMetal), only when the user installed it themselves.
     /// G-Player never ships, downloads or installs Apple's files: Apple's license allows the toolkit for
     /// developing, testing and evaluating games, and distribution only for non-commercial purposes.
@@ -133,10 +163,32 @@ public enum EngineCatalog {
         backends: [.d3dmetal, .wined3d],
         downloads: [])
 
-    /// Recommended first: pickers and Settings list engines in this order.
+    /// The engines G-Player offers, recommended first: pickers, Settings and the first run list them in this order.
     public static let all = [crossover, wineStaging, gptk]
-    /// Callers read a space whose engine id isn't here as `wineStaging` (`info(id) ?? .wineStaging`).
-    public static func info(_ id: String) -> EngineInfo? { all.first { $0.id == id } }
+    /// Engines G-Player no longer offers or installs, but runs and looks after while they are installed.
+    public static let retired = [crossoverRevision1]
+    /// Every engine G-Player can run: what to use to find an engine by its id, and to look after the installed ones.
+    public static let known = all + retired
+    /// Callers read a space whose engine id isn't here as `wineStaging` (`info(id) ?? .wineStaging`). Finds retired engines too.
+    public static func info(_ id: String) -> EngineInfo? { known.first { $0.id == id } }
+
+    /// The engine a retired one gives way to (following replacements that were replaced themselves), or nil for an engine
+    /// that isn't retired.
+    public static func replacement(of info: EngineInfo) -> EngineInfo? {
+        guard info.isRetired else { return nil }
+        var current = info
+        for _ in known {                                        // a chain is never longer than the catalogue
+            guard let next = current.replacedBy.flatMap(Self.info) else { return nil }
+            if !next.isRetired { return next }
+            current = next
+        }
+        return nil
+    }
+
+    /// True when `id` is `info` or a retired revision of it: the same Wine, so what a space has learned there still holds.
+    public static func isRevision(_ id: String, of info: EngineInfo) -> Bool {
+        id == info.id || Self.info(id).flatMap(replacement(of:))?.id == info.id
+    }
 
     /// The engine G-Player recommends for new spaces, and what a bottle found on the Mac gets. G-Player Wine runs
     /// Steam too, has the fixes for 32-bit games and audio, and takes D3DMetal when the user adds it. Spaces made
@@ -192,10 +244,15 @@ public enum EngineCatalog {
     public static let gptkInfoURL = URL(string: "https://developer.apple.com/games/game-porting-toolkit/")!
 }
 
-/// The CrossOver engine archive G-Player publishes (scripts/build-engine-cx.sh, attached to the release
-/// engine-cx26.3.0-1 together with CodeWeavers' source tarball it was built from).
+/// The CrossOver engine archives G-Player publishes (scripts/build-engine-cx.sh, attached to the release
+/// engine-cx26.3.0-<revision> together with CodeWeavers' source tarball it was built from).
 enum CrossOverEnginePin {
-    static let sha256 = "c10b3dff14429944f99ce660ff294c11d58dff3c39df9a0b91bdfd114e223686"
-    static let bytes: Int64 = 283981528
-}
+    // Revision 2 (engine-cx26.3.0-2).
+    // TODO(pin): placeholders until the archive is built and published; replace both with the real SHA-256 and size.
+    static let sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+    static let bytes: Int64 = 285_000_000
 
+    // Revision 1 (engine-cx26.3.0-1), retired.
+    static let revision1SHA256 = "c10b3dff14429944f99ce660ff294c11d58dff3c39df9a0b91bdfd114e223686"
+    static let revision1Bytes: Int64 = 283981528
+}

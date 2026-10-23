@@ -370,11 +370,12 @@ final class AppModel {
         return notes.isEmpty ? "" : "  · " + notes.joined(separator: ", ")
     }
 
-    /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away).
+    /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away). Retired
+    /// engines too: spaces still run on them.
     private func applyEngineFixes() {
         guard let manager = engineManager else { return }
         Task.detached(priority: .utility) {
-            for info in EngineCatalog.all { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+            for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
         }
     }
 
@@ -412,8 +413,8 @@ final class AppModel {
 
     var isEngineBusy: Bool { EngineCatalog.all.contains { download(of: $0) != nil } }
 
-    /// The engines installed on this Mac.
-    var installedEngines: [EngineInfo] { EngineCatalog.all.filter { isInstalled($0) } }
+    /// The engines installed on this Mac, retired ones included: they still run the spaces that are on them.
+    var installedEngines: [EngineInfo] { EngineCatalog.known.filter { isInstalled($0) } }
 
     /// Downloads an engine if it is missing. Returns nil when that failed (the error is shown). Asked again while
     /// the engine downloads (onboarding and a new space can ask at once), it waits for that download: two would
@@ -1067,7 +1068,7 @@ final class AppModel {
                 let steamRunning = space(id).map { WineProcesses.isSteamRunning(in: $0, processes: all) } ?? false
                 launcherSettings[id] = known.look(steamRunning: steamRunning, at: looked) ? known : nil
             }
-            if d3dMetalWaiting, !state.spaces.contains(where: { $0.engineID == EngineCatalog.crossover.id
+            if d3dMetalWaiting, !state.spaces.contains(where: { EngineCatalog.info($0.engineID)?.kind == .crossover
                                                               && WineProcesses.isRunning(in: $0, processes: all) }) {
                 d3dMetalWaiting = false
                 syncD3DMetal()

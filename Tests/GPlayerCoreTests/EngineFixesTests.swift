@@ -103,6 +103,21 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("lib/x.dll.gplayer-new").path))
     }
 
+    @Test func revisionTwoHasTheWineFixesBuiltInSoOnlyRevisionOneGetsThem() {
+        func fixes(for engine: EngineInfo) -> [String] { EngineFixes.all.filter { $0.engineID == engine.id }.map(\.path) }
+        // The ntdll and CoreAudio patches are built into G-Player Wine 26.3.0-2: their fixed files are for -1 only.
+        #expect(fixes(for: EngineCatalog.crossoverRevision1).sorted() == [
+            "lib/wine/i386-windows/ntdll.dll", "lib/wine/x86_64-unix/ntdll.so", "lib/wine/x86_64-unix/winecoreaudio.so",
+            "lib/wine/x86_64-windows/ntdll.dll"])
+        #expect(fixes(for: EngineCatalog.crossover).isEmpty)
+        #expect(EngineFixes.ntdllNoExec.allSatisfy { $0.engineID == "wine-cx-26.3.0-1" } && EngineFixes.coreAudioVolume.engineID == "wine-cx-26.3.0-1")
+        // Wine Staging keeps its two.
+        #expect(fixes(for: EngineCatalog.wineStaging).sorted() == ["lib/libMoltenVK.dylib", "lib/wine/x86_64-windows/wow64cpu.dll"])
+        #expect(fixes(for: EngineCatalog.gptk).isEmpty)
+        // Every fix belongs to an engine G-Player knows, retired ones included.
+        #expect(EngineFixes.all.allSatisfy { EngineCatalog.info($0.engineID) != nil })
+    }
+
     @Test(arguments: EngineFixes.all.map(\.resource))
     func theBundledFilesMatchTheirPins(resource: String) throws {
         let fix = try #require(EngineFixes.all.first { $0.resource == resource })

@@ -10,29 +10,36 @@ import Testing
 
     // MARK: Sizes
 
+    // What the screens say, worked out here from the pinned sizes: G-Player Wine's archive is pinned when it is published,
+    // and the figures follow it. G-Player Wine reuses Wine Staging's libraries, so it doesn't download its own.
+    private func megabytes(_ downloads: [PinnedDownload]) -> Int { EngineCatalog.megabytes(downloads.reduce(0) { $0 + $1.approximateBytes }) }
+    private var ownDownloads: [PinnedDownload] { gplayerWine.downloads.filter { $0.role != .runtimeLibraries } }
+    private var gplayerWineMB: Int { megabytes(ownDownloads) }
+    private var bothMB: Int { megabytes(staging.downloads + ownDownloads) }
+
     @Test func sizesAreRoundedNotCutOff() {
         #expect(EngineCatalog.megabytes(484_886_864) == 485)
         #expect(EngineCatalog.megabytes(287_881_528) == 288)
         #expect(EngineCatalog.megabytes(499_999) == 0)
         #expect(EngineCatalog.megabytes(500_000) == 1)
         // Both engines of the first run: the figure the screens say.
-        #expect(EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: [])) == 485)
-        #expect(EngineCatalog.megabytes(gplayerWine.downloadBytes(wineStagingInstalled: true)) == 288)
+        #expect(EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: [])) == bothMB)
+        #expect(EngineCatalog.megabytes(gplayerWine.downloadBytes(wineStagingInstalled: true)) == gplayerWineMB)
         #expect(EngineCatalog.megabytes(staging.downloadBytes(wineStagingInstalled: false)) == 197)
     }
 
     @Test func theEngineStepSaysTheDownloadAndTheDisk() {
         #expect(FirstRunSetup.engineSizes(installed: []) ==
-                "The download is about 485 MB, and the engines need about 2.7 GB on this disk. G-Player checks every file before it uses it.")
+                "The download is about \(bothMB) MB, and the engines need about 2.7 GB on this disk. G-Player checks every file before it uses it.")
         // Once Wine Staging is in, it says what is left, so the figure never looks like the whole.
-        #expect(FirstRunSetup.engineSizes(installed: [staging])?.hasPrefix("288 MB is still to download") == true)
+        #expect(FirstRunSetup.engineSizes(installed: [staging])?.hasPrefix("\(gplayerWineMB) MB is still to download") == true)
         #expect(FirstRunSetup.engineSizes(installed: [staging, gplayerWine]) == nil)
         #expect(FirstRunSetup.diskBytes == EngineCatalog.firstRunDiskBytes(installed: []))
     }
 
     @Test func continueSaysItStartsTheDownloads() {
-        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about 485 MB and needs about 2.7 GB on this disk.")
-        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads 288 MB more and needs about 1.9 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about \(bothMB) MB and needs about 2.7 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads \(gplayerWineMB) MB more and needs about 1.9 GB on this disk.")
         #expect(FirstRunSetup.continueNote(installed: [staging, gplayerWine]) == nil)
     }
 
@@ -43,9 +50,9 @@ import Testing
             FirstRunSetup.libraryStatus(installed: installed, downloading: downloading, pendingSpaces: pending)
         }
         #expect(status([], downloading: true, ["main", "steam"])
-                == "G-Player is downloading two versions of Wine, about 485 MB in all. Then it sets up Main and Steam.")
-        #expect(status([], downloading: true, []) == "G-Player is downloading two versions of Wine, about 485 MB in all.")
-        #expect(status([staging], downloading: true, ["main"]) == "G-Player is downloading G-Player Wine, about 288 MB. Then it sets up Main.")
+                == "G-Player is downloading two versions of Wine, about \(bothMB) MB in all. Then it sets up Main and Steam.")
+        #expect(status([], downloading: true, []) == "G-Player is downloading two versions of Wine, about \(bothMB) MB in all.")
+        #expect(status([staging], downloading: true, ["main"]) == "G-Player is downloading G-Player Wine, about \(gplayerWineMB) MB. Then it sets up Main.")
         #expect(status([gplayerWine], downloading: true, [])?.hasPrefix("G-Player is downloading Wine Staging, about 197 MB") == true)
         #expect(status([staging, gplayerWine], downloading: true, ["steam"]) == "G-Player is finishing the engines. Then it sets up Steam.")
         // Engines are in: the spaces are made.
@@ -69,6 +76,9 @@ import Testing
         #expect(!FirstRunSetup.upgradeNoteApplies(spaces: [space(staging)], seen: true))
         #expect(!FirstRunSetup.upgradeNoteApplies(spaces: [space(gplayerWine)], seen: false))
         #expect(!FirstRunSetup.upgradeNoteApplies(spaces: [], seen: false))
+        // A space on the earlier revision of G-Player Wine already runs G-Player Wine: nothing is new to it.
+        #expect(!FirstRunSetup.upgradeNoteApplies(spaces: [space(EngineCatalog.crossoverRevision1), space(gplayerWine)], seen: false))
+        #expect(FirstRunSetup.upgradeNoteApplies(spaces: [space(EngineCatalog.crossoverRevision1), space(staging)], seen: false))
     }
 
     // MARK: Bottles
@@ -105,7 +115,7 @@ import Testing
         #expect(EngineSwitch.title(space: "Main", to: gplayerWine) == "Switch “Main” to G-Player Wine?")
         let toGPlayerWine = EngineSwitch.message(space: "Main", from: staging, to: gplayerWine, downloadBytes: 287_881_528)
         #expect(toGPlayerWine.hasPrefix("Every program in “Main” will run on G-Player Wine (Wine 11 from CrossOver 26.3) instead of Wine Staging 11.18."))
-        #expect(toGPlayerWine.contains("G-Player Wine downloads first, about 288 MB."))
+        #expect(toGPlayerWine.contains("G-Player Wine downloads first, about 288 MB."))      // from the bytes the question is given
         #expect(toGPlayerWine.contains("older Wine than the space has now"))
         let toStaging = EngineSwitch.message(space: "Main", from: gplayerWine, to: staging, downloadBytes: 0)
         #expect(!toStaging.contains("downloads first"))

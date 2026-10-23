@@ -41,33 +41,35 @@ public enum EngineFixes {
         resource: "engine-fixes/libMoltenVK.dylib",
         alsoFixed: ["aef00b13bcc808adf15b85bef9ae67393d92be7ed5dfe41cad16fa809e4a4c5f"])
 
-    /// G-Player Wine's ntdll with tools/wine-patches/cx-nx-compat.patch. Wine made every readable page executable for
-    /// a whole 32-bit process as soon as any DLL in it lacked the NX flag (old Microsoft DLLs such as xinput1_3 or
-    /// d3dx9_30 don't have it), and Metal on macOS 26 then fails every frame with "Insufficient Memory": DXVK and DXMT
-    /// both showed a black window. The patched ntdll decides from the program alone, as Windows does, and keeps
-    /// no-execute on under Rosetta. Three files, built from the same source as the engine (scripts/build-engine-cx.sh).
+    /// G-Player Wine 26.3.0-1's ntdll with tools/wine-patches/cx-nx-compat.patch; revision 2 is built with it. Wine made
+    /// every readable page executable for a whole 32-bit process as soon as any DLL in it lacked the NX flag (old
+    /// Microsoft DLLs such as xinput1_3 or d3dx9_30 don't have it), and Metal on macOS 26 then fails every frame with
+    /// "Insufficient Memory": DXVK and DXMT both showed a black window. The patched ntdll decides from the program alone,
+    /// as Windows does, and keeps no-execute on under Rosetta. Three files, built from the same source as the engine
+    /// (scripts/build-engine-cx.sh).
     public static let ntdllNoExec = [
-        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-unix/ntdll.so",
+        FileFix(engineID: EngineCatalog.crossoverRevision1.id, path: "lib/wine/x86_64-unix/ntdll.so",
                 originalSHA256: "ff9596b1a376f634b04be5ee9aa2b74520f8742a9534fee8228ffdd5ddcab50b",
                 fixedSHA256: "b502e8d6a37a568965e2d13dd7028fb17167f7c6db9298d7e3c917e487a0743f",
                 resource: "engine-fixes/cx-ntdll.so",
                 alsoFixed: ["e007f39cb2145966eb895002587c8732fb7be6ea90411d2b497edfeab7b36673"]),
-        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-windows/ntdll.dll",
+        FileFix(engineID: EngineCatalog.crossoverRevision1.id, path: "lib/wine/x86_64-windows/ntdll.dll",
                 originalSHA256: "2d2b919c595771278823051ab6d8aaccc27381e93570bdaaf432241a8daaf072",
                 fixedSHA256: "f2a0de442f64d5c2ff188ce82a3f1d683d7f5a454b43958d5429200a7071cb7f",
                 resource: "engine-fixes/cx-ntdll-x86_64.dll"),
-        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/i386-windows/ntdll.dll",
+        FileFix(engineID: EngineCatalog.crossoverRevision1.id, path: "lib/wine/i386-windows/ntdll.dll",
                 originalSHA256: "100234e83cca543a356d148c84303c0bb430b9218b352185e9b209c5c9ecaa2d",
                 fixedSHA256: "c740fc89435451fed7d53a45a4769b56bada96189ea04d253125a057ec730aed",
                 resource: "engine-fixes/cx-ntdll-i386.dll"),
     ]
 
-    /// G-Player Wine's CoreAudio driver with tools/wine-patches/cx-coreaudio-stream-volume.patch. Wine wrote a game's own
-    /// volume into the Mac's output device: on AirPods and the MacBook speakers that failed, so a game's volume setting
-    /// did nothing, and on outputs where it worked it changed the Mac's volume. The patched driver scales the game's
-    /// samples instead, as Wine's ALSA driver does, and leaves the Mac's volume to the user.
+    /// G-Player Wine 26.3.0-1's CoreAudio driver with tools/wine-patches/cx-coreaudio-stream-volume.patch; revision 2 is
+    /// built with it. Wine wrote a game's own volume into the Mac's output device: on AirPods and the MacBook speakers
+    /// that failed, so a game's volume setting did nothing, and on outputs where it worked it changed the Mac's volume.
+    /// The patched driver scales the game's samples instead, as Wine's ALSA driver does, and leaves the Mac's volume to
+    /// the user.
     public static let coreAudioVolume = FileFix(
-        engineID: EngineCatalog.crossover.id,
+        engineID: EngineCatalog.crossoverRevision1.id,
         path: "lib/wine/x86_64-unix/winecoreaudio.so",
         originalSHA256: "b2e5cd42b7b1300f01818212a4f16a5ec94118a7ddd5352a01efe729a1548132",
         fixedSHA256: "1c08e468be49c6019d270fd25887b1474ed8272e9052352bf13946786905cdba",

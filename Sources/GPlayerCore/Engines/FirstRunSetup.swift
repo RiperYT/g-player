@@ -76,9 +76,10 @@ public enum FirstRunSetup {
     }
 
     /// The one-time note for someone who updated: G-Player Wine is new, and spaces they have keep what they run on. It
-    /// applies while some space runs on another engine and the note hasn't been closed.
+    /// applies while some space runs on another engine and the note hasn't been closed. A space on an earlier revision of
+    /// G-Player Wine already runs G-Player Wine.
     public static func upgradeNoteApplies(spaces: [Space], seen: Bool) -> Bool {
-        !seen && spaces.contains { $0.engineID != EngineCatalog.defaultForNewSpaces.id }
+        !seen && spaces.contains { !EngineCatalog.isRevision($0.engineID, of: EngineCatalog.defaultForNewSpaces) }
     }
 
     /// What to know before bringing CrossOver or Whisky bottles over: G-Player Wine changes a bottle's files the first

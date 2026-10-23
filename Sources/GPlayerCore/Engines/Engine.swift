@@ -215,10 +215,10 @@ public struct EngineManager: Sendable {
     public func cleanLeftovers(now: Date = Date(), partialLifetime: TimeInterval = 7 * 24 * 3600) {
         let fm = FileManager.default
         for name in (try? fm.contentsOfDirectory(atPath: paths.engines.path)) ?? [] where name.hasPrefix(".") {
-            let isStaging = EngineCatalog.all.contains { name.hasPrefix(".\($0.id)-") && name.count == $0.id.count + 10 }
+            let isStaging = EngineCatalog.known.contains { name.hasPrefix(".\($0.id)-") && name.count == $0.id.count + 10 }
             if isStaging { try? fm.removeItem(at: paths.engines.appendingPathComponent(name)) }
         }
-        for info in EngineCatalog.all where !info.downloads.isEmpty {
+        for info in EngineCatalog.known where !info.downloads.isEmpty {
             let downloads = downloadFolder(for: info)
             guard fm.fileExists(atPath: downloads.path) else { continue }
             if isInstalled(info) { try? fm.removeItem(at: downloads); continue }

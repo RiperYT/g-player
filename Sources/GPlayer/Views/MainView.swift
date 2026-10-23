@@ -44,7 +44,7 @@ struct MainView: View {
                let space = model.game(blocked.gameID).flatMap({ model.space($0.spaceID) }) {
                 if !model.d3dMetalAvailable {
                     Button("Set Up Apple's D3DMetal…") { SettingsTab.engines.show(.toolkit); openSettings() }
-                } else if space.engineID != EngineCatalog.crossover.id {
+                } else if !EngineCatalog.isRevision(space.engineID, of: EngineCatalog.crossover) {
                     Button("Move Space to G-Player Wine…") { model.offerGPlayerWine(for: blocked.gameID) }
                 }
             }
