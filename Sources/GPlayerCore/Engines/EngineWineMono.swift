@@ -30,6 +30,7 @@ extension EngineManager {
             throw ShellError.failed("G-Player doesn't know a Wine Mono for \(engine.info.name).")
         }
         guard !WineMono.isUnpacked(package, in: engine.wineRoot) else { return }
+        try requireInstalled(engine)
         if let problem = wineMonoDiskProblem(for: engine.info) { throw ShellError.failed(problem) }
         try paths.createFolders()
         let item = package.download
@@ -50,11 +51,25 @@ extension EngineManager {
         let unpacked = staging.appendingPathComponent(package.folderName, isDirectory: true)
         guard WineMono.isWhole(unpacked) else { throw ShellError.failed("\(item.fileName) doesn't hold \(package.folderName).") }
         try Task.checkCancellation()
+        // The engine may have been removed while this downloaded: its folders are not made again for a Wine Mono nothing runs on.
+        try requireInstalled(engine)
         let target = WineMono.folder(of: package, in: engine.wineRoot)
         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: unpacked, to: target)
+        // Last: a move that was cut short has no marker, and is fetched again.
+        do { try WineMono.writeMarker(for: package, in: target) } catch {
+            try? FileManager.default.removeItem(at: target)
+            throw error
+        }
         try? FileManager.default.removeItem(at: wineMonoDownloadFolder(for: engine.info))
         progress(1, "Ready")
+    }
+
+    /// The engine is still installed (its Wine is there to run).
+    private func requireInstalled(_ engine: Engine) throws {
+        guard Self.wineBinary(in: engine.wineRoot) != nil else {
+            throw ShellError.failed("\(engine.info.name) was removed while Wine Mono was being added to it.")
+        }
     }
 }

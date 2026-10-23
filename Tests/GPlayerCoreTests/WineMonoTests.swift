@@ -71,6 +71,25 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         #expect(WineMono.neededBytes(mono, alreadyDownloaded: 50_000_000) == mono.installedBytes)
     }
 
+    @Test func theWinePathMsCoreeBuildsForWineMonoMustFitIn260Characters() {
+        // "Z:" + the folder + "\bin\libmono-2.0-x86_64.dll" (27), in a buffer of 260 with its terminator.
+        let usual = URL(fileURLWithPath: "/Users/someone/Games/G-Player/Engines/wine-cx-26.3.0-2/wine")
+        #expect(WineMono.loadPathLength(of: mono, in: usual) == 2 + usual.path.count + "/share/wine/mono/wine-mono-10.4.1".count + 27)
+        #expect(WineMono.pathFits(mono, in: usual))
+        // The longest library folder `PrefixPath` accepts (114 characters) leaves 54 to spare.
+        let longest = URL(fileURLWithPath: "/" + String(repeating: "a", count: PrefixPath.maxLibraryRootLength - 1)
+                          + "/Engines/wine-cx-26.3.0-2/wine")
+        #expect(WineMono.loadPathLength(of: mono, in: longest) == 206 && WineMono.pathFits(mono, in: longest))
+        // A folder an older G-Player allowed can be longer, and then the buffer would overflow: 167 characters is the last that fits.
+        func atRoot(_ n: Int) -> URL {
+            URL(fileURLWithPath: "/" + String(repeating: "a", count: n - 1) + "/Engines/wine-cx-26.3.0-2/wine")
+        }
+        #expect(WineMono.pathFits(mono, in: atRoot(167)) && !WineMono.pathFits(mono, in: atRoot(168)))
+        // /var, /tmp and /etc count as /private/…, which is the path Wine gets.
+        let tmp = URL(fileURLWithPath: "/tmp/e/wine")
+        #expect(WineMono.loadPathLength(of: mono, in: tmp) == 2 + "/private/tmp/e/wine/share/wine/mono/wine-mono-10.4.1".count + 27)
+    }
+
     @Test func whatALaunchStillHasToDoForWineMono() {
         // Nothing asks for it: nothing to do.
         #expect(WineMono.plan(wanted: nil, inEngine: false, registered: false) == nil)
@@ -343,6 +362,7 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         let folder = WineMono.folder(of: package, in: engine.wineRoot)
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("support"), withIntermediateDirectories: true)
         try Data("mine".utf8).write(to: WineMono.supportInstaller(of: package, in: engine.wineRoot))
+        try WineMono.writeMarker(for: package, in: folder)
         try await manager.installWineMono(into: engine) { _, _ in }
         #expect(try String(contentsOf: WineMono.supportInstaller(of: package, in: engine.wineRoot), encoding: .utf8) == "mine")
         #expect(FileManager.default.fileExists(atPath: manager.wineMonoDownloadFile(package, of: engine.info).path))   // untouched
@@ -400,9 +420,42 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         let again = tmp.file("Downloads/\(info.id)-mono/wine-mono-10.4.1-x86.tar.xz.part")
         manager.cleanLeftovers()
         #expect(FileManager.default.fileExists(atPath: again.path))             // installed engine, but no Wine Mono yet
+        let folder = tmp.dir("Engines/\(info.id)/wine/share/wine/mono/wine-mono-10.4.1")
         tmp.file("Engines/\(info.id)/wine/share/wine/mono/wine-mono-10.4.1/support/winemono-support.msi")
+        try WineMono.writeMarker(for: EngineCatalog.wineMono10_4_1, in: folder)
         manager.cleanLeftovers()
         #expect(!FileManager.default.fileExists(atPath: again.deletingLastPathComponent().path))
+    }
+
+    @Test func theMarkerIsWrittenLastAndWithoutItTheCopyIsNotCounted() async throws {
+        let tmp = TempFolder()
+        let (manager, engine, package) = try await make(tmp, files: ["wine-mono-\(version)/support/winemono-support.msi": "msi"])
+        let folder = WineMono.folder(of: package, in: engine.wineRoot)
+        // A move cut short: the folder and the support package are there, the marker isn't.
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("support"), withIntermediateDirectories: true)
+        try Data("msi".utf8).write(to: WineMono.supportInstaller(of: package, in: engine.wineRoot))
+        #expect(!WineMono.isUnpacked(package, in: engine.wineRoot) && !engine.hasWineMono)
+        // So it is fetched again, and the copy that was there is replaced.
+        try await manager.installWineMono(into: engine) { _, _ in }
+        #expect(engine.hasWineMono)
+        #expect(try String(contentsOf: WineMono.markerFile(in: folder), encoding: .utf8) == package.download.sha256)
+        // A marker from another archive (a pin that changed under the same version) doesn't count either.
+        try Data("0".utf8).write(to: WineMono.markerFile(in: folder))
+        #expect(!engine.hasWineMono)
+    }
+
+    @Test func anEngineThatWasRemovedWhileWineMonoDownloadedIsNotMadeAgain() async throws {
+        let tmp = TempFolder()
+        let (manager, engine, package) = try await make(tmp, files: ["wine-mono-\(version)/support/winemono-support.msi": "msi"])
+        let engineFolder = manager.folder(for: engine.info)
+        // Removed (by hand, in Finder) before the install began, and while it went on: no folder of the engine comes back.
+        try FileManager.default.removeItem(at: engineFolder)
+        let error = try await #require(throws: ShellError.self) { try await manager.installWineMono(into: engine) { _, _ in } }
+        #expect(error.localizedDescription == "Test Wine was removed while Wine Mono was being added to it.")
+        #expect(!FileManager.default.fileExists(atPath: engineFolder.path))
+        #expect(!FileManager.default.fileExists(atPath: WineMono.folder(of: package, in: engine.wineRoot).path))
+        // The download stays for the next try.
+        #expect(FileManager.default.fileExists(atPath: manager.wineMonoDownloadFile(package, of: engine.info).path))
     }
 
     @Test func removingAnEngineRemovesItsWineMonoDownloadToo() async throws {

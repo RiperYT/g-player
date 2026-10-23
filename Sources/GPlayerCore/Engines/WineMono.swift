@@ -39,10 +39,42 @@ public enum WineMono {
     /// into place.
     static func isWhole(_ folder: URL) -> Bool { FileManager.default.fileExists(atPath: supportInstaller(in: folder).path) }
 
-    /// Wine Mono is in the engine. An unpack moves the finished folder into place in one step
-    /// (`EngineManager.installWineMono`), so a folder that is there is whole.
+    /// Written into the folder last, once it is in place, with the SHA-256 of the archive it came from. A move that stopped halfway
+    /// (a copy, when the engine's folder is on another disk than G-Player's work folder) leaves a folder without it.
+    static let markerName = ".gplayer-unpacked"
+
+    static func markerFile(in folder: URL) -> URL { folder.appendingPathComponent(markerName) }
+
+    /// Marks `folder` (the one `folder(of:in:)` names) as a whole copy of `package`.
+    static func writeMarker(for package: WineMonoPackage, in folder: URL) throws {
+        try Data(package.download.sha256.utf8).write(to: markerFile(in: folder), options: .atomic)
+    }
+
+    /// Wine Mono is in the engine: its folder is there with its support package, and the marker says the copy is whole and is
+    /// this release's.
     public static func isUnpacked(_ package: WineMonoPackage, in wineRoot: URL) -> Bool {
-        isWhole(folder(of: package, in: wineRoot))
+        let folder = folder(of: package, in: wineRoot)
+        guard isWhole(folder), let marker = try? String(contentsOf: markerFile(in: folder), encoding: .utf8) else { return false }
+        return marker == package.download.sha256
+    }
+
+    // MARK: How long its path is
+
+    /// What Wine's `mscoree` builds in a buffer of 260 characters (`WCHAR mono_dll_path[MAX_PATH]` in `dlls/mscoree/metahost.c`,
+    /// filled with `lstrcpyW` and no check) to find Mono: the DOS name of the engine's data folder (`WINEDATADIR`: `Z:` and the
+    /// path), `\mono\wine-mono-<version>`, and this.
+    static let libmonoSuffix = "\\bin\\libmono-2.0-x86_64.dll"
+
+    /// The length of that path, with the `Z:` drive. Counted as `PrefixPath` counts: /var, /tmp and /etc by their longer /private form.
+    public static func loadPathLength(of package: WineMonoPackage, in wineRoot: URL) -> Int {
+        2 + PrefixPath.length(of: folder(of: package, in: wineRoot).path) + libmonoSuffix.utf16.count
+    }
+
+    /// Wine can load this Wine Mono: the path `mscoree` builds for it, and its end, fit in 260 characters (the last being the
+    /// terminator). A longer one would overflow the buffer; the library folder `PrefixPath` allows leaves room for it (114
+    /// characters, 206 here), a folder an older G-Player allowed may not.
+    public static func pathFits(_ package: WineMonoPackage, in wineRoot: URL) -> Bool {
+        loadPathLength(of: package, in: wineRoot) < 260
     }
 
     // MARK: In a space
