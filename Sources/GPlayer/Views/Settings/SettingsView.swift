@@ -45,8 +45,22 @@ struct GeneralSettings: View {
             } footer: {
                 Text("Walks through setup again. Your library stays as it is.").font(.caption).foregroundStyle(.secondary)
             }
+            if model.updater.isEnabled { UpdateSettings() }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Whether G-Player looks for a newer version by itself. Only in a build that updates itself (`AppUpdater`).
+struct UpdateSettings: View {
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        @Bindable var updater = model.updater
+        Section {
+            Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
+        } footer: {
+            Text("G-Player asks GitHub whether a newer version is out. Nothing else is sent.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 

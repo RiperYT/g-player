@@ -41,6 +41,7 @@ struct GPlayerApp: App {
         let model = AppModel()
         _model = State(initialValue: model)
         AppDelegate.model = model                                    // for the question on quitting
+        model.updater.start()                                        // does nothing in a build without the update key
     }
 
     var body: some Scene {
@@ -51,6 +52,12 @@ struct GPlayerApp: App {
         }
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .appInfo) {
+                if model.updater.isEnabled {
+                    Button("Check for Updates…") { model.updater.check() }
+                        .disabled(!model.updater.canCheck)
+                }
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Add Game…") { model.openAddGame() }
                     .keyboardShortcut("n")
@@ -94,9 +101,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Quitting while engines download, a space is made, components or a store app install: ask first. Pressing Quit
     /// leaves what came on disk, so most of it goes on from there. Never when the system asks (shut down, restart, log out):
-    /// a question that can stop it would keep the Mac from going down.
+    /// a question that can stop it would keep the Mac from going down. Nor when Sparkle quits G-Player to install an update the
+    /// user chose: it relaunches G-Player once this has quit (`SetupQuit.mayAsk`).
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !systemIsGoingDown, !SetupQuit.isSystemQuit(reason: Self.quitReason), let question = Self.model?.quitQuestion else {
+        let updating = Self.model?.updater.isInstalling ?? false
+        guard SetupQuit.mayAsk(systemIsGoingDown: systemIsGoingDown, reason: Self.quitReason, updateIsInstalling: updating),
+              let question = Self.model?.quitQuestion else {
             return .terminateNow
         }
         let alert = NSAlert()
