@@ -22,7 +22,7 @@ Sources/
     Views/              Library, AddGame, Spaces, Files, Apps, Settings, Onboarding, Components
 Tests/GPlayerCoreTests  unit tests for everything in the core that doesn't need Wine
 tools/                  chromium-helper-wrapper (C, cross-compiled with mingw-w64)
-scripts/                build-app.sh, release.sh, make-icon.swift, build-wrapper.sh
+scripts/                build-app.sh, release.sh, make-icon.swift, build-wrapper.sh, sparkle-public-key.txt
 releases/               zipped builds, one folder per version
 ```
 
@@ -124,6 +124,19 @@ any. Two guards, both decided in the core:
   `wineserver -k`, then SIGKILL again for what is left, and the user is told. A space past half a limit is looked at
   every 1.5 seconds. Programs are the space's by working folder, `WINEPREFIX` or a `drive_c` path in the command (Wine's
   programs have lost their parent, so the parent says nothing), plus those of the space's games found by their own folder.
+
+## Updating G-Player itself
+
+G-Player updates itself with [Sparkle](https://sparkle-project.org) 2 (MIT), pinned to an exact version in `Package.swift`;
+SwiftPM checks the checksum of its binary framework. Only the app target knows it. `AppUpdater` wraps
+`SPUStandardUpdaterController` and starts it only when the bundle's Info.plist has `SUPublicEDKey`
+(`SelfUpdate.isEnabled`), so a build from source never looks for updates. `scripts/build-app.sh` takes the key from
+`scripts/sparkle-public-key.txt` (empty: no key), copies Sparkle.framework into `Contents/Frameworks` with an rpath for
+it, and signs Sparkle's nested code before the app. `SUFeedURL` is the `appcast.xml` attached to the latest GitHub
+release and system profiling is off, so the only requests are the appcast and the update's download. Sparkle asks by
+itself, the second time the app opens, whether to check automatically; Settings › General changes the answer. An install
+quits G-Player with Sparkle's own quit event, and `applicationShouldTerminate` doesn't ask about setup then
+(`SetupQuit.mayAsk`), so the installer isn't left waiting for the app.
 
 ## Reviewing the UI
 

@@ -15,15 +15,17 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
   it the way MaPC does (see [How Steam works here](docs/HOW-STEAM-WORKS.md)).
 - **Brings over what you have.** CrossOver bottles, Whisky bottles and hand-made prefixes are found on first
   launch and used in place, with their games and saves. G-Player asks once before it changes one of them.
-- **No account, no telemetry.** G-Player talks to GitHub (engine downloads), the stores' own CDNs (installers,
-  cover art), the makers of Windows components when it installs them (Microsoft, NVIDIA…), and nothing else.
+- **No account, no telemetry.** G-Player talks to GitHub (engine downloads, and whether a newer G-Player is out), the
+  stores' own CDNs (installers, cover art), the makers of Windows components when it installs them (Microsoft,
+  NVIDIA…), and nothing else.
 
 ## Download
 
 Get the latest `G-Player-<version>.dmg` from [Releases](https://github.com/RiperYT/g-player/releases)
 (the same files are kept in [`releases/`](releases/)). Open it and drag **G-Player** onto **Applications**.
 The app is signed with a Developer ID and notarized by Apple, so it opens like any other app. A newer version
-goes over the old one the same way: your library, spaces and games stay where they are.
+goes over the old one the same way: your library, spaces and games stay where they are. Later versions arrive in the app
+itself (**G-Player › Check for Updates…**); the automatic check can be turned off in **Settings › General**.
 
 **Needs:** a Mac with Apple Silicon (M1 or later), macOS 15 Sequoia or later, Rosetta 2 (G-Player offers to
 install it), about 3.0 GB for G-Player Wine (a download of about 640 MB) plus room for games.

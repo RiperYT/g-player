@@ -14,6 +14,7 @@ so it can be published, forked or sold without surprises. It is a summary, not l
 | `engine-fixes/libMoltenVK.dylib` | Apache-2.0 (MoltenVK, SPIRV-Cross, SPIRV-Tools, Vulkan-Headers), MIT-style (SPIRV-Headers), BSD-3-Clause (cereal) | MoltenVK 1.4.2 from the Khronos release, code unchanged and signed with G-Player's Developer ID for notarization; `scripts/fetch-moltenvk.sh` fetches it and the license texts, each checked against a pinned SHA-256. License texts in `Resources/licenses/`. Replaced in the user's engine only over the exact Gcenx file, which is kept. |
 | `GameFixes.json` | Data derived from umu-protonfixes, BSD-2-Clause; G-Player's own entries Apache-2.0 | License text in `Resources/licenses/`. |
 | `steamdb-rules.ini` | MIT, SteamDB FileDetectionRuleSets | Unchanged copy. License text in `Resources/licenses/`. |
+| `Frameworks/Sparkle.framework` (Sparkle 2.10.0) | MIT (Sparkle); BSD-style (bsdiff, SUSignatureVerifier), MIT (sais-lite), zlib (Ed25519) inside it | Bundled, code unchanged: it updates G-Player itself. SwiftPM fetches Sparkle's own release, pinned to the exact version and checked against the checksum in its `Package.swift`. License texts in `Resources/licenses/`. |
 
 All of these allow commercial use, as long as the notices stay in place.
 
