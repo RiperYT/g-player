@@ -1317,8 +1317,11 @@ final class AppModel {
         let startingIn = game.spaceID
         launchesStarting[startingIn, default: 0] += 1
         defer { Self.decrement(&launchesStarting, startingIn) }
-        guard let paths, let space = space(game.spaceID),
-              let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        guard let paths, let found = space(game.spaceID),
+              let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        // The space as it is now: the engine that was just installed may be the replacement of the one it was on, and then the
+        // launch, and what it records, belong to the engine it runs on.
+        let space = settleSpace(found, on: engine)
         // A restart of Steam made for this launch is over when it is.
         defer { if steamRestarts[space.id] == game.id { steamRestarts[space.id] = nil } }
         if retry?.automatic != true { stoppedRetries.remove(game.id) }

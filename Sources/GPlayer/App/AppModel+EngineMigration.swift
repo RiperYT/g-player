@@ -54,6 +54,17 @@ extension AppModel {
         return true
     }
 
+    /// The space as it is once `engine` is ready for a start in it. Asked for a retired engine that isn't installed, `ensureEngine`
+    /// installs and returns the replacement, and the space would move to it a moment later in the background: it moves now
+    /// (`EngineMigration.moveForStart`), so the start, and what it records about the game's graphics, go by the engine it runs on.
+    func settleSpace(_ space: Space, on engine: Engine) -> Space {
+        guard let manager = engineManager else { return space }
+        let installed = Set(EngineCatalog.known.filter { manager.isInstalled($0) }.map(\.id))
+        let current = self.space(space.id) ?? space
+        if let move = EngineMigration.moveForStart(current, on: engine.info, installed: installed) { moveSpaces([move]) }
+        return self.space(space.id) ?? current
+    }
+
     /// `EngineMigration.plan` for what is installed and in use now.
     private func enginePlan(processes: [WineProcess], manager: EngineManager) -> EngineMigration.Plan {
         let installed = Set(EngineCatalog.known.filter { manager.isInstalled($0) }.map(\.id))

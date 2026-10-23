@@ -142,6 +142,28 @@ import Testing
         #expect(plan([allowed], installed: [new]).switches.count == 1)
     }
 
+    @Test func aStartOnTheReplacementMovesTheSpaceOfARetiredEngineThatIsGone() {
+        func start(_ s: Space, on engine: EngineInfo, installed: [EngineInfo]) -> EngineMigration.Plan.Switch? {
+            EngineMigration.moveForStart(s, on: engine, installed: Set(installed.map(\.id)))
+        }
+        let main = space("Main", on: old.id)
+        // The old engine isn't installed, so the start runs on the replacement: the space moves with it, here and now.
+        #expect(start(main, on: new, installed: [new]) == .init(space: main.id, from: old.id, to: new.id))
+        #expect(start(main, on: new, installed: []) == .init(space: main.id, from: old.id, to: new.id))
+        // The old engine is there: the start runs on it, and the space stays (it moves when it is quiet).
+        #expect(start(main, on: old, installed: [old, new]) == nil)
+        #expect(start(main, on: new, installed: [old, new]) == nil)
+        // Not a start on the replacement, or not a space on a retired engine.
+        #expect(start(main, on: staging, installed: [staging]) == nil)
+        #expect(start(space("Now", on: new.id), on: new, installed: [new]) == nil)
+        #expect(start(space("Staging", on: staging.id), on: new, installed: [new]) == nil)
+        // A space of another app moves only with its owner's yes.
+        let b = bottle("Bottle", on: old.id)
+        #expect(start(b, on: new, installed: [new]) == nil)
+        var allowed = b; allowed.allowsChanges = true
+        #expect(start(allowed, on: new, installed: [new]) == .init(space: b.id, from: old.id, to: new.id))
+    }
+
     // MARK: In use
 
     func program(_ command: String, in space: Space, folder: String = "drive_c/windows/system32") -> WineProcess {

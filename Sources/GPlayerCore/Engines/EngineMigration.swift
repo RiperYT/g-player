@@ -104,6 +104,15 @@ public enum EngineMigration {
         return plan
     }
 
+    /// A program is about to start in `space` on `engine`. When the space is on a retired engine that isn't installed and `engine`
+    /// is its replacement (what `ensureEngine` hands back then), the space moves now, so that what the start records, such as
+    /// the graphics it learns, names the engine it ran on. Nothing can run from an engine that isn't there, so nothing is in the
+    /// way. Nil for every other start.
+    public static func moveForStart(_ space: Space, on engine: EngineInfo, installed: Set<String>) -> Plan.Switch? {
+        guard let old = EngineCatalog.info(space.engineID), !installed.contains(old.id) else { return nil }
+        return plan(spaces: [space], installed: installed, busy: []).switches.first { $0.to == engine.id }
+    }
+
     /// Puts the plan's spaces on their new engines, and what G-Player learned about their games' graphics with them: the
     /// replacement is the same Wine, so the learning still holds. A space that is no longer on the engine the plan saw (the
     /// user switched it meanwhile) is left as it is, and so is one G-Player may not change (the user said no meanwhile).
