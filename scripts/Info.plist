@@ -32,6 +32,8 @@
             <key>LSItemContentTypes</key><array><string>public.folder</string></array>
         </dict>
     </array>
+    <key>SUFeedURL</key><string>https://github.com/RiperYT/g-player/releases/latest/download/appcast.xml</string>
+    <key>SUEnableSystemProfiling</key><false/>
     <key>NSHumanReadableCopyright</key><string>G-Player contributors. Apache License 2.0.</string>
 </dict>
 </plist>

@@ -44,4 +44,14 @@ import Testing
         #expect(!SetupQuit.isSystemQuit(reason: nil))
         #expect(code("shut") == 0x73687574)
     }
+
+    @Test func theQuestionNeverStopsAnUpdateThatIsInstallingOrTheMacGoingDown() {
+        let user = SetupQuit.fourCharCode("quia")
+        #expect(SetupQuit.mayAsk(systemIsGoingDown: false, reason: user, updateIsInstalling: false))
+        #expect(SetupQuit.mayAsk(systemIsGoingDown: false, reason: nil, updateIsInstalling: false))
+        // Sparkle's installer quits G-Player and waits for it: the user already chose Install and Relaunch.
+        #expect(!SetupQuit.mayAsk(systemIsGoingDown: false, reason: nil, updateIsInstalling: true))
+        #expect(!SetupQuit.mayAsk(systemIsGoingDown: true, reason: nil, updateIsInstalling: false))
+        #expect(!SetupQuit.mayAsk(systemIsGoingDown: false, reason: SetupQuit.fourCharCode("rest"), updateIsInstalling: false))
+    }
 }

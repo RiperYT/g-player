@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+- **G-Player updates itself.** **G-Player › Check for Updates…** looks for a newer version and installs it, so you no
+  longer download the disk image by hand. The second time G-Player opens it asks whether to check by itself (once a day);
+  Settings › General turns that on or off. G-Player asks GitHub for the list of versions and sends nothing about your Mac,
+  and an update installs only if it is signed with G-Player's own update key.
+
 ## [0.4.3] - 2026-10-23
 
 - **Game videos play on G-Player Wine.** Intros and cutscenes that go through Windows Media Foundation can play now.

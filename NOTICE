@@ -97,3 +97,12 @@ under the MIT License:
 The rules are in Sources/GPlayerCore/Resources/steamdb-rules.ini, unchanged. The second pass that names engines from
 the rules' "Evidence" matches is a port of that project's FileDetector.php. The license text is in
 Sources/GPlayerCore/Resources/licenses/SteamDB-FileDetectionRuleSets-LICENSE.txt, and in the app's Resources/licenses folder.
+
+G-Player includes Sparkle 2.10.0 (https://sparkle-project.org, https://github.com/sparkle-project/Sparkle), unchanged, as
+Contents/Frameworks/Sparkle.framework in the app, to update G-Player itself. SwiftPM fetches it from Sparkle's own release
+and checks its checksum (pinned in Package.swift and Package.resolved). Sparkle is licensed under the MIT License:
+  Copyright (c) 2006-2013 Andy Matuschak, (c) 2009-2013 Elgato Systems GmbH, (c) 2011-2014 Kornel Lesiński,
+  (c) 2015-2017 Mayur Pawashe, (c) 2014 C.W. Betts, (c) 2014 Petroules Corporation, (c) 2014 Big Nerd Ranch.
+It contains bsdiff (Colin Percival) and SUSignatureVerifier (Mark Hamlin) under BSD-style licenses, sais-lite (Yuta Mori)
+under the MIT License and Ed25519 (Orson Peters) under the zlib License. All the texts are in
+Sources/GPlayerCore/Resources/licenses/Sparkle-LICENSE.txt, and in the app's Resources/licenses folder.

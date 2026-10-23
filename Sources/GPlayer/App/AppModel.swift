@@ -192,6 +192,8 @@ final class AppModel {
     var storeReadyID: String?
     var engineVersion = 0                        // bumps when engines change, so views re-read them
     var componentsVersion = 0                    // bumps when components are installed
+    /// G-Player's own updates (Sparkle). Started by `GPlayerApp`, and only in a build that carries the update key.
+    let updater = AppUpdater()
 
     /// - Parameter watching: false keeps the model passive (no process watcher, no observers), for drawing the UI.
     init(defaults d: UserDefaults = .standard, watching: Bool = true) {
