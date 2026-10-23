@@ -7,8 +7,9 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 
 - **One library.** Steam and Epic games show up on their own. Add any other game by dropping its folder,
   its zip/rar/7z archive or its installer onto the window.
-- **Epic games without Epic's launcher.** Sign in on Epic's own page and install your Epic games with
-  [Legendary](https://github.com/legendary-gl/legendary), an open-source Epic client (see [Epic Games](#epic-games-without-epics-launcher)).
+- **Epic games, two ways.** Epic's own launcher runs on G-Player Wine (recommended), or you sign in on Epic's own page and
+  install your games without it, faster, with [Legendary](https://github.com/legendary-gl/legendary), an open-source Epic
+  client not made by Epic (see [Epic Games](#epic-games-without-epics-launcher)).
 - **Your library, your way.** Real icons read from each program, cover art for Steam games, and any game
   can be hidden and brought back later.
 - **Spaces.** Each space is a separate Windows (a Wine prefix) with its own C: drive. Browse its files,
@@ -49,8 +50,9 @@ settings that worked, for you to read and submit; G-Player itself sends nothing.
 
 ### Epic Games without Epic's launcher
 
-Epic's own launcher stops at its loading screen under Wine (it is still in **Get Apps**, for those who have it set up). The
-way G-Player recommends for Epic is **Epic Games** in the sidebar:
+Epic has two ways here. **Epic Games Launcher** in **Get Apps** is Epic's own app, the recommended one: it runs on G-Player
+Wine and reaches Epic's sign-in page. **Epic Games** in the sidebar is the alternative, without the launcher: faster, through
+Legendary, an open-source Epic client not made by Epic.
 
 1. **Sign In…** opens Epic's own sign-in page in a window. You sign in there, with Epic, Google, Apple or whatever you use. Your
    password goes to Epic and never to G-Player, which reads nothing on that page; it only takes the one-time code Epic's page

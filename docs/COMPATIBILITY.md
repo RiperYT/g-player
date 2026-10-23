@@ -245,6 +245,31 @@ main display's size (`-screen-width`, `-screen-height`; 80% of it when the game 
 than points in Retina mode), which Unity then saves. The space isn't changed. Wine writes the registry to disk every
 30 seconds, so a start right after the failed one can still see the old file.
 
+## Epic Games Launcher
+
+Epic's own launcher (the 2026 build, CEF 90) opens on G-Player Wine and reaches its sign-in page. It doesn't on Wine Staging
+11.18, where its network service and GPU process crash in a loop; G-Player Wine carries CodeWeavers' hacks for this launcher
+in `kernelbase` and `advapi32`. The recipe, in `AppPreset.epic` (`engineRecipes`, `needsGPlayerWine`), decided per engine kind
+(`helpersToWrap`, `helpersToUnwrap`, `launcherBackend`):
+
+- **G-Player Wine.** New launcher spaces are made on it, and a space on another engine is offered "Move to G-Player Wine…".
+- **No helper wrapper.** On G-Player Wine the wrapper makes the network service crash again and again ("Network service
+  crashed, restarting service"); with Epic's own `EpicWebHelper.exe` there is no crash and the sign-in page loads. A space
+  that was wrapped gets it back before the next start: `EpicWebHelper_real.exe` is copied over `EpicWebHelper.exe`, only
+  where that file is exactly the wrapper G-Player ships, and only in a space G-Player may change. Nothing is deleted.
+- **WineD3D for the launcher itself**, whatever its library entry says: no DXVK or DXMT override, so the engine's own `d3d11`,
+  `d3d10core` and `dxgi` load (Apple's, where D3DMetal has been copied in). On DXVK its renderer fails
+  `IDXGIFactory1::CreateSwapChain` (0x80004005) and the launcher restarts itself about every 5 seconds with
+  `-AllowSoftwareRendering`; `-opengl` crashes it.
+- **Wine Staging** is set up as before (wrapper, the engine's usual graphics); it isn't known to help there.
+
+Games the launcher starts inherit its environment, so they run on its graphics too; G-Player can't give a game started
+from inside the launcher graphics of its own. Epic Games without the launcher (Legendary) starts each game through
+G-Player's own launch, with its own.
+
+Lines in the launcher's log that mean nothing: `WSALookupServiceBegin failed`, "Memory pressure detected … commit limit",
+and a failure to create the process for `curl.exe`.
+
 ## Spaces from other apps
 
 A CrossOver or Whisky bottle, or a prefix you made by hand, is used in place. G-Player changes nothing in it until you
