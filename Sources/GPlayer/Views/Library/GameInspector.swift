@@ -92,6 +92,13 @@ struct GameInspector: View {
             Text("Removing keeps the game's files. Delete them from the space's files if you want the disk space back.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+        if case .legendary = game.source {
+            Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
+                .buttonStyle(.link).foregroundStyle(.red)
+                .disabled(model.epic.isOccupied || model.isRunning(game))
+            Text("Deletes the game's files from its space. Install it again from Epic Games in the sidebar.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func sync() {

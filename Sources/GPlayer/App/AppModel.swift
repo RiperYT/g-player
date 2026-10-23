@@ -17,7 +17,7 @@ struct BlockedLaunch: Identifiable {
 }
 
 enum SidebarItem: Hashable {
-    case allGames, recent, hidden, space(UUID), files, apps
+    case allGames, recent, hidden, space(UUID), files, epic, apps
 }
 
 /// Long work shown at the bottom of the sidebar (engine downloads, store setup, imports).
@@ -100,6 +100,12 @@ final class AppModel {
     var showNewSpace = false
     /// The game waiting for the "Remove from Library" confirmation.
     var gamePendingRemoval: Game?
+    /// The Epic game waiting for the "Uninstall" confirmation.
+    var gamePendingUninstall: Game?
+    /// Epic Games through Legendary: who is signed in, the games, and what it is busy with (`AppModel+Epic`).
+    var epic = EpicState()
+    /// The last look at what Legendary has on this Mac; the next one waits for it.
+    @ObservationIgnored var epicLooking: Task<Void, Never>?
     /// The space the Files browser shows.
     var filesSpaceID: UUID?
     private(set) var running: [UUID: RunningProgram] = [:]
@@ -223,7 +229,7 @@ final class AppModel {
             MainActor.assumeIsolated { self?.refreshStores(); self?.refreshPrograms() }
         }
         watchPrograms()
-        if onboardingDone, libraryRoot != nil { resumeFirstRunSpaces() }
+        if onboardingDone, libraryRoot != nil { resumeFirstRunSpaces(); loadEpic() }
     }
 
     /// The library's folders, or nil while there is no library or it can't be used (`libraryProblem`): every write to the
@@ -334,7 +340,7 @@ final class AppModel {
 
     /// What waited for the library: the first spaces onboarding promised.
     private func libraryOpened() {
-        if onboardingDone { resumeFirstRunSpaces() }
+        if onboardingDone { resumeFirstRunSpaces(); loadEpic() }
     }
 
     private func save() {
@@ -1047,12 +1053,26 @@ final class AppModel {
         return best.representation(using: .png, properties: [:])
     }
 
-    private func fetchMissingCovers() {
+    /// Where a store game's cover comes from, and what it is called in the Covers folder.
+    private func coverSource(of game: Game) -> (url: URL, file: String)? {
+        switch game.source {
+        case .steam(let appID):
+            return SteamLibrary.coverURL(appID: appID).map { ($0, "steam-\(appID).jpg") }
+        case .legendary(let appName):
+            guard let url = epic.games.first(where: { $0.appName == appName })?.coverURL,
+                  let file = EpicGames.coverFileName(appName: appName) else { return nil }
+            return (url, file)
+        case .executable, .epic:
+            return nil
+        }
+    }
+
+    func fetchMissingCovers() {
         guard let paths else { return }
         for game in state.games where game.coverFile == nil && !coverFetches.contains(game.id) {
-            guard case .steam(let appID) = game.source, let url = SteamLibrary.coverURL(appID: appID) else { continue }
+            guard let (url, file) = coverSource(of: game) else { continue }
             coverFetches.insert(game.id)
-            let file = "steam-\(appID).jpg", target = paths.covers.appendingPathComponent(file)
+            let target = paths.covers.appendingPathComponent(file)
             Task {
                 if !FileManager.default.fileExists(atPath: target.path) {
                     guard let (data, response) = try? await URLSession.shared.data(from: url),
@@ -1429,10 +1449,19 @@ final class AppModel {
             if retryStopped(retry, game.id) { return false }
             diagnoses[game.id] = nil
             failedAutoLaunches[game.id] = nil
+            // An Epic game from Legendary is planned again with Legendary's launch parameters, right before it starts (they hold
+            // a one-time code): the plan above is for everything that has to be settled before.
+            var replan: EpicReplan?
+            if case .legendary = current.source {
+                replan = { launch in
+                    try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
+                                           launcher: launcher, legendary: launch)
+                }
+            }
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
             let started = await enqueue(in: space.id, isInstall: false, holds: "“\(current.title)” to start") {
-                await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry)
+                await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry, replan: replan)
             }.value
             let program = try started.get()
             // Steam started now runs with this launch's settings, and games it starts later inherit them.
@@ -1477,7 +1506,8 @@ final class AppModel {
     /// Components, registry, Steam's wrapper and DXVK (only where G-Player may change the space), then Wine.
     /// Runs from the space's queue.
     private func prepareAndStart(_ game: Game, plan: LaunchPlan, in space: Space, engine: Engine,
-                                 paths: LibraryPaths, retry: GraphicsRetryLaunch?) async -> Result<RunningProgram, Error> {
+                                 paths: LibraryPaths, retry: GraphicsRetryLaunch?,
+                                 replan: EpicReplan? = nil) async -> Result<RunningProgram, Error> {
         // A try with other graphics that was stopped while it waited for the queue starts nothing.
         if retryStopped(retry, game.id) { return .failure(CancellationError()) }
         // Read now: the answer may have changed while this waited.
@@ -1499,7 +1529,16 @@ final class AppModel {
         }
         // Installing components and writing settings can take minutes: a Stop since then still prevents the start.
         if retryStopped(retry, game.id) { return .failure(CancellationError()) }
-        let helpers = plan.chromiumHelpers, backend = plan.backend
+        let toStart: LaunchPlan
+        if let replan, case .legendary(let appName) = game.source {
+            // As late as it can be: the code Epic gives the game to log in with lives for a few minutes.
+            do { toStart = try await epicPlan(replan, appName: appName, engine: engine, paths: paths) }
+            catch { return .failure(error) }
+            if retryStopped(retry, game.id) { return .failure(CancellationError()) }
+        } else {
+            toStart = plan
+        }
+        let helpers = toStart.chromiumHelpers, backend = toStart.backend
         let allowed = self.space(space.id)?.mayChange == true
         let gameID = game.id, logName = game.title
         // The Steam helper wrapper and DXVK's files compare multi-MB files, so off the main thread.
@@ -1510,8 +1549,8 @@ final class AppModel {
                     try SpaceManager(paths: paths).prepareGraphics(backend, engine: engine, space: space)
                 }
                 return try WineLauncher.start(
-                    engine: engine, space: space, arguments: plan.arguments, workingDirectory: plan.workingDirectory,
-                    backend: backend, tweaks: plan.tweaks, logsFolder: paths.logs, logName: logName
+                    engine: engine, space: space, arguments: toStart.arguments, workingDirectory: toStart.workingDirectory,
+                    backend: backend, tweaks: toStart.tweaks, logsFolder: paths.logs, logName: logName
                 ) { [weak self] status in
                     Task { @MainActor in self?.finished(gameID, status: status) }
                 }

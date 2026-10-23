@@ -19,6 +19,7 @@ struct MainView: View {
                 case .hidden: LibraryView(filter: .hidden)
                 case .space(let id): if let s = model.space(id) { SpaceView(space: s) } else { LibraryView(filter: .all) }
                 case .files: FilesView()
+                case .epic: EpicView()
                 case .apps: AppsView()
                 }
             }
@@ -26,6 +27,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $model.showAddGame) { AddGameSheet(initialSource: model.addGameSource) }
         .sheet(isPresented: $model.showNewSpace) { NewSpaceSheet() }
+        .sheet(isPresented: $model.epic.showSignIn) { EpicSignInSheet() }
         .sheet(isPresented: Binding(get: { model.failedLaunch != nil }, set: { if !$0 { model.failedLaunch = nil } })) {
             if let g = model.game(model.failedLaunch) { FailedLaunchSheet(game: g) }
         }
@@ -96,6 +98,13 @@ struct MainView: View {
         } message: { game in
             Text("“\(game.title)” leaves the library. Its files stay in the space, and you can add it again.")
         }
+        .confirmationDialog("Uninstall from Epic Games?", isPresented: Binding(get: { model.gamePendingUninstall != nil },
+                                                                              set: { if !$0 { model.gamePendingUninstall = nil } }),
+                            titleVisibility: .visible, presenting: model.gamePendingUninstall) { game in
+            Button("Uninstall “\(game.title)”", role: .destructive) { model.uninstallEpicGame(game) }
+        } message: { game in
+            Text("Deletes “\(game.title)” and its files from the space. Saves the game keeps outside its own folder stay. Your Epic account keeps the game, so you can install it again.")
+        }
     }
 }
 
@@ -132,6 +141,7 @@ struct Sidebar: View {
             }
             Section("Browse") {
                 Label("Files", systemImage: "folder").tag(SidebarItem.files)
+                Label("Epic Games", systemImage: "shippingbox").tag(SidebarItem.epic)
                 Label("Get Apps", systemImage: "square.and.arrow.down.on.square").tag(SidebarItem.apps)
             }
         }

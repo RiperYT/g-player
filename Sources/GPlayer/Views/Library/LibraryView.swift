@@ -220,5 +220,9 @@ struct GameMenu: View {
         if game.canRemove {
             Button("Remove from Library…", role: .destructive) { model.gamePendingRemoval = game }
         }
+        if case .legendary = game.source {
+            Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
+                .disabled(model.epic.isOccupied || model.isRunning(game))
+        }
     }
 }
