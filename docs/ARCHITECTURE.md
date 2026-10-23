@@ -68,14 +68,23 @@ G-Player Wine is published in revisions (`wine-cx-26.3.0-1`, `-2`). A revision t
 `EngineCatalog` as a retired engine (`EngineInfo.replacedBy`, `EngineCatalog.retired`): `EngineCatalog.all` is what is
 offered (pickers, Settings, the first run, new spaces), `EngineCatalog.known` is everything G-Player can run, and
 everything that runs or looks after an installed engine (launching, `EngineFixes`, D3DMetal, Stop All, leftovers) goes
-by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space moves once the
-replacement is installed and nothing runs or starts in it, or at once when the retired engine isn't installed; the
-replacement downloads in the background once per run when spaces still need it; and the retired engine's folder goes
-when no space is on it. `AppModel` looks at start, after an engine install, and at every look at the running programs.
-What G-Player learned about a game's graphics (`AutoGraphics`, which names its engine) moves with the space.
+by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space G-Player may change moves
+once the replacement is installed and nothing runs, starts or is queued in it and no Add Game works in it
+(`EngineMigration.isInUse`), or at once when the retired engine isn't installed. A space of another app
+(`Space.mayChange` is false) never moves without the user's yes, since Wine updates the prefix's files on the first start
+there: its page offers the move, and the retired engine stays installed while a space is on it. The replacement downloads
+in the background once per run when a space on the retired engine or the installed retired engine needs it, and the
+retired engine's folder goes only once the replacement is installed and no space is on it, after a fresh look at the
+programs and at the files the running processes come from (`WineProcesses.executables`, `EngineMigration.mayRemove`), in
+turn with the other work in engine folders (`AppModel.engineFilesWork`). Before the first move `library.json` is kept as
+`library.json.before-engine-update-<date>`: an older G-Player reads the new engine's id as unknown. `AppModel` looks at
+start, after an engine install, and at every look at the running programs. What G-Player learned about a game's graphics
+(`AutoGraphics`, which names its engine) moves with the space.
 
 An engine archive that lists GStreamer files (`gstreamer-files.txt`, `GStreamerRuntime`) gets them copied, at install,
-out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder.
+out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder. The
+files an install downloads stay in `Downloads/<id>` until it has succeeded, so a failure in its last step doesn't download
+them again; `EngineCatalog.diskBytes` counts every archive and the room the expansion takes.
 
 ## A launch
 
