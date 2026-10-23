@@ -53,6 +53,16 @@ import Testing
         #expect(!WineProcesses.isSteamRunning(in: steam2, processes: processes))
     }
 
+    @Test func steamsHelpersAreLeftoversOnlyOnceSteamItselfHasGone() {
+        // With steam.exe there, its web helper is Steam's.
+        #expect(WineProcesses.orphanedSteamHelpers(in: steam, processes: processes).isEmpty)
+        // Without it, the web helper is a leftover; the game and Wine's services in the space are not.
+        let gone = processes.filter { $0.programName != "steam.exe" }
+        let orphans = WineProcesses.orphanedSteamHelpers(in: steam, processes: gone)
+        #expect(!orphans.isEmpty && orphans.allSatisfy { $0.programName?.hasPrefix("steamwebhelper") == true })
+        #expect(WineProcesses.orphanedSteamHelpers(in: steam2, processes: gone).isEmpty)
+    }
+
     @Test func aProgramStartedWithTheSpacesPrefixBelongsToIt() {
         // Indie's own process shows WINEPREFIX; its GPU helper doesn't and isn't in the prefix.
         #expect(WineProcesses.programs(in: indie, from: processes).map(\.pid) == [500])

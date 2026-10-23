@@ -91,6 +91,17 @@ public enum WineProcesses {
     }
 
     /// True when Steam or one of its helpers runs in the space.
+    /// Steam's helpers (its web helpers and its service) left in `space` after steam.exe itself has gone. They don't go on
+    /// their own every time, and while they stay the space never empties, so a Steam that should restart never can.
+    /// Empty while steam.exe runs: then they are Steam's, not leftovers.
+    public static func orphanedSteamHelpers(in space: Space, processes: [WineProcess]) -> [WineProcess] {
+        let steam = programs(in: space, from: processes).filter { p in
+            guard let name = p.programName else { return false }
+            return name == "steam.exe" || name.hasPrefix("steamwebhelper") || name == "steamservice.exe"
+        }
+        return steam.contains { $0.programName == "steam.exe" } ? [] : steam
+    }
+
     public static func isSteamRunning(in space: Space, processes: [WineProcess]) -> Bool {
         programs(in: space, from: processes).contains { p in
             guard let name = p.programName else { return false }

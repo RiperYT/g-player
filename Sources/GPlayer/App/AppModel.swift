@@ -1285,7 +1285,7 @@ final class AppModel {
                 var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
                 if !opened {
                     d = Diagnosis(kind: .closedRightAway, title: "The game didn't open",
-                                  detail: "Steam started it, but no window came up within a minute. It may have closed right away.",
+                                  detail: "Steam started it, but no window came up in time. It may have closed right away.",
                                   remedy: d.remedy)
                 }
                 found = [d]
@@ -1375,6 +1375,8 @@ final class AppModel {
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
             let fixes = current.kind == .game ? self.fixes(for: current) : []
             let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine)
+            // Steam's helpers left behind by a Steam that has gone would count as Steam running, and a new one can't start.
+            if startsSteam { _ = await endOrphanedSteamHelpers(in: space) }
             var steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
             let launcher = steamWasRunning ? launcherSettings[space.id]?.settings : nil
             // Planning reads the game's folder (program names, .NET), so it runs off the main thread.
@@ -1450,7 +1452,7 @@ final class AppModel {
             // A store game starts through its launcher: "Starting…" until it shows up, and look for it soon.
             if !plan.chromiumHelpers.isEmpty { helperWatchUntil[space.id] = Date().addingTimeInterval(180) }
             if current.storeKey != nil && current.kind == .game {
-                startingUntil[game.id] = Date().addingTimeInterval(60)
+                startingUntil[game.id] = Date().addingTimeInterval(GraphicsRetry.secondsToShowUp(launcherWasRunning: steamWasRunning))
                 storeLaunches[game.id] = Date()
                 firstSeen[game.id] = nil
             }

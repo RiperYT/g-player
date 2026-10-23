@@ -84,6 +84,12 @@ public enum GraphicsRetry {
 
     // MARK: Steam
 
+    /// How long a store game may take to show up before it counts as not opening: a minute when its launcher was already
+    /// running, four when the launch started the launcher too. A Steam that starts cold (and updates Wine's files on the
+    /// first start on a new engine, or checks for its own update after a crash) can take over a minute before it even
+    /// starts the game, and calling that a failure offered other graphics, which meant restarting Steam, again and again.
+    public static func secondsToShowUp(launcherWasRunning: Bool) -> TimeInterval { launcherWasRunning ? 60 : 240 }
+
     /// Whether Steam may be closed for a retry without asking: nothing else in its space is open, starting or being
     /// installed, so nothing is lost with it. Otherwise the usual "Steam is already running" question is asked.
     /// - Parameters:

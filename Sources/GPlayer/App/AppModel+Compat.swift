@@ -240,6 +240,27 @@ extension AppModel {
         }.value
     }
 
+    /// Ends Steam's helpers left in `space` after steam.exe has gone, once they have stayed on their own for a few seconds
+    /// (Steam restarting itself has them alone for a moment). Left there, the space never empties, and a Steam started
+    /// into them gets the old window, which ignores clicks. True when none are left.
+    func endOrphanedSteamHelpers(in space: Space) async -> Bool {
+        guard !(await Self.orphanedSteamHelpers(in: space)).isEmpty else { return true }
+        try? await Task.sleep(for: .seconds(5))
+        let orphans = await Self.orphanedSteamHelpers(in: space)
+        guard !orphans.isEmpty else { return true }
+        orphans.forEach { kill($0.pid, SIGTERM) }
+        try? await Task.sleep(for: .seconds(3))
+        (await Self.orphanedSteamHelpers(in: space)).forEach { kill($0.pid, SIGKILL) }
+        try? await Task.sleep(for: .seconds(1))
+        return (await Self.orphanedSteamHelpers(in: space)).isEmpty
+    }
+
+    nonisolated static func orphanedSteamHelpers(in space: Space) async -> [WineProcess] {
+        await Task.detached(priority: .userInitiated) {
+            WineProcesses.orphanedSteamHelpers(in: space, processes: WineProcesses.snapshot())
+        }.value
+    }
+
     nonisolated static func isSteamRunning(in space: Space) async -> Bool {
         await Task.detached(priority: .userInitiated) {
             WineProcesses.isSteamRunning(in: space, processes: WineProcesses.snapshot())
@@ -407,6 +428,8 @@ extension AppModel {
         for _ in 0..<40 {
             // Stopped (a try with other graphics that was ended): Steam was asked to quit, but nothing waits for it.
             do { try await Task.sleep(for: .seconds(1.5)) } catch { return .failed }
+            // steam.exe has gone but its helpers stay: leftovers, ended, or the space never empties.
+            if !(await Self.orphanedSteamHelpers(in: space)).isEmpty { _ = await endOrphanedSteamHelpers(in: space) }
             if !(await Self.isSteamRunning(in: space)) {
                 // Closed on purpose: nothing that closed with it is a failure to learn from.
                 for g in state.games(in: space) { autoLaunches[g.id] = nil }
