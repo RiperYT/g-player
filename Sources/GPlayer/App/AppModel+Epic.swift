@@ -37,11 +37,12 @@ typealias EpicReplan = @Sendable (LegendaryLaunch) throws -> LaunchPlan
 extension AppModel {
     // MARK: What is on this Mac
 
-    /// The list of games from the last time, and a look at who is signed in and what is installed.
+    /// The list of games from the last time. Nothing is started: each Legendary command takes seconds, so who is signed in and
+    /// what is installed are looked at when the Epic Games page opens (`openEpicPage`) or something changes them.
     func loadEpic() {
         guard let paths else { return }
         epic.games = EpicGames.loadList(in: paths)
-        lookAtEpic()
+        fetchMissingCovers()
     }
 
     /// Asks Legendary who is signed in and which games it has installed (from what is on this Mac: no Epic account is asked,

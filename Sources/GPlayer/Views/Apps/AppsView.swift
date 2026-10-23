@@ -85,7 +85,7 @@ private struct EpicGamesCard: View {
                 }
                 Text("Sign in with your Epic account and install your games without Epic's launcher, with Legendary, an open-source Epic client.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button(model.epic.isSignedIn ? "Open" : "Sign In…") { model.selection = .epic }
+                Button("Open") { model.selection = .epic }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 4)
             }

@@ -94,7 +94,8 @@ public struct Legendary: Sendable {
     func prepareConfig() throws {
         let fm = FileManager.default
         try fm.createDirectory(at: configFolder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configFolder.path)
+        // A folder that was there already may be looser. (A disk that keeps no permissions says no, and nothing can be done.)
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configFolder.path)
         let file = configFolder.appendingPathComponent("config.ini")
         let current = try? String(contentsOf: file, encoding: .utf8)
         let wanted = Self.config(updating: current)
