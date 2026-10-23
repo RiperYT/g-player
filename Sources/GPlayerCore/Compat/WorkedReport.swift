@@ -140,7 +140,7 @@ public struct WorkedReport: Sendable, Equatable {
             if includesSteamAppID, !appID.isEmpty, appID.allSatisfy({ $0.isASCII && $0.isNumber }) {
                 lines.append("Steam app ID: \(appID)")
             }
-        case .epic:
+        case .epic, .legendary:
             lines.append("Store: Epic")
         case .executable:
             lines.append("Store: Added .exe")

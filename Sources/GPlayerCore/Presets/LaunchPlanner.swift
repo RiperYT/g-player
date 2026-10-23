@@ -71,10 +71,11 @@ extension LaunchPlan {
 
 public enum LaunchPlanner {
     public enum PlanError: LocalizedError {
-        case missingExecutable(String), launcherMissing(String)
+        case missingExecutable(String), launcherMissing(String), epicFilesMissing(String)
         public var errorDescription: String? {
             switch self {
             case .missingExecutable(let t): "\(t) has no program to start. Choose one in its settings."
+            case .epicFilesMissing(let t): "\(t)'s files aren't where Epic Games installed them. Open Epic Games in the sidebar to repair or remove it."
             case .launcherMissing(let n): "\(n) isn't installed in this space yet."
             }
         }
@@ -88,9 +89,13 @@ public enum LaunchPlanner {
     ///   - ready: the backends the installed engine can run now (`Engine.readyBackends`); all of them when nil.
     ///   - launcher: the settings the running Steam was started with, when G-Player knows; a plain start (the engine's
     ///     default backend, no variables) otherwise. A Steam game whose settings differ needs Steam restarted.
+    ///   - legendary: how Legendary says to start an Epic game it installed, which holds a one-time code (so it is asked for
+    ///     right before the start, and the plan made with it is used at once). Without it the plan has everything but that:
+    ///     what the checks before a launch need (the layers, components, the program).
     public static func plan(for game: Game, in space: Space, fixes: [GameFix] = [], verboseLogs: Bool = false,
                             programNames: [String]? = nil, screen: CGSize? = nil,
-                            ready: [GraphicsBackend]? = nil, launcher: LauncherSettings? = nil) throws -> LaunchPlan {
+                            ready: [GraphicsBackend]? = nil, launcher: LauncherSettings? = nil,
+                            legendary: LegendaryLaunch? = nil) throws -> LaunchPlan {
         let preset = AppPresets.preset(space.presetID)
         let catalogued = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
         let engine = ready.map { catalogued.limited(to: $0) } ?? catalogued
@@ -104,7 +109,8 @@ public enum LaunchPlanner {
         let dotNet = hasDotNet(space)
 
         var environment = preset?.environment ?? [:]
-        for (k, v) in compat?.environment ?? [:] { environment[k] = v }
+        for (k, v) in legendary?.environment ?? [:] { environment[k] = v }           // Legendary's: only what a game may get
+        for (k, v) in compat?.environment ?? [:] { environment[k] = v }              // the layers' win over it
         for (k, v) in game.environment { environment[k] = v }                        // the user's own settings win
         var overrides = preset?.dllOverrides ?? []
         overrides += (compat?.dllOverrides ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }
@@ -124,7 +130,7 @@ public enum LaunchPlanner {
             guard !isLauncher, game.analysis?.engine == .unity else { return [] }
             // A program the user added is found from the space (the library may have moved since the analysis).
             let program: URL? = switch game.source {
-            case .executable: game.executableURL(in: space)
+            case .executable, .legendary: game.executableURL(in: space)
             case .steam, .epic: game.analysis?.programPath.map { URL(fileURLWithPath: $0) }
             }
             guard let program else { return [] }
@@ -154,6 +160,20 @@ public enum LaunchPlanner {
             return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
                               tweaks: tweaks, chromiumHelpers: helpers, components: compat?.components ?? [],
                               registry: registry, compat: compat, launcherSettings: launcherSettings)
+
+        case .legendary:
+            // TODO: some Epic games want Epic's launcher (EpicGamesLauncher.exe) as their parent; a stand-in isn't made yet.
+            // The program Legendary names for this launch; before that, the one it installed.
+            guard let exe = legendary?.executableURL ?? game.executableURL(in: space),
+                  FileManager.default.fileExists(atPath: exe.path) else { throw PlanError.epicFilesMissing(game.title) }
+            // Legendary's order: the game's arguments, the user's, and last Epic's sign-in arguments, which the fixes' replacements
+            // never touch. G-Player's own (the profile, the fixes) go with the game's.
+            let own = (legendary?.gameParameters ?? []) + gameArguments() + (legendary?.userParameters ?? [])
+            let args = CompatResolver.apply(compat?.replacements ?? [], to: WineLauncher.arguments(toOpen: exe, extra: own))
+                + (legendary?.eglParameters ?? [])
+            return LaunchPlan(arguments: args, workingDirectory: legendary?.workingDirectoryURL ?? exe.deletingLastPathComponent(),
+                              backend: backend, tweaks: tweaks, chromiumHelpers: helpers, components: compat?.components ?? [],
+                              registry: registry, compat: compat)
 
         case .steam(let appID):
             let steam = AppPresets.steam
@@ -211,7 +231,7 @@ public enum LaunchPlanner {
     static func programNames(of game: Game, in space: Space, fixes: [GameFix], given: [String]?) -> [String] {
         if let given { return given }
         switch game.source {
-        case .executable: return game.executableURL(in: space).map { [$0.lastPathComponent] } ?? []
+        case .executable, .legendary: return game.executableURL(in: space).map { [$0.lastPathComponent] } ?? []
         case .steam(let appID): return fixes.isEmpty ? [] : SteamLibrary.programNames(appID: appID, in: space)
         case .epic: return []
         }

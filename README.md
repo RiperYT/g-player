@@ -7,6 +7,8 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 
 - **One library.** Steam and Epic games show up on their own. Add any other game by dropping its folder,
   its zip/rar/7z archive or its installer onto the window.
+- **Epic games without Epic's launcher.** Sign in on Epic's own page and install your Epic games with
+  [Legendary](https://github.com/legendary-gl/legendary), an open-source Epic client (see [Epic Games](#epic-games-without-epics-launcher)).
 - **Your library, your way.** Real icons read from each program, cover art for Steam games, and any game
   can be hidden and brought back later.
 - **Spaces.** Each space is a separate Windows (a Wine prefix) with its own C: drive. Browse its files,
@@ -15,9 +17,10 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
   it the way MaPC does (see [How Steam works here](docs/HOW-STEAM-WORKS.md)).
 - **Brings over what you have.** CrossOver bottles, Whisky bottles and hand-made prefixes are found on first
   launch and used in place, with their games and saves. G-Player asks once before it changes one of them.
-- **No account, no telemetry.** G-Player talks to GitHub (engine downloads, and whether a newer G-Player is out), the
-  stores' own CDNs (installers, cover art), the makers of Windows components when it installs them (Microsoft,
-  NVIDIA…), and nothing else.
+- **No account, no telemetry.** G-Player talks to GitHub (engine downloads, Legendary, and whether a newer G-Player is out),
+  the stores' own CDNs (installers, cover art), the makers of Windows components when it installs them (Microsoft, NVIDIA…),
+  and, if you use Epic Games, Legendary does: it talks to Epic's servers for your library, installs and launches, and to
+  `legendary.gl` (`api.legendary.gl`) for its own version information when you sign in. Nothing else.
 
 ## Download
 
@@ -43,6 +46,36 @@ The first minutes of a game can stutter while shaders compile. That settles once
 
 When a game runs well, **Share What Worked…** in its panel opens a GitHub issue, filled in with the engine, graphics and
 settings that worked, for you to read and submit; G-Player itself sends nothing.
+
+### Epic Games without Epic's launcher
+
+Epic's own launcher stops at its loading screen under Wine (it is still in **Get Apps**, for those who have it set up). The
+way G-Player recommends for Epic is **Epic Games** in the sidebar:
+
+1. **Sign In…** opens Epic's own sign-in page in a window. You sign in there, with Epic, Google, Apple or whatever you use. Your
+   password goes to Epic and never to G-Player, which reads nothing on that page; it only takes the one-time code Epic's page
+   gives the app that asked, and hands it to Legendary. The window keeps nothing. If you'd rather use your own browser, **Sign
+   in in your browser instead** explains `legendary.gl` (a helper page by Legendary's authors that shows the code) and opens it
+   on a button, and takes the code you paste.
+2. Before the first sign-in the page says that G-Player downloads Legendary 0.21.1 (15 MB) from its GitHub release. It checks the
+   file against a pinned SHA-256 before every run, and keeps it, with its settings and your sign-in token, in `Tools` in your
+   library folder (a library on an exFAT, network or iCloud disk can't keep that token private). It isn't part of G-Player: it
+   runs as a separate program, and it is the same program Heroic Games Launcher uses.
+3. The page lists the games your account owns. **Install…** asks first: where the game goes (a space of its own, "Epic Games",
+   on G-Player Wine, made first if it isn't there, with G-Player Wine downloaded first if it isn't installed), and how much room
+   it takes. Then it installs one game at a time, with progress and a Stop in the sidebar (installing again goes on from where it
+   stopped). **Play** starts it the way G-Player starts any game, with its graphics, components and automatic retry. Each start
+   asks Epic for a one-time code to log the game in, so it needs your sign-in; when Epic can't be reached the game starts
+   without the code, which most single-player games accept, and its panel says "Started offline". **Uninstall…** is on the
+   game's panel and on this page. **Sign Out** forgets the login on this Mac.
+4. If you move your library folder or its disk, Legendary still has the old place on record: the game says "Files not found" and
+   offers **Repair** when its files are in this library's Epic Games space, or **Remove…**, which makes Legendary forget it
+   without deleting a file. Nothing about the game is lost until you remove it.
+
+Not in this version: updating games, verify and repair, cloud saves, Epic's overlay, and the installers of a game's
+prerequisites. Games with EasyAntiCheat or BattlEye don't run on a Mac. Legendary isn't made by Epic, and Epic hasn't published
+a position on programs like it; G-Player doesn't get around any anti-cheat or protection. Legendary takes a few
+seconds to start each time, so Play waits a moment before the game opens.
 
 ### Engines
 
@@ -92,7 +125,8 @@ G-Player stands on other people's work:
 [Gcenx's macOS Wine builds and DXVK for macOS](https://github.com/Gcenx),
 [DXVK](https://github.com/doitsujin/dxvk), [MoltenVK](https://github.com/KhronosGroup/MoltenVK), and
 [MaPC's open-source MacadeKit](https://github.com/abduzeedo/mapc-engine) (Apache-2.0), where the Steam
-helper wrapper comes from.
+helper wrapper comes from, and [Legendary](https://github.com/legendary-gl/legendary) (GPL-3.0), which G-Player downloads and
+runs for Epic Games.
 
 ## License
 

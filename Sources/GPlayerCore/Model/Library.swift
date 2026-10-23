@@ -8,8 +8,50 @@ public struct LibraryState: Codable, Sendable, Equatable {
     /// Older libraries kept hidden store games here. Discovery turns them into entries with `hidden` set
     /// (see `StoreMerge`). Still decoded so old files load.
     public var hiddenStoreKeys: Set<String> = []
+    /// Games this version of G-Player can't read: one a newer version wrote with a source or a field this one doesn't know. They
+    /// are kept exactly as they were written and written back on every save, so an older version never costs a newer one its
+    /// games, and they are not shown or used. A library file that is damaged in any other way is still refused.
+    public var unreadableGames: [JSONValue] = []
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey { case version, spaces, games, hiddenStoreKeys }
+
+    /// A game that can't be read goes to `unreadableGames` instead of failing the whole library.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(Int.self, forKey: .version)
+        spaces = try c.decode([Space].self, forKey: .spaces)
+        hiddenStoreKeys = try c.decode(Set<String>.self, forKey: .hiddenStoreKeys)
+        var list = try c.nestedUnkeyedContainer(forKey: .games)
+        while !list.isAtEnd {
+            switch try list.decode(GameRecord.self) {
+            case .game(let game): games.append(game)
+            case .unreadable(let raw): unreadableGames.append(raw)
+            }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(version, forKey: .version)
+        try c.encode(spaces, forKey: .spaces)
+        try c.encode(hiddenStoreKeys, forKey: .hiddenStoreKeys)
+        var list = c.nestedUnkeyedContainer(forKey: .games)
+        for game in games { try list.encode(game) }
+        for raw in unreadableGames { try list.encode(raw) }
+    }
+
+    /// One entry of `games`: a game, or what could not be read as one.
+    private enum GameRecord: Decodable {
+        case game(Game)
+        case unreadable(JSONValue)
+
+        init(from decoder: Decoder) throws {
+            if let game = try? Game(from: decoder) { self = .game(game) }
+            else { self = .unreadable(try JSONValue(from: decoder)) }
+        }
+    }
 
     public func space(_ id: UUID) -> Space? { spaces.first { $0.id == id } }
     public func games(in space: Space) -> [Game] { games.filter { $0.spaceID == space.id } }

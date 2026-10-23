@@ -31,11 +31,18 @@ struct GameInspector: View {
 
                 PlayStopButton(game: game)
 
+                if let note = model.epic.startNotes[game.id] {
+                    Label(note, systemImage: "wifi.slash").font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if model.isRunning(game), !model.isPreparing(game), let other = model.otherGraphics(for: game) {
                     PictureMissingButton(game: game, other: other)
                 }
 
                 facts(space)
+
+                if case .legendary = game.source { EpicFilesNote(game: game) }
 
                 if let space, case .executable = game.source { executableSettings(space) }
                 if let space {
@@ -67,6 +74,7 @@ struct GameInspector: View {
         }
         .onAppear(perform: sync)
         .onChange(of: game.id) { sync() }
+        .task(id: game.id) { if case .legendary = game.source { model.lookAtEpicIfNeeded() } }
         .task(id: [game.id.uuidString, game.executablePath ?? ""]) {
             details = nil
             let exe = model.space(game.spaceID).flatMap { game.executableURL(in: $0) }
@@ -90,6 +98,14 @@ struct GameInspector: View {
             Button("Remove from Library…", role: .destructive) { model.gamePendingRemoval = game }
                 .buttonStyle(.link).foregroundStyle(.red)
             Text("Removing keeps the game's files. Delete them from the space's files if you want the disk space back.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        if case .legendary = game.source {
+            let block = model.epicUninstallBlock(for: game)
+            Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
+                .buttonStyle(.link).foregroundStyle(.red)
+                .disabled(block != nil).help(block ?? "")
+            Text("Deletes the game's files from its space. Install it again from Epic Games in the sidebar.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -208,8 +224,8 @@ private struct PlayStopButton: View {
         let running = model.isRunning(game)
         Button(action: act) { label(retry: retry, running: running) }
             .buttonStyle(.borderedProminent).controlSize(.large)
-            .disabled(model.isPreparing(game) && (retry == .none || retry == .stopping))
-            .help(help(retry: retry, running: running))
+            .disabled(model.isPreparing(game) && (retry == .none || retry == .stopping) || model.epicPlayBlock(for: game) != nil)
+            .help(model.epicPlayBlock(for: game) ?? help(retry: retry, running: running))
             .keyboardShortcut(.return, modifiers: [])
     }
 
@@ -232,7 +248,7 @@ private struct PlayStopButton: View {
             Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity)
         case .none:
             if model.isPreparing(game) {
-                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…")
+                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…")
             } else {
                 Label(running ? "Stop" : "Play", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity)
             }

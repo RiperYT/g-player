@@ -94,6 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// A Legendary download left running would go on with no window to show it; it goes on from where it stopped next time.
+    func applicationWillTerminate(_ notification: Notification) { Legendary.stopRunning() }
+
     /// Why the quit that is being handled was asked for: the reason in its Apple event, when the system sent it.
     private static var quitReason: UInt32? {
         NSAppleEventManager.shared().currentAppleEvent?.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue

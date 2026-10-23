@@ -14,6 +14,7 @@ struct AppsView: View {
                         .foregroundStyle(.secondary)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16, alignment: .top)], spacing: 16) {
+                    EpicGamesCard()
                     ForEach(AppPresets.all) { PresetCard(preset: $0) }
                 }
                 Text("Experimental apps install, but haven't been checked from start to finish on Apple Silicon yet. Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) don't run under Wine.")
@@ -59,6 +60,34 @@ struct PresetCard: View {
                     }
                 }
                 .padding(.top, 4)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Epic's store through Legendary: the way G-Player recommends, since Epic's own launcher stops at its loading screen under Wine.
+private struct EpicGamesCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "shippingbox").font(.system(size: 22, weight: .regular))
+                .frame(width: 44, height: 44)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("Epic Games").font(.headline)
+                    Text("Recommended").font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 6).padding(.vertical, 2).background(Color.accentColor.opacity(0.12), in: Capsule())
+                }
+                Text("Sign in with your Epic account and install your games without Epic's launcher, with Legendary, an open-source Epic client.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Button("Open") { model.selection = .epic }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
             }
             Spacer(minLength: 0)
         }

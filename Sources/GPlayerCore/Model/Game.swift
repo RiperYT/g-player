@@ -11,12 +11,25 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
         case steam(appID: String)
         /// An Epic game, started through the Epic Games Launcher.
         case epic(appName: String, launchURI: String)
+        /// An Epic game G-Player installed with Legendary, without Epic's launcher. G-Player starts its program itself, with
+        /// the parameters Legendary gives for that launch (`LegendaryLaunch`). `appName` is Legendary's name for the game.
+        case legendary(appName: String)
 
         public var label: String {
             switch self {
             case .executable: "Added by you"
             case .steam: "Steam"
             case .epic: "Epic"
+            case .legendary: "Epic Games"
+            }
+        }
+
+        /// G-Player starts the game's own program (an .exe the user added, or an Epic game installed with Legendary), where Steam
+        /// and Epic's launcher start theirs themselves.
+        public var startsProgramItself: Bool {
+            switch self {
+            case .executable, .legendary: true
+            case .steam, .epic: false
             }
         }
     }
@@ -94,6 +107,11 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
 
     public var isHidden: Bool { hidden == true }
 
+    /// Legendary's name for the game, when it is an Epic game G-Player installed.
+    public var legendaryAppName: String? {
+        if case .legendary(let name) = source { name } else { nil }
+    }
+
     /// Only games the user added can be removed. A store game would come back, a launcher is rebuilt, so those are hidden instead.
     public var canRemove: Bool { source == .executable && kind == .game }
 
@@ -116,6 +134,8 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
         case .executable: nil
         case .steam(let id): "steam:\(id)"
         case .epic(let name, _): "epic:\(name)"
+        // Not a store key: the store doesn't list these (`StoreMerge`), Legendary does (`EpicGames.merge`).
+        case .legendary: nil
         }
     }
 }

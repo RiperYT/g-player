@@ -170,6 +170,9 @@ struct GameTile: View {
             if model.didNotStart(game) && !model.isRunning(game) && !model.isPreparing(game) {
                 Label("Didn't start · see what to try", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.orange).lineLimit(1)
+            } else if let note = model.epicNote(for: game) {
+                Label("\(note.title) · see Epic Games", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.orange).lineLimit(1)
             } else {
                 Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -185,7 +188,7 @@ struct GameTile: View {
     }
 
     private var subtitle: String {
-        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…" }
+        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…" }
         if model.isRunning(game) { return "Running" }
         if let d = game.lastPlayedAt { return "Played " + d.formatted(.relative(presentation: .named)) }
         if game.kind == .app { return "Launcher" }
@@ -219,6 +222,10 @@ struct GameMenu: View {
         }
         if game.canRemove {
             Button("Remove from Library…", role: .destructive) { model.gamePendingRemoval = game }
+        }
+        if case .legendary = game.source {
+            Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
+                .disabled(model.epicUninstallBlock(for: game) != nil)
         }
     }
 }

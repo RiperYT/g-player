@@ -37,7 +37,7 @@ extension Game {
     var symbol: String {
         switch source {
         case .steam: "cloud"
-        case .epic: "shippingbox"
+        case .epic, .legendary: "shippingbox"
         case .executable: kind == .app ? "macwindow" : "gamecontroller"
         }
     }

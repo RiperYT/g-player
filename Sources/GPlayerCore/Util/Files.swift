@@ -78,6 +78,25 @@ public enum Files {
         return candidate
     }
 
+    /// Writes `data` so that only the user can read the file, from its first byte: it is made 0600 under a temporary name
+    /// (`Leftovers.isComponentDownload` knows it) and then put in place, so there is no moment when it could be read by others.
+    public static func writePrivately(_ data: Data, to url: URL) throws {
+        let fm = FileManager.default
+        let folder = url.deletingLastPathComponent()
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = folder.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString.prefix(8))")
+        guard fm.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            throw ShellError.failed("Couldn't write \(url.lastPathComponent).")
+        }
+        do {
+            if fm.fileExists(atPath: url.path) { _ = try fm.replaceItemAt(url, withItemAt: temporary) }
+            else { try fm.moveItem(at: temporary, to: url) }
+        } catch {
+            try? fm.removeItem(at: temporary)
+            throw error
+        }
+    }
+
     /// Removes Gatekeeper's quarantine flag from downloaded engine files.
     public static func clearQuarantine(_ url: URL) async {
         _ = try? await Shell.run(Shell.tool("xattr"), ["-dr", "com.apple.quarantine", url.path])

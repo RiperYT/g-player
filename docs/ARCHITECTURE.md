@@ -16,6 +16,9 @@ Sources/
                         PEInfo (CPU, .NET, 32-bit warning) + PEIcon (.exe icon → .ico) read from PE headers,
                         EnvironmentFinder (CrossOver/Whisky/~/Games prefixes, old launcher scripts)
     Presets/            AppPreset (Steam, Epic, GOG, Ubisoft), PresetInstaller, LaunchPlanner
+    Epic/               Legendary (the runner and its pinned download), LegendaryCommand (command lines),
+                        LegendaryOutput / LegendaryInstallStatus / LegendaryFailure (what it prints),
+                        EpicSignIn (the code from Epic's sign-in page), EpicGames (space, library merge)
     Resources/          chromium-helper-wrapper.exe (built from tools/)
   GPlayer/              the SwiftUI app
     App/                GPlayerApp, AppModel (state, actions, persistence), SnapshotRenderer (UI to PNGs)
@@ -48,6 +51,7 @@ G-Player/
   Covers/           cover art and program icons
   Logs/             one log per launch (the command, the DLL overrides, Wine's output)
   Downloads/        installers while they run
+  Tools/            Legendary (legendary-0.21.1/), its settings (legendary-config/, 0700) and the list of Epic games
 ```
 
 Spaces found elsewhere (a CrossOver bottle) stay where they are. `library.json` stores their absolute path,
@@ -61,6 +65,67 @@ Empty). Start Empty first keeps the previous copy as `library.json.before-empty-
 saves would rotate it away; neither dated copy is ever deleted. Locate… is also how a library is moved: quit, move the
 folder, start G-Player, choose it. The spaces G-Player made in it (not those found elsewhere on the Mac) are pointed at
 the new place (`LibraryState.movingLibrary`).
+
+## Epic Games without Epic's launcher
+
+Epic's own launcher stops at its loading screen under Wine, so G-Player can also install and start Epic games through
+[Legendary](https://github.com/legendary-gl/legendary) (GPL-3.0-or-later), as Heroic does. Legendary is never bundled or linked:
+the Mac downloads the pinned release (`Legendary.download`, `Tools/legendary-0.21.1/`) the first time the user signs in, and
+G-Player runs it as a separate program (`Legendary.run`).
+
+- **Isolated and checked.** `LEGENDARY_CONFIG_PATH` is `Tools/legendary-config` (0700), whose `config.ini` sets
+  `default_platform = Windows` (Legendary's default on a Mac is `Mac`), `disable_auto_crossover` (G-Player passes `--wine` itself)
+  and `disable_update_check`. The environment it gets is a short list (`Legendary.environment`), never a `CX_BOTTLE` or
+  `WINEPREFIX` of the app's own, and stdin is closed, so nothing can wait for an answer. **Every run** is preceded by a SHA-256 check
+  of the file against the pin (`Legendary.verified`), since it sits in the user's folder and is given a login and one-time codes.
+  `LegendaryCommand` builds the command lines (global flags such as `-y` before the subcommand, `--platform Windows`,
+  `--skip-sdl --skip-dlcs` on install so nothing is asked); `LegendaryOutput` reads what it prints with `--json`, leniently.
+  Legendary exits with 0 after some failures (a refused code, an uninstall that could not delete, a move that didn't happen), so each
+  operation is judged by what its own list says afterwards (`status`, `list-installed`, and the program being on the disk). Each kind
+  of command has a limit (`Legendary.Limits`), and a stop or a limit is reported only once the process is gone, because it holds
+  a lock on what it installs. Its process ids are kept in `running.pids`; at start G-Player ends the ones still running this very
+  Legendary file (`Legendary.endLeftovers`: a crash must not leave an install running), never one of its own run.
+- **Signing in.** The sheet shows Epic's login page in a web view with no stored data. Epic's own pages (`epicgames.com`) are told
+  the browser is the Epic Games Launcher (`EpicSignIn.userAgent`), Google's and Apple's pages are not. The user signs in there; the
+  sheet only looks at a navigation of the page itself to `localhost` (http or https) with `?code=` and, on Epic's redirect page
+  (`EpicSignIn.isRedirectPage`), at that page's text, a JSON with `authorizationCode`: never a frame inside a page, never another
+  address. No form is read and nothing is injected. The code goes to `legendary auth --code`. The other way is the helper page
+  legendary.gl in the user's browser (explained first, opened by a button) and a pasted code (`EpicSignIn.code(fromPasted:)`: 30 or
+  more letters and digits). Legendary keeps the token in `Tools/legendary-config`, which only a disk that keeps permissions protects;
+  the sheet says so.
+- **In the library.** Games install into a space of their own, "Epic Games" (`EpicGames.presetID`), made on G-Player Wine
+  (`EpicGames.engineForSpace`: downloaded first if it isn't installed, never Wine Staging), under `drive_c/Games/Epic`, after a
+  question that says where the game goes, what is fetched first and, once Legendary has said (`info --json`), how much room it
+  takes. One install at a time (Legendary locks what it installs; progress is read from its log, `LegendaryInstallStatus`; Stop ends
+  Legendary, and so does quitting G-Player; the next install goes on from its resume file); an install isn't first-run "setup" in
+  the quit question. Nothing runs at start but, for a library that has an Epic game, one look at what Legendary has (each command
+  takes seconds); otherwise it is looked at when the Epic Games page or such a game's panel opens, on Refresh, or when something
+  changes it. A look that fails is a line (`EpicGames.lookFailureLine`) and changes nothing else: who was signed in and the games are
+  kept in `Tools/epic-library.json` (0600, `EpicGames.Cache`), and only Legendary saying "not logged in" shows the sign-in card
+  (`EpicGames.page`). What Legendary lists as installed becomes library entries with the source `.legendary(appName:)`
+  (`EpicGames.merge`), which **never removes** an entry: Legendary records absolute paths, so a moved library or another volume makes
+  every game's files "not found" (`EpicGames.health`), and the game keeps its playtime and settings. A game whose files are in the
+  current Epic Games space at the same place offers Repair (`legendary move --skip-move`, `Legendary.relink`); any other offers
+  Remove…, which makes Legendary forget it (`uninstall --keep-files`; no file is touched). Uninstall and Remove take the entry out
+  themselves.
+- **A launch.** A `.legendary` game is a program G-Player starts itself, so it goes through `LaunchPlanner` like one the user
+  added (layers, components, graphics retry, running-program detection). Everything is settled with a plan made without Epic's
+  parameters; then, right before Wine starts, `legendary launch --json` gives the program, folder, arguments and environment (and
+  a one-time exchange code, `-AUTH_PASSWORD=…`, that logs the game in for a few minutes), and the launch is planned again with them
+  (`LaunchPlanner.plan(legendary:)`): Legendary's game arguments, G-Player's, the user's, and Epic's sign-in arguments last. Of
+  Legendary's environment only names on a whitelist pass (`LegendaryOutput.gameVariables`, empty: Legendary sets nothing a game
+  needs), never one of G-Player's (`WINE*`, `GST_*`, `DXVK_*`, `PATH`…), and below the layers' and the user's own. It goes online;
+  only when Epic can't be reached (no network, no answer in time) it asks again with `--offline`, and the game's panel says
+  "Started offline: …". Any other failure is shown. While it asks, the game's tile says "Asking Epic for the launch parameters…".
+- **Library files.** The first Epic game goes into `library.json` only after `library.json.before-epic-<date>` was kept
+  (`LibraryStore.keepBeforeEpic`), since a G-Player from before Epic Games takes such a file for damaged. In the other direction, a
+  game this version can't read (a source or field of a newer one) is not a reason to refuse the library: `LibraryState` keeps it as
+  raw JSON (`JSONValue`, `unreadableGames`), writes it back unchanged on every save and shows and uses nothing of it.
+- **Secrets.** `LaunchSecrets` hides the code (and the account's name and id) in the launch log's header and in the text of an
+  error; `LegendaryLaunch` prints masked; the output of `launch` and `auth` is never logged; no address that holds a code is
+  logged. The code is still in the process list while the game runs, as with any launcher.
+- **Not yet** (TODO where the code has a natural place): updating, verify and repair, cloud saves, Epic's overlay, prerequisite
+  installers, and the stand-in `EpicGamesLauncher.exe` some games look for.
 
 ## Engine revisions
 

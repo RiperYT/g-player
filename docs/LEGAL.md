@@ -29,14 +29,28 @@ The user's Mac fetches these from their original sources and checks each against
 | GStreamer 1.28.8 (the runtime package, for game videos in G-Player Wine) | LGPL-2.1+ (GStreamer), LGPL (glib), MIT (libffi, graphene), BSD (pcre2, orc), libpng and libjpeg-turbo under their own licenses | The GStreamer project's official macOS package (`gstreamer-1.0-1.28.8-universal.pkg` from gstreamer.freedesktop.org). G-Player expands it on the user's Mac and copies only the files G-Player Wine lists (`gstreamer-files.txt` in its archive) into the user's G-Player Wine, unchanged. |
 | DXVK for macOS 1.10.3 | zlib | Gcenx on GitHub |
 | winetricks 20260125 | LGPL-2.1+ | GitHub; run as a separate program |
+| Legendary 0.21.1 (`legendary_macOS_arm64`, 15 275 984 bytes) | GPL-3.0-or-later | `legendary-gl/legendary`'s GitHub release; run as a separate program, on command-line arguments and its output, never linked or bundled and not part of G-Player. Downloaded only when the user first signs in to Epic Games; its source is in the same repository. |
 | Visual C++ 2015–2022 Redistributable | Microsoft | Microsoft's download servers |
 | `d3dcompiler_47.dll` | Microsoft | `mozilla/fxc2`, as winetricks does |
 | Other components (DirectX, .NET, PhysX, XNA, OpenAL, fonts) | Each maker's | The sources winetricks pins |
 | Store installers | Each store's | Valve, Epic, GOG, Ubisoft |
 | Steam cover art | Valve | Valve's CDN, cached locally, never redistributed |
+| Epic game box art | Epic | Epic's CDN, cached locally, never redistributed |
 
 Microsoft's runtimes and fonts can't be bundled with an app like this, which is why they are only ever
 downloaded onto the user's Mac when a game needs them.
+
+## Epic Games through Legendary
+
+Legendary is GPL-3.0-or-later software and G-Player is Apache-2.0, so G-Player never includes it: it is a separate program
+that the user's Mac downloads and runs, talking to it only through arguments and what it prints (the same terms as winetricks
+above). Its login and settings stay in the user's library folder (`Tools/legendary-config`, readable by the user only on a disk that keeps permissions: not on exFAT, most network volumes or iCloud). G-Player
+turns off Legendary's check for newer versions; it still asks legendary.gl for its version information once, when you sign in,
+and for the few games with selectable language packs, which packs there are, and sends nothing about the account.
+
+Legendary isn't made or endorsed by Epic Games, and Epic hasn't published a position on third-party clients such as it and
+Heroic Games Launcher. G-Player doesn't bypass anti-cheat or copy protection: games that need EasyAntiCheat or BattlEye don't
+run on a Mac, and G-Player says so. The user signs in on Epic's own page; G-Player never sees the password.
 
 ## Apple's Game Porting Toolkit
 
