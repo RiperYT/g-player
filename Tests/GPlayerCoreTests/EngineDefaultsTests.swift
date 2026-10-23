@@ -73,9 +73,10 @@ import Testing
         #expect(download.approximateBytes > 0)
     }
 
-    @Test func firstRunInstallsStagingBeforeGPlayerWine() {
-        #expect(EngineCatalog.firstRunInstalls.map(\.id) == [staging.id, gplayerWine.id])
-        // G-Player Wine's runtime libraries come from Staging's download, so it must be there first.
+    @Test func firstRunInstallsOnlyGPlayerWine() {
+        #expect(EngineCatalog.firstRunInstalls.map(\.id) == [gplayerWine.id])
+        // Wine Staging isn't installed as an engine: G-Player Wine's runtime libraries come from Gcenx's archive of it, which
+        // is downloaded for them (and deleted after).
         #expect(gplayerWine.downloads.contains { $0.role == .runtimeLibraries && $0.sha256 == staging.downloads[0].sha256 })
     }
 
@@ -124,15 +125,14 @@ import Testing
     }
 
     @Test func firstRunDownloadSizeSkipsLibrariesStagingAlreadyBrings() {
-        let stagingBytes = staging.downloadBytes(wineStagingInstalled: false)
         let withoutLibraries = gplayerWine.downloadBytes(wineStagingInstalled: true)
         let withLibraries = gplayerWine.downloadBytes(wineStagingInstalled: false)
         #expect(withLibraries - withoutLibraries == staging.downloads[0].approximateBytes)
-        // Nothing installed: Staging, then G-Player Wine reusing Staging's libraries, so the archive is downloaded once.
-        #expect(EngineCatalog.firstRunBytes(installed: []) == stagingBytes + withoutLibraries)
+        // Nothing installed: G-Player Wine with Gcenx's archive for its libraries, which is downloaded once.
+        #expect(EngineCatalog.firstRunBytes(installed: []) == withLibraries)
         #expect(EngineCatalog.firstRunBytes(installed: [staging]) == withoutLibraries)
-        #expect(EngineCatalog.firstRunBytes(installed: [gplayerWine]) == stagingBytes)
+        #expect(EngineCatalog.firstRunBytes(installed: [gplayerWine]) == 0)
         #expect(EngineCatalog.firstRunBytes(installed: [staging, gplayerWine]) == 0)
-        #expect(EngineCatalog.firstRunBytes(installed: [EngineCatalog.gptk]) == stagingBytes + withoutLibraries)
+        #expect(EngineCatalog.firstRunBytes(installed: [EngineCatalog.gptk]) == withLibraries)
     }
 }

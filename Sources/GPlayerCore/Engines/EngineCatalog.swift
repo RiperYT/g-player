@@ -220,18 +220,19 @@ public enum EngineCatalog {
         return has(defaultForNewSpaces) || !has(wineStaging) ? defaultForNewSpaces : wineStaging
     }
 
-    /// What the first run installs, in order. Wine Staging goes first so G-Player Wine copies its runtime libraries
-    /// instead of downloading the same archive again; Staging stays as the alternative engine.
-    public static let firstRunInstalls = [wineStaging, crossover]
+    /// What the first run installs: G-Player Wine alone. Its runtime libraries come out of Gcenx's Wine Staging archive, which
+    /// is downloaded for them and deleted (`EngineManager.install`); Wine Staging itself isn't installed as an engine.
+    public static let firstRunInstalls = [crossover]
 
-    /// The engine for the spaces the first run creates: G-Player Wine, or Wine Staging when G-Player Wine couldn't
-    /// be installed, so there is always an engine. Nil with neither installed: those spaces wait for an engine.
+    /// The engine for the spaces the first run creates: G-Player Wine, or an installed Wine Staging (an earlier version of
+    /// G-Player put it there) when G-Player Wine couldn't be installed, so there is an engine. Nil with neither installed:
+    /// those spaces wait for G-Player Wine. Wine Staging is never installed for this.
     public static func firstRunEngine(installed: [EngineInfo]) -> EngineInfo? {
         installed.contains { $0.id == crossover.id || $0.id == wineStaging.id } ? engineForNewSpace(installed: installed) : nil
     }
 
     /// What the first run still has to download, in bytes: the engines of `firstRunInstalls` that aren't installed,
-    /// leaving out G-Player Wine's runtime libraries once Wine Staging is (or by then will be) there.
+    /// leaving out G-Player Wine's runtime libraries when an installed Wine Staging has them.
     public static func firstRunBytes(installed: [EngineInfo]) -> Int64 {
         var have = Set(installed.map(\.id))
         var total: Int64 = 0
@@ -250,7 +251,7 @@ public enum EngineCatalog {
             + (infos.flatMap(\.downloads).map { $0.approximateBytes + $0.scratchBytes }.max() ?? 0)
     }
 
-    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 3.3 GB for both).
+    /// The free space the first run's engine needs, if it isn't installed yet (about 2.6 GB for G-Player Wine).
     public static func firstRunDiskBytes(installed: [EngineInfo]) -> Int64 {
         diskBytes(installing: firstRunInstalls.filter { first in !installed.contains { $0.id == first.id } })
     }

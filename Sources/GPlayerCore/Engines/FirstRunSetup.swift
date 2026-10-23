@@ -1,20 +1,21 @@
 import Foundation
 
-/// The words of the first run, made from facts: how much the engines download and take on disk, what G-Player is doing
+/// The words of the first run, made from facts: how much G-Player Wine downloads and takes on disk, what G-Player is doing
 /// while the library waits for it, and what to know before bringing bottles over. Pure, so tests hold the figures.
 public enum FirstRunSetup {
-    /// What the first run's two engines need on this disk: unpacked, with room for the archive being unpacked.
+    /// What the first run's engine needs on this disk: unpacked, with room for the archive being unpacked.
     public static var diskBytes: Int64 { EngineCatalog.diskBytes(installing: EngineCatalog.firstRunInstalls) }
-    /// "3.3 GB" for both engines; less once one is installed.
+    /// "2.6 GB" for G-Player Wine; nothing once it is installed.
     public static func diskLabel(installed: [EngineInfo] = []) -> String {
         String(format: "%.1f GB", Double(EngineCatalog.firstRunDiskBytes(installed: installed)) / 1_000_000_000)
     }
 
-    /// The engine step's size paragraph: the download, the disk, and that every file is checked. Nil when both engines
-    /// are installed. Once one is in, it says what is still to download, so the figure never looks like the whole.
+    /// The engine step's size paragraph: the download, the disk, and that every file is checked. Nil when G-Player Wine is
+    /// installed. With a Wine Staging that an earlier version installed, it says what is still to download (G-Player Wine
+    /// takes its libraries from it), so the figure never looks like the whole.
     public static func engineSizes(installed: [EngineInfo]) -> String? {
         guard let download = downloadLabel(installed: installed) else { return nil }
-        return "\(download), and the engines need about \(diskLabel(installed: installed)) on this disk. G-Player checks every file before it uses it."
+        return "\(download), and G-Player Wine needs about \(diskLabel(installed: installed)) on this disk. G-Player checks every file before it uses it."
     }
 
     /// What Continue says on the location step, which starts the downloads. Nil when nothing is left to download.
@@ -27,7 +28,7 @@ public enum FirstRunSetup {
             : "Continue downloads \(mb) MB more and needs about \(diskLabel(installed: installed)) on this disk."
     }
 
-    /// "The download is about 640 MB" before anything is installed, "440 MB is still to download" after part of it.
+    /// "The download is about 640 MB" before anything is installed, "446 MB is still to download" with Wine Staging's libraries there.
     private static func downloadLabel(installed: [EngineInfo]) -> String? {
         let left = EngineCatalog.firstRunBytes(installed: installed)
         guard left > 0 else { return nil }
@@ -35,9 +36,9 @@ public enum FirstRunSetup {
         return left == EngineCatalog.firstRunBytes(installed: []) ? "The download is about \(mb) MB" : "\(mb) MB is still to download"
     }
 
-    /// What the empty library says while the first run works: the engines downloading (with what is left to download),
-    /// or the first spaces being made. Nil when it isn't working: engines that failed to download and wait for the next
-    /// start say nothing here.
+    /// What the empty library says while the first run works: G-Player Wine downloading (with what is left to download),
+    /// or the first spaces being made. Nil when it isn't working: an engine that failed to download and waits for the next
+    /// start says nothing here.
     /// - Parameters:
     ///   - downloading: an engine is installing now.
     ///   - pendingSpaces: the first spaces not made yet (`"main"`, `"steam"`).
@@ -46,10 +47,7 @@ public enum FirstRunSetup {
         if downloading {
             let missing = EngineCatalog.firstRunInstalls.filter { engine in !installed.contains { $0.id == engine.id } }
             let mb = EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: installed))
-            let text: String
-            if missing.count > 1 { text = "G-Player is downloading two versions of Wine, about \(mb) MB in all." }
-            else if let engine = missing.first { text = "G-Player is downloading \(engine.name), about \(mb) MB." }
-            else { text = "G-Player is finishing the engines." }
+            let text = missing.first.map { "G-Player is downloading \($0.name), about \(mb) MB." } ?? "G-Player Wine is almost ready."
             return spaces.isEmpty ? text : text + " Then it sets up \(spaces)."
         }
         guard !pendingSpaces.isEmpty, EngineCatalog.firstRunEngine(installed: installed) != nil else { return nil }
@@ -65,7 +63,7 @@ public enum FirstRunSetup {
     public static func pausedNote(pendingSpaces: [String]) -> (title: String, text: String) {
         let names = spaceNames(pendingSpaces)
         return ("Setup is on hold",
-                "You stopped the download, so setting up \(names.isEmpty ? "the first spaces" : names) is on hold. It goes on once the engine is "
+                "You stopped the download, so setting up \(names.isEmpty ? "the first spaces" : names) is on hold. It goes on once G-Player Wine is "
                 + "installed: download it in Settings › Engines, or it starts again the next time G-Player opens.")
     }
 

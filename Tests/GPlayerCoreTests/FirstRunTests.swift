@@ -11,36 +11,38 @@ import Testing
     // MARK: Sizes
 
     // What the screens say, worked out here from the pinned sizes: G-Player Wine's archive is pinned when it is published,
-    // and the figures follow it. G-Player Wine reuses Wine Staging's libraries, so it doesn't download its own.
+    // and the figures follow it. On a clean Mac G-Player Wine downloads Gcenx's archive for its libraries too; a Wine
+    // Staging that is installed already has them, so those aren't downloaded.
     private func megabytes(_ downloads: [PinnedDownload]) -> Int { EngineCatalog.megabytes(downloads.reduce(0) { $0 + $1.approximateBytes }) }
-    private var ownDownloads: [PinnedDownload] { gplayerWine.downloads.filter { $0.role != .runtimeLibraries } }
-    private var gplayerWineMB: Int { megabytes(ownDownloads) }
-    private var bothMB: Int { megabytes(staging.downloads + ownDownloads) }
+    private var withoutLibraries: [PinnedDownload] { gplayerWine.downloads.filter { $0.role != .runtimeLibraries } }
+    private var stagingInstalledMB: Int { megabytes(withoutLibraries) }
+    private var downloadMB: Int { megabytes(gplayerWine.downloads) }
 
     @Test func sizesAreRoundedNotCutOff() {
         #expect(EngineCatalog.megabytes(484_886_864) == 485)
         #expect(EngineCatalog.megabytes(287_881_528) == 288)
         #expect(EngineCatalog.megabytes(499_999) == 0)
         #expect(EngineCatalog.megabytes(500_000) == 1)
-        // Both engines of the first run: the figure the screens say.
-        #expect(EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: [])) == bothMB)
-        #expect(EngineCatalog.megabytes(gplayerWine.downloadBytes(wineStagingInstalled: true)) == gplayerWineMB)
+        // The engine of the first run: the figure the screens say.
+        #expect(EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: [])) == downloadMB)
+        #expect(EngineCatalog.megabytes(gplayerWine.downloadBytes(wineStagingInstalled: true)) == stagingInstalledMB)
         #expect(EngineCatalog.megabytes(staging.downloadBytes(wineStagingInstalled: false)) == 197)
     }
 
     @Test func theEngineStepSaysTheDownloadAndTheDisk() {
         #expect(FirstRunSetup.engineSizes(installed: []) ==
-                "The download is about \(bothMB) MB, and the engines need about 3.3 GB on this disk. G-Player checks every file before it uses it.")
-        // Once Wine Staging is in, it says what is left, so the figure never looks like the whole.
-        #expect(FirstRunSetup.engineSizes(installed: [staging])?.hasPrefix("\(gplayerWineMB) MB is still to download") == true)
+                "The download is about \(downloadMB) MB, and G-Player Wine needs about 2.6 GB on this disk. G-Player checks every file before it uses it.")
+        // With a Wine Staging that an earlier version installed, it says what is left, so the figure never looks like the whole.
+        #expect(FirstRunSetup.engineSizes(installed: [staging])?.hasPrefix("\(stagingInstalledMB) MB is still to download") == true)
+        #expect(FirstRunSetup.engineSizes(installed: [gplayerWine]) == nil)
         #expect(FirstRunSetup.engineSizes(installed: [staging, gplayerWine]) == nil)
         #expect(FirstRunSetup.diskBytes == EngineCatalog.firstRunDiskBytes(installed: []))
     }
 
     @Test func continueSaysItStartsTheDownloads() {
-        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about \(bothMB) MB and needs about 3.3 GB on this disk.")
-        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads \(gplayerWineMB) MB more and needs about 2.6 GB on this disk.")
-        #expect(FirstRunSetup.continueNote(installed: [staging, gplayerWine]) == nil)
+        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about \(downloadMB) MB and needs about 2.6 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads \(stagingInstalledMB) MB more and needs about 2.6 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: [gplayerWine]) == nil)
     }
 
     // MARK: The library while the first run works
@@ -50,19 +52,18 @@ import Testing
             FirstRunSetup.libraryStatus(installed: installed, downloading: downloading, pendingSpaces: pending)
         }
         #expect(status([], downloading: true, ["main", "steam"])
-                == "G-Player is downloading two versions of Wine, about \(bothMB) MB in all. Then it sets up Main and Steam.")
-        #expect(status([], downloading: true, []) == "G-Player is downloading two versions of Wine, about \(bothMB) MB in all.")
-        #expect(status([staging], downloading: true, ["main"]) == "G-Player is downloading G-Player Wine, about \(gplayerWineMB) MB. Then it sets up Main.")
-        #expect(status([gplayerWine], downloading: true, [])?.hasPrefix("G-Player is downloading Wine Staging, about 197 MB") == true)
-        #expect(status([staging, gplayerWine], downloading: true, ["steam"]) == "G-Player is finishing the engines. Then it sets up Steam.")
-        // Engines are in: the spaces are made.
-        #expect(status([staging, gplayerWine], ["main", "steam"])?.hasPrefix("G-Player is getting Windows ready for Main and installing Steam.") == true)
-        #expect(status([staging, gplayerWine], ["steam"])?.hasPrefix("G-Player is installing Steam.") == true)
-        #expect(status([staging, gplayerWine], ["main"]) == "G-Player is getting Windows ready for Main. This takes about a minute.")
+                == "G-Player is downloading G-Player Wine, about \(downloadMB) MB. Then it sets up Main and Steam.")
+        #expect(status([], downloading: true, []) == "G-Player is downloading G-Player Wine, about \(downloadMB) MB.")
+        #expect(status([staging], downloading: true, ["main"]) == "G-Player is downloading G-Player Wine, about \(stagingInstalledMB) MB. Then it sets up Main.")
+        #expect(status([gplayerWine], downloading: true, ["steam"]) == "G-Player Wine is almost ready. Then it sets up Steam.")
+        // G-Player Wine is in: the spaces are made.
+        #expect(status([gplayerWine], ["main", "steam"])?.hasPrefix("G-Player is getting Windows ready for Main and installing Steam.") == true)
+        #expect(status([gplayerWine], ["steam"])?.hasPrefix("G-Player is installing Steam.") == true)
+        #expect(status([gplayerWine], ["main"]) == "G-Player is getting Windows ready for Main. This takes about a minute.")
     }
 
     @Test func theLibraryStaysQuietWhenNothingIsGoingOn() {
-        #expect(FirstRunSetup.libraryStatus(installed: [staging, gplayerWine], downloading: false, pendingSpaces: []) == nil)
+        #expect(FirstRunSetup.libraryStatus(installed: [gplayerWine], downloading: false, pendingSpaces: []) == nil)
         // The downloads failed: the spaces wait for the next start, and the library is as usual (Add Game works, and downloads).
         #expect(FirstRunSetup.libraryStatus(installed: [], downloading: false, pendingSpaces: ["main", "steam"]) == nil)
     }
@@ -179,7 +180,7 @@ import Testing
     @Test func theNoteSaysWhatIsOnHoldAndHowItGoesOn() {
         let both = FirstRunSetup.pausedNote(pendingSpaces: ["main", "steam"])
         #expect(both.title == "Setup is on hold")
-        #expect(both.text.contains("setting up Main and Steam is on hold"))
+        #expect(both.text.contains("setting up Main and Steam is on hold") && both.text.contains("once G-Player Wine is installed"))
         #expect(both.text.contains("Settings › Engines") && both.text.contains("next time G-Player opens"))
         #expect(FirstRunSetup.pausedNote(pendingSpaces: ["main"]).text.contains("setting up Main is on hold"))
         #expect(FirstRunSetup.pausedNote(pendingSpaces: []).text.contains("the first spaces"))

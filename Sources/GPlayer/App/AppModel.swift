@@ -545,41 +545,39 @@ final class AppModel {
         }
     }
 
-    /// The first run's engines: Wine Staging, then G-Player Wine, which reuses Staging's libraries (no second download).
-    /// Starts once at a time. All failures show in one message, and the message says what the first spaces use then.
-    /// When Staging failed because the connection is down, G-Player Wine isn't tried: its libraries come from the
-    /// same download.
+    /// The first run's engine: G-Player Wine, with its runtime libraries from Gcenx's Wine Staging archive (downloaded for
+    /// them and deleted; Wine Staging isn't installed). Starts once at a time. A failure shows in one message, and the message
+    /// says what the first spaces use then.
     func installFirstRunEngines() {
         guard firstRunInstall == nil, let manager = engineManager else { return }
-        // Both engines take about 3.3 GB: said before anything is downloaded, not when the disk fills up.
+        // G-Player Wine takes about 2.6 GB: said before anything is downloaded, not when the disk fills up.
         let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
         if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
         firstRunPaused = false
         firstRunInstall = Task {
             var failures: [String] = []
             for info in EngineCatalog.firstRunInstalls where await ensureEngine(info) == nil {
-                if stoppedEngines.contains(info.id) {                                   // Stop means stop: not the next one either,
-                    firstRunPaused = true                                               // and the first spaces wait for the engine
+                if stoppedEngines.contains(info.id) {                                   // Stop means stop: the first spaces wait
+                    firstRunPaused = true                                               // for the engine
                     pausedNoteClosed = false
                     break
                 }
                 failures.append(errorMessage ?? "\(info.name) wasn't installed.")
                 errorMessage = nil                                  // shown together below, not one over the other
-                if let error = engineFailures[info.id], EngineManager.isConnectionFailure(error) { break }
             }
             if !failures.isEmpty {
                 let gplayerWine = isInstalled(EngineCatalog.defaultForNewSpaces), staging = isInstalled(EngineCatalog.wineStaging)
                 failures.append(gplayerWine ? "" : staging
                     ? "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines."
-                    : "Download the engines again in Settings › Engines. The first spaces are made once an engine is installed.")
+                    : "Download G-Player Wine again in Settings › Engines. The first spaces are made once it is installed.")
                 errorMessage = failures.filter { !$0.isEmpty }.joined(separator: "\n\n")
             }
             firstRunInstall = nil
         }
     }
 
-    /// The engine for the spaces the first run creates, once its installs are over: G-Player Wine, or Wine Staging
-    /// when that is all there is. Nil with neither installed.
+    /// The engine for the spaces the first run creates, once its installs are over: G-Player Wine, or a Wine Staging that
+    /// is installed already when G-Player Wine couldn't be. Nil with neither installed.
     func firstRunEngine() async -> EngineInfo? {
         await firstRunInstall?.value
         return EngineCatalog.firstRunEngine(installed: installedEngines)

@@ -88,7 +88,6 @@ enum SnapshotRenderer {
             },
             Shot(name: "main-library-setting-up-spaces", size: mainSize, firstRunSpaces: ["main", "steam"]) { box in
                 box.finishedOnboarding()
-                box.installEngine(EngineCatalog.wineStaging)
                 box.installEngine(EngineCatalog.crossover)
                 _ = box.model.begin("Creating “Main”", "Setting up Windows. This takes about a minute the first time.")
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
@@ -266,16 +265,16 @@ enum SnapshotRenderer {
                                            attributes: [.posixPermissions: 0o755])
         }
 
-        /// Wine Staging installed, G-Player Wine on its way: the engine step a minute into the first run.
+        /// G-Player Wine on its way, nothing else installed: the engine step a minute into the first run.
         func downloadingEngines() {
-            installEngine(EngineCatalog.wineStaging)
-            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 41 of 98 MB", progress: 0.42)
+            model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 268 of 639 MB", progress: 0.42)
         }
 
-        /// Nothing installed yet, Wine Staging on its way: the first minute of the first run.
+        /// Nothing installed yet, G-Player Wine just started: the first minute of the first run.
         func downloadingFirstEngine() {
             model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
-            _ = model.begin(AppModel.downloadTitle(EngineCatalog.wineStaging), "Downloading 35 of 193 MB", progress: 0.18)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 115 of 639 MB", progress: 0.18)
         }
 
         /// Spaces on both engines, a few games, and what the library says to someone who just updated and just got Steam.
