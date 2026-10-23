@@ -23,12 +23,12 @@ extension AppModel {
     /// `syncD3DMetal`, for callers that need D3DMetal in place before they go on. One run at a time: the toggle, an
     /// engine install and an import can ask at once, and they share the engine's files.
     func prepareD3DMetal() async {
-        let previous = d3dMetalWork
+        let previous = engineFilesWork
         let work = Task { @MainActor in
             await previous?.value
             await self.linkD3DMetal()
         }
-        d3dMetalWork = work
+        engineFilesWork = work
         await work.value
     }
 

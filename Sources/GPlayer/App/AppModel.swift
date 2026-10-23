@@ -68,8 +68,9 @@ final class AppModel {
     var movingSpaces: Set<UUID> = []
     /// A G-Player Wine engine had programs open when D3DMetal was to go in or out; tried again once they quit.
     @ObservationIgnored var d3dMetalWaiting = false
-    /// The last D3DMetal link or unlink, so the next one waits for it.
-    @ObservationIgnored var d3dMetalWork: Task<Void, Never>?
+    /// The last job that walks or changes the installed engines' folders (linking D3DMetal, the engine fixes, deleting a retired
+    /// engine): the next one waits for it, so none works in a folder another is filling or deleting.
+    @ObservationIgnored var engineFilesWork: Task<Void, Never>?
     /// Which backends each installed engine can run, read from disk once per change of engines (views ask often).
     @ObservationIgnored private let readyCache = ReadyCache()
 
@@ -126,8 +127,11 @@ final class AppModel {
     /// The replacements the background update has tried in this run, whether they came, failed or were stopped: a failed one
     /// is tried again at the next start, not before.
     @ObservationIgnored var engineUpdatesTried: Set<String> = []
-    /// Retired engines whose removal was tried in this run (it is tried once, so one that can't be deleted isn't looked at again).
+    /// Retired engines whose folder was deleted, or failed to be, in this run (not tried again). A look that found the engine in
+    /// use doesn't count: the next look tries again.
     @ObservationIgnored var retiredRemovalsTried: Set<String> = []
+    /// Retired engines whose removal waits for its turn or is under way (`removeRetiredEngine`).
+    @ObservationIgnored var removingEngines: Set<String> = []
     /// Launches that have begun and whose program hasn't started yet, per space. The space's engine mustn't change under one
     /// (`migrateEngines`).
     @ObservationIgnored var launchesStarting: [UUID: Int] = [:]
@@ -387,11 +391,15 @@ final class AppModel {
     }
 
     /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away). Retired
-    /// engines too: spaces still run on them.
+    /// engines too: spaces still run on them. In turn with the other work in engine folders (`engineFilesWork`).
     private func applyEngineFixes() {
         guard let manager = engineManager else { return }
-        Task.detached(priority: .utility) {
-            for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+        let previous = engineFilesWork
+        engineFilesWork = Task {
+            await previous?.value
+            await Task.detached(priority: .utility) {
+                for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+            }.value
         }
     }
 
