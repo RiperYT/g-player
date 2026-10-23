@@ -22,6 +22,29 @@ public enum EpicGames {
         LegendaryCommand.isAppName(appName) ? "epic-\(appName).jpg" : nil
     }
 
+    // MARK: The list of owned games, kept between runs
+
+    /// What Epic last said the account owns, so the page has it at the next start, offline too. It lives next to Legendary's
+    /// own files (`Tools`), apart from `library.json`: it is a copy of what Epic knows, not something the user made.
+    public static func listFile(in paths: LibraryPaths) -> URL { paths.tools.appendingPathComponent("epic-library.json") }
+
+    /// The kept list; empty when there is none or it can't be read. A name that isn't Legendary's is dropped.
+    public static func loadList(in paths: LibraryPaths) -> [EpicGame] {
+        guard let data = try? Data(contentsOf: listFile(in: paths)),
+              let games = try? JSONDecoder().decode([EpicGame].self, from: data) else { return [] }
+        return games.filter { LegendaryCommand.isAppName($0.appName) }
+    }
+
+    public static func saveList(_ games: [EpicGame], in paths: LibraryPaths) throws {
+        try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)
+        try JSONEncoder().encode(games).write(to: listFile(in: paths), options: .atomic)
+    }
+
+    /// Signing out takes the account's list with it.
+    public static func forgetList(in paths: LibraryPaths) { try? FileManager.default.removeItem(at: listFile(in: paths)) }
+
+    // MARK: In the library
+
     /// Brings the library's Epic games of `space` in line with `installed`, which is everything Legendary has installed (not a
     /// partial list: a game missing from it is taken out). A new game becomes a library entry; one that is already there keeps
     /// its title, playtime, settings and `hidden`, and learns again what it is if its program moved; one that Legendary no longer

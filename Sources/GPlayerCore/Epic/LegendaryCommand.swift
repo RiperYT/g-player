@@ -32,6 +32,8 @@ public enum LegendaryCommand {
 
     public static func uninstall(appName: String) -> [String] { command(["uninstall", appName]) }
 
+    // TODO: update and repair (`install` again, `install --repair`), verify, sync-saves and eos-overlay, once G-Player offers them.
+
     /// How to start a game, as JSON; Legendary starts nothing. Online it asks Epic for a one-time code to log the game in, so
     /// the answer is for right now. `--wine` is always given: without it Legendary looks for CrossOver. The version check is
     /// skipped: an out-of-date game would otherwise refuse to start, and G-Player can't update games yet.

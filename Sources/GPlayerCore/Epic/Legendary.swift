@@ -239,6 +239,7 @@ public struct Legendary: Sendable {
         })
         if let problem = lacking.value { throw ShellError.failed(problem) }
         guard (try? await installedGames())?.contains(where: { $0.appName == appName }) == true else { throw fail(result) }
+        // TODO: a game's prerequisites (Visual C++, DirectX): on a Mac Legendary only records them (`prereq_info`).
     }
 
     /// Removes a game and its files. Legendary exits with 0 when it can't, so the game must be gone from its list.

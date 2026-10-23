@@ -161,6 +161,7 @@ public enum LaunchPlanner {
                               registry: registry, compat: compat, launcherSettings: launcherSettings)
 
         case .legendary:
+            // TODO: some Epic games want Epic's launcher (EpicGamesLauncher.exe) as their parent; a stand-in isn't made yet.
             // The program Legendary names for this launch; before that, the one it installed.
             guard let exe = legendary?.executableURL ?? game.executableURL(in: space),
                   FileManager.default.fileExists(atPath: exe.path) else { throw PlanError.missingExecutable(game.title) }

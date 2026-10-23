@@ -136,6 +136,26 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(merged.games == [mine, steam, elsewhere])
     }
 
+    @Test func theListOfOwnedGamesIsKeptAndForgotten() throws {
+        let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
+        #expect(EpicGames.loadList(in: paths).isEmpty)
+        let games = [EpicGame(appName: "SampleApp", title: "Sample Game", coverURL: URL(string: "https://cdn.example/t.jpg")),
+                     EpicGame(appName: "Other", title: "Other Game")]
+        try EpicGames.saveList(games, in: paths)
+        #expect(EpicGames.loadList(in: paths) == games)
+        EpicGames.forgetList(in: paths)
+        #expect(EpicGames.loadList(in: paths).isEmpty)
+    }
+
+    @Test func aListThatCannotBeReadIsEmptyAndABadNameIsDropped() throws {
+        let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
+        try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: EpicGames.listFile(in: paths))
+        #expect(EpicGames.loadList(in: paths).isEmpty)
+        try Data(#"[{"appName": "--force", "title": "Bad"}, {"appName": "Fine", "title": "Fine"}]"#.utf8).write(to: EpicGames.listFile(in: paths))
+        #expect(EpicGames.loadList(in: paths).map(\.appName) == ["Fine"])
+    }
+
     @Test func aCoverIsNamedAfterTheGameOnlyWhenTheNameIsLegendarys() {
         #expect(EpicGames.coverFileName(appName: "SampleApp") == "epic-SampleApp.jpg")
         #expect(EpicGames.coverFileName(appName: "../x") == nil)
