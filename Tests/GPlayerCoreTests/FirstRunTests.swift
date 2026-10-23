@@ -31,7 +31,7 @@ import Testing
 
     @Test func theEngineStepSaysTheDownloadAndTheDisk() {
         #expect(FirstRunSetup.engineSizes(installed: []) ==
-                "The download is about \(downloadMB) MB, and G-Player Wine needs about 2.6 GB on this disk. G-Player checks every file before it uses it.")
+                "The download is about \(downloadMB) MB, and G-Player Wine needs about 3.0 GB on this disk. G-Player checks every file before it uses it.")
         // With a Wine Staging that an earlier version installed, it says what is left, so the figure never looks like the whole.
         #expect(FirstRunSetup.engineSizes(installed: [staging])?.hasPrefix("\(stagingInstalledMB) MB is still to download") == true)
         #expect(FirstRunSetup.engineSizes(installed: [gplayerWine]) == nil)
@@ -40,8 +40,8 @@ import Testing
     }
 
     @Test func continueSaysItStartsTheDownloads() {
-        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about \(downloadMB) MB and needs about 2.6 GB on this disk.")
-        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads \(stagingInstalledMB) MB more and needs about 2.6 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: []) == "Continue downloads about \(downloadMB) MB and needs about 3.0 GB on this disk.")
+        #expect(FirstRunSetup.continueNote(installed: [staging]) == "Continue downloads \(stagingInstalledMB) MB more and needs about 3.0 GB on this disk.")
         #expect(FirstRunSetup.continueNote(installed: [gplayerWine]) == nil)
     }
 

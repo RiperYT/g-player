@@ -69,13 +69,25 @@ G-Player Wine is published in revisions (`wine-cx-26.3.0-1`, `-2`). A revision t
 offered (G-Player Wine and Wine Staging: the engine menus while they are on, Settings), `EngineCatalog.known` is
 everything G-Player can run (also Apple's toolkit, for the spaces that already use it), and
 everything that runs or looks after an installed engine (launching, `EngineFixes`, D3DMetal, Stop All, leftovers) goes
-by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space moves once the
-replacement is installed and nothing runs or starts in it, or at once when the retired engine isn't installed; the
-replacement downloads in the background once per run when spaces still need it; and the retired engine's folder goes
-when no space is on it. `AppModel` looks at start, after an engine install, and at every look at the running programs.
-What G-Player learned about a game's graphics (`AutoGraphics`, which names its engine) moves with the space.
+by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space G-Player may change moves
+once the replacement is installed and nothing runs, starts or is queued in it and no Add Game works in it
+(`EngineMigration.isInUse`), or at once when the retired engine isn't installed. A space of another app
+(`Space.mayChange` is false) never moves without the user's yes, since Wine updates the prefix's files on the first start
+there: its page offers the move, and the retired engine stays installed while a space is on it. The replacement downloads
+in the background once per run when a space on the retired engine or the installed retired engine needs it, and the
+retired engine's folder goes only once the replacement is installed and no space is on it, after a fresh look at the
+programs and at the files the running processes come from (`WineProcesses.executables`, `EngineMigration.mayRemove`), in
+turn with the other work in engine folders (`AppModel.engineFilesWork`). Before the first move `library.json` is kept as
+`library.json.before-engine-update-<date>`: an older G-Player reads the new engine's id as unknown. `AppModel` looks at
+start, after an engine install, and at every look at the running programs. What G-Player learned about a game's graphics
+(`AutoGraphics`, which names its engine) moves with the space.
 An installed retired revision counts as G-Player Wine for new spaces and found bottles
 (`EngineCatalog.installedGPlayerWine`), so they start offline on it and move with the rest.
+
+An engine archive that lists GStreamer files (`gstreamer-files.txt`, `GStreamerRuntime`) gets them copied, at install,
+out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder. The
+files an install downloads stay in `Downloads/<id>` until it has succeeded, so a failure in its last step doesn't download
+them again; `EngineCatalog.diskBytes` counts every archive and the room the expansion takes.
 
 ## One engine
 
@@ -84,11 +96,10 @@ Gcenx's Wine Staging archive, which `EngineManager.install` downloads for them w
 deletes with its unpacked copy. New spaces get `EngineCatalog.engineForNewSpace` (a pick in New Space counts only while
 `AppModel.choosesEngines`, "Choose the Wine engine for each space" in Settings › Advanced, is on). A space's page shows
 what `EngineSwitch.pageOffer` says: nothing, the engine menu (G-Player Wine and Wine Staging only), or plain words about
-Wine Staging or Apple's toolkit with "Move to G-Player Wine…", which asks the `EngineSwitch.message` question. Wine
-Staging is installed or removed under Settings › Engines › Advanced and never by itself.
-
-An engine archive that lists GStreamer files (`gstreamer-files.txt`, `GStreamerRuntime`) gets them copied, at install,
-out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder.
+Wine Staging or Apple's toolkit with "Move to G-Player Wine…", which asks the `EngineSwitch.message` question. A bottle of
+another app that is on a retired revision gets "Move Bottle" instead (`EngineMigration.offersMove`), which is its consent to
+the move; the page shows one offer at a time, that one first. Wine Staging is installed or removed under Settings ›
+Engines › Advanced and never by itself.
 
 ## A launch
 

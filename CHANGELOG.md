@@ -11,12 +11,17 @@
   when they run on DXMT. DXMT compiles its shaders again the first time each game runs.
 - **G-Player Wine updates by itself, and your spaces follow.** G-Player downloads the new G-Player Wine (about 450 MB) in
   the background after you update the app, and says so in the sidebar and in Settings › Engines. Your games keep working
-  on the old version meanwhile, offline too; if the download fails, G-Player tries again the next time it opens. A space
-  moves to the new version once nothing runs in it, with its files, Steam login and what G-Player learned about each
-  game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose old version is gone installs
-  the new one when you start something in it, instead of switching to Wine Staging.
-- The first run now says it needs about 2.6 GB free and downloads about 640 MB, since GStreamer is part of G-Player
-  Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
+  on the old version meanwhile, offline too; if the download fails, both say so in one line and G-Player tries again the
+  next time it opens. A space moves to the new version once nothing runs in it, with its files, Steam login and what
+  G-Player learned about each game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose
+  old version is gone installs the new one when you start something in it, instead of switching to Wine Staging. A bottle
+  of another app (CrossOver, Whisky) stays on the old version until you say yes, since Wine updates its files on the
+  first start: its page offers Move Bottle, and the old version stays while a bottle is on it. Before the first move
+  G-Player keeps `library.json` as `library.json.before-engine-update-<date>`, in case you go back to an older G-Player.
+- The first run now says it needs about 3.0 GB free and downloads about 640 MB, since GStreamer is part of G-Player
+  Wine. The disk check counts every archive and the room GStreamer's package takes while it is unpacked. The files an
+  engine install downloads stay until it has succeeded, so one that fails in its last step goes on from them next time
+  instead of downloading again.
 - **One Wine for everyone.** G-Player Wine is the only engine you meet. The first run installs it alone: Wine Staging is
   no longer installed, which saves about 750 MB of disk (G-Player Wine still takes its libraries from Gcenx's Wine
   Staging download, which is deleted once they are copied). New spaces and the bottles G-Player finds on your Mac get

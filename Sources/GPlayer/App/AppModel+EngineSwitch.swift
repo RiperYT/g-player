@@ -35,6 +35,12 @@ extension AppModel {
                 return
             }
             guard var latest = self.space(current.id) else { return }
+            // From the old revision of an engine to its newer one it is the move the app makes by itself: what G-Player learned
+            // about the games' graphics goes with the space.
+            if let move = EngineMigration.switchBetweenRevisions(of: latest, to: info) {
+                moveSpaces([move], userAsked: true)
+                return
+            }
             latest.engineID = info.id
             update(latest)
         }

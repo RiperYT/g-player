@@ -330,6 +330,51 @@ private func library(_ names: [String]) -> LibraryState {
         #expect(try names(store).isEmpty)
     }
 
+    // MARK: Before the first engine update
+
+    @Test func theLibraryIsKeptOnceBeforeTheFirstMoveToAnotherEngine() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.save(library(["One"]))
+        let kept = try #require(try store.keepBeforeEngineUpdate())
+        #expect(kept.lastPathComponent.hasPrefix("library.json.before-engine-update-"))
+        #expect(try Data(contentsOf: kept) == Data(contentsOf: store.paths.libraryFile))
+        // The moved library is saved and saved again: the copy is still the library from before, under a name no save writes.
+        try store.save(library(["One", "Moved"]))
+        try store.save(library(["One", "Moved", "More"]))
+        #expect(try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: kept)) == library(["One"]))
+        // Once: a later move (another start, another engine) doesn't keep the moved library next to the first copy.
+        let again = try store.keepBeforeEngineUpdate(now: Date().addingTimeInterval(3 * 24 * 3600))
+        #expect(again == kept)
+        #expect(try names(store).filter { $0.hasPrefix("library.json.before-engine-update-") }.count == 1)
+        #expect(try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: kept)) == library(["One"]))
+    }
+
+    @Test func withoutALibraryFileThereIsNothingToKeepAndNothingIsWritten() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.paths.createFolders()
+        #expect(try store.keepBeforeEngineUpdate() == nil)
+        #expect(try names(store).isEmpty)
+    }
+
+    @Test func aCopyThatCantBeMadeSaysSoAndLeavesTheLibraryAlone() throws {
+        let tmp = TempFolder()
+        let store = store(tmp)
+        try store.save(library(["One"]))
+        // A library folder the system won't let anything be written into: the copy fails, and the caller moves nothing.
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: store.paths.root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: store.paths.root.path) }
+        if getuid() != 0 { #expect(throws: (any Error).self) { try store.keepBeforeEngineUpdate() } }
+        #expect(try LibraryStore.decoder.decode(LibraryState.self, from: Data(contentsOf: store.paths.libraryFile)) == library(["One"]))
+    }
+
+    @Test func theEngineUpdateCopyIsNamedByTheDay() {
+        let day = Date(timeIntervalSince1970: 1_792_000_000)
+        #expect(LibraryStore.dayName(LibraryStore.beforeEngineUpdatePrefix, at: day, in: TimeZone(identifier: "UTC")!)
+                == "library.json.before-engine-update-2026-10-14")
+    }
+
     @Test func theCopyIsNamedByTheSecond() {
         let name = LibraryStore.dated(LibraryStore.beforeEmptyPrefix, at: Date(timeIntervalSince1970: 1_792_000_000), in: TimeZone(identifier: "UTC")!)
         #expect(name == "library.json.before-empty-2026-10-14-174640")

@@ -280,8 +280,11 @@ struct AddGameSheet: View {
             }
             try Task.checkCancellation()                                    // Cancel was pressed while it was made or downloaded
             guard let space else { step = .details; return }                // the reason is shown
+            // From here Add Game counts as work in the space: its engine isn't switched or deleted under the steps below.
+            model.beginAddGame(in: space.id)
+            defer { model.endAddGame(in: space.id) }
             if model.engine(for: space) == nil { workMessage = "Downloading \(EngineCatalog.info(space.engineID)?.name ?? "the engine")…" }
-            guard let engine = await model.engineReady(for: space) else { step = .details; return }
+            guard await model.engineReady(for: space) != nil else { step = .details; return }       // checked now, looked up again to start
             try Task.checkCancellation()
             targetSpace = space
             stoppable = true
@@ -302,7 +305,7 @@ struct AddGameSheet: View {
                 let run = InstallerRun()
                 installer = run
                 createdSpaceUsed = createdSpaceUsed || space.id == createdSpaceID
-                candidates = try await model.runInstaller(setup, in: space, engine: engine, title: name, run: run)
+                candidates = try await model.runInstaller(setup, in: space, title: name, run: run)
             }
             chosen = candidates.first?.url
             workProgress = nil; workDetail = ""

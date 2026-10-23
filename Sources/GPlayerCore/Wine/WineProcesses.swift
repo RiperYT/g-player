@@ -40,6 +40,14 @@ public struct WineProcess: Sendable, Hashable {
                                         "lsass.exe", "conhost.exe", "tabtip.exe", "wineboot.exe", "mscorsvw.exe"]
 }
 
+/// A running process and the program file it runs from, as the kernel says (`proc_pidpath`).
+public struct ProcessExecutable: Sendable, Hashable {
+    public let pid: Int32
+    public let path: String
+
+    public init(pid: Int32, path: String) { self.pid = pid; self.path = path }
+}
+
 /// Which Windows programs run where. Installers wait for every program in a space to quit, so G-Player doesn't start
 /// them while a game or Steam is open, and the library shows what is running.
 public enum WineProcesses {
@@ -105,6 +113,28 @@ public enum WineProcesses {
         }
         guard let name = programName?.lowercased() else { return [] }
         return programs(in: space, from: processes).filter { $0.programName == name }
+    }
+
+    /// Every process on the Mac with the file it runs from, whatever it is. Wine's own `wine-preloader` and `wineserver` are
+    /// among them, which `snapshot()` (Windows programs only) never lists. Reads the kernel's process table directly; call it
+    /// off the main thread.
+    public static func executables() -> [ProcessExecutable] {
+        allPIDs().compactMap { pid in
+            var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))              // PROC_PIDPATHINFO_MAXSIZE
+            guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+            return ProcessExecutable(pid: pid, path: String(cString: buffer))
+        }
+    }
+
+    /// The processes among `executables` that run a file inside `folder`: what makes an engine's folder in use, whichever of
+    /// its programs it is. Compared without regard to case, as the Mac's usual volumes do; on one that cares, a similarly named
+    /// folder only holds a deletion back.
+    public static func executables(inside folder: URL, from executables: [ProcessExecutable]) -> [ProcessExecutable] {
+        let roots = paths(of: folder).map { $0.lowercased() }
+        return executables.filter { executable in
+            let path = executable.path.lowercased()
+            return roots.contains { isInside(path, $0) }
+        }
     }
 
     // MARK: Paths

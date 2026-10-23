@@ -27,37 +27,123 @@ extension AppModel {
     /// under its program; one that can't move yet is looked at again at the next look at the programs.
     func migrateEngines(processes: [WineProcess]) {
         guard let manager = engineManager, needsEngineMigration else { return }
-        let installed = Set(EngineCatalog.known.filter { manager.isInstalled($0) }.map(\.id))
-        let busy = Set(state.spaces.filter { isEngineInUse(by: $0, processes: processes) }.map(\.id))
-        let plan = EngineMigration.plan(spaces: state.spaces, installed: installed, busy: busy)
-        if !plan.switches.isEmpty {
-            mutate { EngineMigration.apply(plan, to: &$0) }
-            carryOverLaunchRecords(plan.switches)
-            engineVersion += 1
-        }
+        var plan = enginePlan(processes: processes)
+        if !plan.switches.isEmpty, !moveSpaces(plan.switches) { plan.remove = [] }       // moved, or not at all
         for id in plan.install { if let info = EngineCatalog.info(id) { updateEngineInBackground(info) } }
-        for id in plan.remove {
-            guard retiredRemovalsTried.insert(id).inserted, let info = EngineCatalog.info(id) else { continue }
-            Task {
-                await Task.detached(priority: .utility) { _ = try? manager.remove(info) }.value
-                engineVersion += 1
+        for id in plan.remove { if let info = EngineCatalog.info(id) { removeRetiredEngine(info, manager: manager) } }
+    }
+
+    // MARK: Spaces of other apps
+
+    /// The newer engine to offer a bottle of another app that is on a retired one, once it is installed and the user wasn't
+    /// asked (`EngineMigration.offersMove`). The space's page shows the offer.
+    func engineMoveOffer(for space: Space) -> EngineInfo? {
+        guard let current = self.space(space.id), EngineMigration.offersMove(current, installed: installedEngineIDs),
+              let old = EngineCatalog.info(current.engineID) else { return nil }
+        return EngineCatalog.replacement(of: old)
+    }
+
+    /// Yes to the offer: changes are allowed in the space, as the other consent flows save it, and it moves like any space G-Player
+    /// may change: now when nothing runs in it, otherwise once it goes quiet.
+    func acceptEngineMove(of space: Space) {
+        guard let current = self.space(space.id), engineMoveOffer(for: current) != nil else { return }
+        setAllowsChanges(true, for: current)
+        migrateEngines()
+    }
+
+    /// A start in the space would run a newer engine in a bottle of another app and update its files
+    /// (`EngineMigration.startNeedsConsent`): asks first, as every change to such a space does, and goes on with `retry` on a
+    /// yes. A no is final. Returns true when the start must not go on.
+    func askBeforeNewEngine(for space: Space, then retry: @escaping @MainActor () -> Void) -> Bool {
+        guard EngineMigration.startNeedsConsent(space, installed: installedEngineIDs) else { return false }
+        if space.allowsChanges == nil {
+            askToChange(space) { allowed in if allowed { retry() } }
+        } else {
+            errorMessage = "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first."
+        }
+        return true
+    }
+
+    /// Puts the spaces on their new engines, with what was learned about their games' graphics (`EngineMigration.apply`) and what
+    /// the app remembers about their launches. Before the first move library.json is kept as it is
+    /// (`LibraryStore.keepBeforeEngineUpdate`): an older G-Player would read the moved spaces as unknown. Moves nothing, and says
+    /// so, when that copy can't be made (the user is told once per run, and the next look tries again; always, for something
+    /// the user asked for).
+    @discardableResult
+    func moveSpaces(_ switches: [EngineMigration.Plan.Switch], userAsked: Bool = false) -> Bool {
+        guard !switches.isEmpty, let paths else { return false }
+        do { try LibraryStore(paths: paths).keepBeforeEngineUpdate() }
+        catch {
+            if userAsked || !engineBackupWarned {
+                engineBackupWarned = true
+                errorMessage = "G-Player couldn't keep a copy of library.json before updating G-Player Wine, so your spaces stay on the old version for now. \(error.localizedDescription)"
             }
+            return false
+        }
+        mutate { EngineMigration.apply(EngineMigration.Plan(switches: switches), to: &$0) }
+        carryOverLaunchRecords(switches)
+        engineVersion += 1
+        return true
+    }
+
+    /// The space as it is once `engine` is ready for a start in it. Asked for a retired engine that isn't installed, `ensureEngine`
+    /// installs and returns the replacement, and the space would move to it a moment later in the background: it moves now
+    /// (`EngineMigration.moveForStart`), so the start, and what it records about the game's graphics, go by the engine it runs on.
+    func settleSpace(_ space: Space, on engine: Engine) -> Space {
+        let current = self.space(space.id) ?? space
+        if let move = EngineMigration.moveForStart(current, on: engine.info, installed: installedEngineIDs) { moveSpaces([move]) }
+        return self.space(space.id) ?? current
+    }
+
+    /// `EngineMigration.plan` for what is installed and in use now.
+    private func enginePlan(processes: [WineProcess]) -> EngineMigration.Plan {
+        let busy = Set(state.spaces.filter { isEngineInUse(by: $0, processes: processes) }.map(\.id))
+        return EngineMigration.plan(spaces: state.spaces, installed: installedEngineIDs, busy: busy)
+    }
+
+    /// The ids of the engines installed on this Mac, retired ones too.
+    var installedEngineIDs: Set<String> { Set(installedEngines.map(\.id)) }
+
+    /// Deletes a retired engine's folder once nothing uses it, off the main thread, after the other work in engine folders
+    /// (`engineFilesWork`: linking D3DMetal, the engine fixes) and the start's clean-up have ended. Right before, it looks again: the plan was made from
+    /// a look taken a moment ago, and a program may have started since, so there is a fresh look at the programs and at which
+    /// files the running processes come from (`EngineMigration.mayRemove`). If anything uses the engine it is left, and the next
+    /// look at the programs tries again.
+    private func removeRetiredEngine(_ info: EngineInfo, manager: EngineManager) {
+        guard !removingEngines.contains(info.id), !retiredRemovalsTried.contains(info.id) else { return }
+        removingEngines.insert(info.id)
+        let previous = engineFilesWork
+        engineFilesWork = Task {
+            await previous?.value
+            await leftoversCleaning?.value                  // the start's clean-up walks the Engines folder too
+            defer { removingEngines.remove(info.id) }
+            let folder = manager.folder(for: info)
+            let (processes, executables) = await Task.detached(priority: .utility) {
+                (WineProcesses.snapshot(), WineProcesses.executables())
+            }.value
+            let plan = enginePlan(processes: processes)
+            guard EngineMigration.mayRemove(info.id, plan: plan, folder: folder, executables: executables) else { return }
+            retiredRemovalsTried.insert(info.id)
+            await Task.detached(priority: .utility) { _ = try? manager.remove(info) }.value
+            engineVersion += 1
         }
     }
 
-    /// Something runs in the space, is being started or installed in it, or is queued for it: its engine's files are in use.
-    /// Programs count whatever they are, Wine's own services too (a Wine server of the old engine that is winding down must
-    /// be gone before the new Wine starts there).
+    /// Something runs in the space, is being started or installed in it, or is queued for it: its engine's files are in use
+    /// (`EngineMigration.isInUse`). Wine's own services count as programs; the Wine server isn't seen as one, and the engine's
+    /// folder is checked for the processes that run from it before it is deleted (`removeRetiredEngine`).
     private func isEngineInUse(by space: Space, processes: [WineProcess]) -> Bool {
-        !WineProcesses.programs(in: space, from: processes).isEmpty
-            || movingSpaces.contains(space.id) || installingSpaces.contains(space.id) || queueHolder(in: space.id) != nil
-            || (launchesStarting[space.id] ?? 0) > 0
-            || state.games(in: space).contains { preparing.contains($0.id) || isRunning($0) }
+        let games = state.games(in: space)
+        return EngineMigration.isInUse(space, processes: processes, activity: .init(
+            movingEngine: movingSpaces.contains(space.id), installing: installingSpaces.contains(space.id),
+            queued: queueHolder(in: space.id) != nil, launchesStarting: launchesStarting[space.id] ?? 0,
+            gameStarting: games.contains { preparing.contains($0.id) }, gameRunning: games.contains { isRunning($0) },
+            addingGame: (addGameSpaces[space.id] ?? 0) > 0))
     }
 
     /// What the app remembers about launches of the moved spaces' games belongs to the engine they ran on (the "Try Other
     /// Graphics" offer after a failure, say): the replacement is the same Wine, so it goes with them.
-    private func carryOverLaunchRecords(_ switches: [EngineMigration.Plan.Switch]) {
+    func carryOverLaunchRecords(_ switches: [EngineMigration.Plan.Switch]) {
         for move in switches {
             for game in state.games where game.spaceID == move.space {
                 if autoLaunches[game.id]?.engineID == move.from { autoLaunches[game.id]?.engineID = move.to }

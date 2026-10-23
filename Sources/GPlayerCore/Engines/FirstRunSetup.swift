@@ -3,9 +3,10 @@ import Foundation
 /// The words of the first run, made from facts: how much G-Player Wine downloads and takes on disk, what G-Player is doing
 /// while the library waits for it, and what to know before bringing bottles over. Pure, so tests hold the figures.
 public enum FirstRunSetup {
-    /// What the first run's engine needs on this disk: unpacked, with room for the archive being unpacked.
+    /// What the first run's engine needs on this disk: unpacked, with room for the files it downloads (they stay until it has
+    /// installed) and for GStreamer's package while it is expanded.
     public static var diskBytes: Int64 { EngineCatalog.diskBytes(installing: EngineCatalog.firstRunInstalls) }
-    /// "2.6 GB" for G-Player Wine; nothing once it is installed.
+    /// The figure for G-Player Wine ("3.0 GB"); nothing once it is installed.
     public static func diskLabel(installed: [EngineInfo] = []) -> String {
         String(format: "%.1f GB", Double(EngineCatalog.firstRunDiskBytes(installed: installed)) / 1_000_000_000)
     }

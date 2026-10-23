@@ -18,7 +18,13 @@ struct SpaceView: View {
             VStack(alignment: .leading, spacing: 28) {
                 header
                 if model.needsAppleToolkit(space) { ToolkitOffBanner() }
-                if model.engineOffer(for: space) == .move { EngineMoveNote(space: space) { askToSwitch(to: EngineCatalog.crossover.id) } }
+                // One offer at a time, the bottle's consent first: a bottle of another app on the retired engine asks for its
+                // owner's yes (`EngineMigration.offersMove`); a space on another engine is offered G-Player Wine (`pageOffer`).
+                if let target = model.engineMoveOffer(for: space) {
+                    EngineMoveOffer(space: space, target: target)
+                } else if model.engineOffer(for: space) == .move {
+                    EngineMoveNote(space: space) { askToSwitch(to: EngineCatalog.crossover.id) }
+                }
                 if let preset = AppPresets.preset(space.presetID), !preset.isInstalled(in: space) {
                     presetMissing(preset)
                 }
@@ -261,6 +267,25 @@ private struct EngineMoveNote: View {
     private var detail: String {
         let newer = "New spaces use G-Player Wine, which plays game videos and can use Apple's D3DMetal. Moving asks first."
         return info?.kind == .gptk ? "It keeps running while the toolkit is installed and turned on in Settings. " + newer : newer
+    }
+}
+
+/// A bottle of another app that is on a retired engine, once the newer one is ready: one sentence and the yes. Nothing is
+/// written into the bottle before it.
+private struct EngineMoveOffer: View {
+    @Environment(AppModel.self) private var model
+    let space: Space
+    let target: EngineInfo
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(Color.accentColor).font(.title3)
+            Text(EngineMigration.moveOffer(to: target)).font(.callout).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Move Bottle") { model.acceptEngineMove(of: space) }
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

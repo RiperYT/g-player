@@ -26,6 +26,7 @@ struct ChangesRequestSheet: View {
                 • change Wine settings in its registry: per-game DLL and Windows-version settings, Retina mode, and removing ones it set before
                 • put DXVK's graphics files and Steam's window fix in place of Wine's own (it keeps Wine's copies)
                 • install a store app such as Steam into it, when you ask
+                • move it to a newer G-Player Wine, which updates Wine's own files in it once
                 • keep small notes next to drive_c about what it added
                 """)
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

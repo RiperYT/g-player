@@ -73,8 +73,9 @@ final class AppModel {
     var movingSpaces: Set<UUID> = []
     /// A G-Player Wine engine had programs open when D3DMetal was to go in or out; tried again once they quit.
     @ObservationIgnored var d3dMetalWaiting = false
-    /// The last D3DMetal link or unlink, so the next one waits for it.
-    @ObservationIgnored var d3dMetalWork: Task<Void, Never>?
+    /// The last job that walks or changes the installed engines' folders (linking D3DMetal, the engine fixes, deleting a retired
+    /// engine): the next one waits for it, so none works in a folder another is filling or deleting.
+    @ObservationIgnored var engineFilesWork: Task<Void, Never>?
     /// Which backends each installed engine can run, read from disk once per change of engines (views ask often).
     @ObservationIgnored private let readyCache = ReadyCache()
 
@@ -130,14 +131,27 @@ final class AppModel {
     /// Engines downloading in the background to take over from a retired one (`migrateEngines`): their download shows no errors,
     /// and says why it runs.
     private(set) var updatingEngines: Set<String> = []
+    /// Why the background update of an engine failed in this run (its error's text), by engine id, until it is tried again or
+    /// has come. Settings › Engines and the sidebar say so in one line (`EngineMigration.updateFailure`).
+    private(set) var engineUpdateFailures: [String: String] = [:]
+    /// Engines whose failed update the user hid from the sidebar.
+    private(set) var closedUpdateNotices: Set<String> = []
     /// The replacements the background update has tried in this run, whether they came, failed or were stopped: a failed one
     /// is tried again at the next start, not before.
     @ObservationIgnored var engineUpdatesTried: Set<String> = []
-    /// Retired engines whose removal was tried in this run (it is tried once, so one that can't be deleted isn't looked at again).
+    /// Retired engines whose folder was deleted, or failed to be, in this run (not tried again). A look that found the engine in
+    /// use doesn't count: the next look tries again.
     @ObservationIgnored var retiredRemovalsTried: Set<String> = []
+    /// The copy of library.json before the first move to another engine couldn't be made, and the user was told (once per run).
+    @ObservationIgnored var engineBackupWarned = false
+    /// Retired engines whose removal waits for its turn or is under way (`removeRetiredEngine`).
+    @ObservationIgnored var removingEngines: Set<String> = []
     /// Launches that have begun and whose program hasn't started yet, per space. The space's engine mustn't change under one
     /// (`migrateEngines`).
     @ObservationIgnored var launchesStarting: [UUID: Int] = [:]
+    /// Spaces an Add Game is working in, and how many: from the choice of the space until the installer has quit or the game was
+    /// copied in. The space's engine mustn't change, or be deleted, under the steps in between (`migrateEngines`).
+    @ObservationIgnored var addGameSpaces: [UUID: Int] = [:]
     /// Stops for activities that can be stopped, by activity id.
     var cancellers: [UUID: () -> Void] = [:]
     /// Work queued per space (installs, store setup), so two installers never run in one space at once.
@@ -403,11 +417,15 @@ final class AppModel {
     }
 
     /// Puts G-Player's Wine fixes into engines installed before they existed (new installs get them right away). Retired
-    /// engines too: spaces still run on them.
+    /// engines too: spaces still run on them. In turn with the other work in engine folders (`engineFilesWork`).
     private func applyEngineFixes() {
         guard let manager = engineManager else { return }
-        Task.detached(priority: .utility) {
-            for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+        let previous = engineFilesWork
+        engineFilesWork = Task {
+            await previous?.value
+            await Task.detached(priority: .utility) {
+                for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
+            }.value
         }
     }
 
@@ -492,6 +510,21 @@ final class AppModel {
     /// The engine is downloading in the background to replace a retired one (Settings says why).
     func isUpdating(_ info: EngineInfo) -> Bool { updatingEngines.contains(info.id) }
 
+    /// The line to show where the engine's download is offered: its background update failed, and is tried again at the next
+    /// start. Nil while it hasn't failed, is under way, or has come.
+    func updateFailureLine(for info: EngineInfo) -> String? {
+        guard !updatingEngines.contains(info.id), !isInstalled(info), let reason = engineUpdateFailures[info.id] else { return nil }
+        return EngineMigration.updateFailure(for: info, reason: reason)
+    }
+
+    /// The failed updates the sidebar still shows.
+    var updateNotices: [(id: String, line: String)] {
+        EngineCatalog.all.filter { !closedUpdateNotices.contains($0.id) }
+            .compactMap { info in updateFailureLine(for: info).map { (info.id, $0) } }
+    }
+
+    func closeUpdateNotice(_ id: String) { closedUpdateNotices.insert(id) }
+
     private func installEngine(_ info: EngineInfo, with manager: EngineManager, updating: Bool) async -> Engine? {
         await leftoversCleaning?.value
         // An update nobody asked for isn't "setup" to quit over: what came is kept, and it goes on at the next start.
@@ -499,6 +532,8 @@ final class AppModel {
                              note: updating ? EngineMigration.updateNote(for: info) : nil)
         defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil; updatingEngines.remove(info.id) }
         engineFailures[info.id] = nil
+        engineUpdateFailures[info.id] = nil
+        closedUpdateNotices.remove(info.id)
         stoppedEngines.remove(info.id)
         // What came stays on disk, so downloading again goes on from there.
         setStop(activity, help: "Stop downloading \(info.name). What came is kept, and the download goes on from there next time.") { [weak self] in
@@ -518,7 +553,8 @@ final class AppModel {
             return nil
         } catch {
             engineFailures[info.id] = error
-            if !updating { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
+            if updating { engineUpdateFailures[info.id] = error.localizedDescription }       // no alert: a line says so
+            else { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
             return nil
         }
     }
@@ -559,7 +595,8 @@ final class AppModel {
     /// says what the first spaces use then.
     func installFirstRunEngines() {
         guard firstRunInstall == nil, let manager = engineManager else { return }
-        // G-Player Wine takes about 2.6 GB: said before anything is downloaded, not when the disk fills up.
+        // G-Player Wine takes about 3.0 GB with its downloads (`FirstRunSetup.diskLabel`): said before anything is downloaded,
+        // not when the disk fills up.
         let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
         if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
         firstRunPaused = false
@@ -1311,8 +1348,17 @@ final class AppModel {
         let startingIn = game.spaceID
         launchesStarting[startingIn, default: 0] += 1
         defer { Self.decrement(&launchesStarting, startingIn) }
-        guard let paths, let space = space(game.spaceID),
-              let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        guard let paths, let found = space(game.spaceID) else { return false }
+        // A bottle of another app whose old engine is gone would meet the newer one on this start, which updates its files:
+        // asked first. (An automatic retry never asks; it is not made.)
+        let held = retry?.automatic == true
+            ? EngineMigration.startNeedsConsent(found, installed: installedEngineIDs)
+            : askBeforeNewEngine(for: found) { [weak self] in if let g = self?.game(game.id) { self?.play(g, skipping: skipped) } }
+        if held { return false }
+        guard let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        // The space as it is now: the engine that was just installed may be the replacement of the one it was on, and then the
+        // launch, and what it records, belong to the engine it runs on.
+        let space = settleSpace(found, on: engine)
         // A restart of Steam made for this launch is over when it is.
         defer { if steamRestarts[space.id] == game.id { steamRestarts[space.id] = nil } }
         if retry?.automatic != true { stoppedRetries.remove(game.id) }
@@ -1541,6 +1587,7 @@ final class AppModel {
     /// Runs any Windows program in a space without adding it to the library.
     func run(_ file: URL, in space: Space) {
         guard let paths else { return }
+        if askBeforeNewEngine(for: space, then: { [weak self] in self?.run(file, in: space) }) { return }
         Task {
             var found = engine(for: space)
             if found == nil { found = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }

@@ -26,16 +26,16 @@ import Testing
         #expect(!DiskSpace.sameVolume(tmp.url, URL(fileURLWithPath: "/dev")))
     }
 
-    @Test func theFirstRunsEngineNeedsAboutTwoPointSixGigabytes() {
+    @Test func theFirstRunsEngineNeedsAboutThreeGigabytes() {
         let needed = EngineCatalog.firstRunDiskBytes(installed: [])
-        #expect(needed > 2_400_000_000 && needed < 2_800_000_000)
+        #expect(needed > 2_900_000_000 && needed < 3_200_000_000)
         // What is installed already isn't counted again. A Wine Staging that is there doesn't lower it: G-Player Wine takes
-        // the same room unpacked, and its biggest archive is GStreamer's package, not Gcenx's.
+        // the same room unpacked, and Gcenx's archive is counted among its files (the figure only has to be enough).
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.wineStaging]) == needed)
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.crossover]) == 0)
-        // One engine: what it takes unpacked, and room for its biggest archive.
+        // One engine: what it takes unpacked, and room for its files while it installs (both of Wine Staging's archives).
         let one = EngineCatalog.diskBytes(installing: [EngineCatalog.wineStaging])
-        #expect(one == EngineCatalog.wineStaging.installedBytes + 193_105_336)
+        #expect(one == EngineCatalog.wineStaging.installedBytes + 193_105_336 + 3_900_000)
     }
 
     @Test func everyEngineThatIsDownloadedSaysHowMuchRoomItTakes() {
