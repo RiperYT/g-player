@@ -27,18 +27,17 @@ struct EpicSignInSheet: View {
                 EpicLoginWebView(onCode: finish)
             }
             Divider()
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
                 if usesBrowser {
                     Button("Use Epic's page here instead") { usesBrowser = false }.buttonStyle(.link)
                 } else {
-                    Button("Sign in in your browser instead") {
-                        NSWorkspace.shared.open(EpicSignIn.browserLoginURL)
-                        usesBrowser = true
-                    }
-                    .buttonStyle(.link)
+                    // Doesn't open anything: the next screen says what legendary.gl is, and opens it on a button of its own.
+                    Button("Sign in in your browser instead") { usesBrowser = true }.buttonStyle(.link)
                 }
-                Spacer()
+                Text("Legendary keeps your sign-in token in your G-Player library folder. A library on an exFAT, network or iCloud disk can't keep it private.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
         }
         .frame(width: 500, height: 560)
@@ -58,13 +57,13 @@ private struct BrowserSignIn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Your browser opened Legendary's sign-in page. Sign in there, copy the authorizationCode value from the page it shows, and paste it below.")
+            Text("legendary.gl is a helper page by Legendary's authors, not by Epic. It sends you to Epic's sign-in and then shows the code Epic gives. Open it in your browser, sign in there, copy the authorizationCode value from the page, and paste it below.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextField("Authorization code", text: $pasted, prompt: Text("Paste the code"))
                 .textFieldStyle(.roundedBorder).font(Theme.path)
                 .onSubmit(submit)
             HStack {
-                Button("Open the Page Again") { NSWorkspace.shared.open(EpicSignIn.browserLoginURL) }
+                Button("Open legendary.gl") { NSWorkspace.shared.open(EpicSignIn.browserLoginURL) }
                 Spacer()
                 Button("Sign In", action: submit)
                     .buttonStyle(.borderedProminent)
@@ -80,9 +79,10 @@ private struct BrowserSignIn: View {
     }
 }
 
-/// Epic's login page in a web view that keeps nothing: its website data is gone with the sheet. It tells the page it is the
-/// Epic Games Launcher (`EpicSignIn.userAgent`), and looks at two things only: an address on `localhost` with `?code=`, and the
-/// text of Epic's redirect page. Nothing is injected into any page, and no address is written to a log.
+/// Epic's login page in a web view that keeps nothing: its website data is gone with the sheet. It tells Epic's own pages it is the
+/// Epic Games Launcher (`EpicSignIn.userAgent`; Google's and Apple's pages get the browser's own name), and looks at two things only,
+/// both of the page itself and never of a frame inside it: an address on `localhost` with `?code=`, and the text of Epic's redirect
+/// page. Nothing is injected into any page, and no address is written to a log.
 private struct EpicLoginWebView: NSViewRepresentable {
     let onCode: (String) -> Void
 
@@ -92,7 +92,7 @@ private struct EpicLoginWebView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let web = WKWebView(frame: .zero, configuration: configuration)
-        web.customUserAgent = EpicSignIn.userAgent
+        web.customUserAgent = EpicSignIn.userAgent                    // for Epic's own page; the coordinator takes it off for the others
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
         web.load(URLRequest(url: EpicSignIn.loginURL))
@@ -113,22 +113,27 @@ private struct EpicLoginWebView: NSViewRepresentable {
 
         init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
 
-        /// An address on localhost with a code is where Epic's login can lead instead of the redirect page.
+        /// An address on localhost with a code is where Epic's login can lead instead of the redirect page, but only for the page
+        /// itself. And the page about to load is told what the browser is: the launcher for Epic's own, the default for the rest.
         func webView(_ web: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = action.request.url, let code = EpicSignIn.code(fromRedirect: url) {
+            let isMainFrame = action.targetFrame?.isMainFrame == true
+            if let url = action.request.url, let code = EpicSignIn.code(navigatingTo: url, isMainFrame: isMainFrame) {
                 decisionHandler(.cancel)
                 deliver(code)
-            } else {
-                decisionHandler(.allow)
+                return
             }
+            if isMainFrame { web.customUserAgent = EpicSignIn.usesLauncherAgent(for: action.request.url) ? EpicSignIn.userAgent : nil }
+            decisionHandler(.allow)
         }
 
-        /// Epic's redirect page shows a JSON text with the code. Only that page's text is read, and only then.
+        /// Epic's redirect page shows a JSON text with the code. Only that page's text is read, and only then. (This is called for
+        /// the page itself, not for the frames inside it.)
         func webView(_ web: WKWebView, didFinish navigation: WKNavigation!) {
             guard !delivered, EpicSignIn.isRedirectPage(web.url) else { return }
+            let address = web.url
             web.evaluateJavaScript("document.body ? document.body.innerText : ''") { [weak self] result, _ in
-                if let text = result as? String, let code = EpicSignIn.code(fromPageBody: text) { self?.deliver(code) }
+                if let text = result as? String, let code = EpicSignIn.code(fromPage: address, isMainFrame: true, text: text) { self?.deliver(code) }
             }
         }
 

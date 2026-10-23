@@ -31,6 +31,11 @@ struct GameInspector: View {
 
                 PlayStopButton(game: game)
 
+                if let note = model.epic.startNotes[game.id] {
+                    Label(note, systemImage: "wifi.slash").font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if model.isRunning(game), !model.isPreparing(game), let other = model.otherGraphics(for: game) {
                     PictureMissingButton(game: game, other: other)
                 }
@@ -243,7 +248,7 @@ private struct PlayStopButton: View {
             Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity)
         case .none:
             if model.isPreparing(game) {
-                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…")
+                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…")
             } else {
                 Label(running ? "Stop" : "Play", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity)
             }

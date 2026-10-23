@@ -26,7 +26,16 @@ struct EpicState: Equatable {
     var installedKnown = false
     /// Why the last fetch of the list failed, for the page.
     var refreshFailure: String?
+    /// Why the last look at what Legendary has on this Mac failed ("Couldn't reach Legendary: …"). The account and the games
+    /// shown stay what they were; a failed look never says anyone is signed out.
+    var lookFailure: String?
     var showSignIn = false
+    /// The game the install question is asking about.
+    var installRequest: EpicGame?
+    /// What the game is waiting for while it starts ("Asking Epic for the launch parameters…"), by library entry.
+    var startStatus: [UUID: String] = [:]
+    /// "Started offline: …" for a game that was started without Epic's login, until it is started again.
+    var startNotes: [UUID: String] = [:]
 
     var isSignedIn: Bool { account != nil }
     /// A new install, sign-in or fetch has to wait.
@@ -48,11 +57,16 @@ extension AppModel {
     func loadEpic() {
         guard let paths else { return }
         Legendary(paths: paths).endLeftovers()          // one a G-Player that crashed left running would hold Legendary's lock
-        epic.games = EpicGames.loadList(in: paths)
+        let cache = EpicGames.loadCache(in: paths)
+        epic.games = cache.games
+        epic.account = cache.account                    // who was signed in: a look that fails later doesn't make it look signed out
         fetchMissingCovers()
         // Only a library with an Epic game in it has anything that can be out of date (Legendary's record of where it is).
         if state.games.contains(where: { $0.legendaryAppName != nil }) { lookAtEpicIfNeeded() }
     }
+
+    /// Legendary isn't on this Mac yet: signing in downloads it first.
+    var legendaryNeedsDownload: Bool { paths.map { !Legendary(paths: $0).isDownloaded } ?? true }
 
     /// Looks once per run at what Legendary has, when nothing has yet.
     func lookAtEpicIfNeeded() { if !epic.looked { lookAtEpic() } }
@@ -70,19 +84,38 @@ extension AppModel {
     private func lookAtEpicNow() async {
         guard let paths else { return }
         let legendary = Legendary(paths: paths)
-        guard legendary.isDownloaded else { epic.looked = true; return }
+        guard legendary.isDownloaded else {
+            // Without Legendary nobody is signed in, whatever was kept.
+            epic.account = nil
+            epic.games = []
+            epic.lookFailure = nil
+            EpicGames.forgetCache(in: paths)
+            epic.looked = true
+            return
+        }
         do {
             try await legendary.ensureInstalled()                         // the file is checked, and fetched again if it isn't the pinned one
             let status = try await legendary.status()
+            epic.account = status.account                                 // only Legendary saying "not logged in" means signed out
+            if status.account == nil { epic.games = []; EpicGames.forgetCache(in: paths) } else { keepEpicCache() }
             let installed = try await legendary.installedGames()
-            epic.account = status.account
             epic.installed = Dictionary(installed.map { ($0.appName, $0) }, uniquingKeysWith: { first, _ in first })
             epic.installedKnown = true
+            epic.lookFailure = nil
             mergeEpicGames(installed)
+        } catch is CancellationError {
+            // Nothing was learned, and nothing is said.
         } catch {
-            // A look that fails says nothing; what the user asks for next says why it can't be done.
+            // Nothing changes on the page but this line (and Try Again): the account and the games stay as they were.
+            epic.lookFailure = "Couldn't reach Legendary: \(error.localizedDescription)"
         }
         epic.looked = true
+    }
+
+    /// Keeps who is signed in and the list of games for the next start.
+    private func keepEpicCache() {
+        guard let paths else { return }
+        try? EpicGames.saveCache(EpicGames.Cache(account: epic.account, games: epic.games), in: paths)
     }
 
     private func mergeEpicGames(_ installed: [LegendaryInstalledGame]) {
@@ -137,7 +170,7 @@ extension AppModel {
             let games = try await legendary.library()
             epic.games = games
             epic.fetched = true
-            try? EpicGames.saveList(games, in: paths)
+            keepEpicCache()
             fetchMissingCovers()
         } catch is CancellationError {
             return
@@ -201,6 +234,8 @@ extension AppModel {
             let status = try await legendary.signIn(code: code)
             epic.account = status.account
             epic.looked = true
+            epic.lookFailure = nil
+            keepEpicCache()
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -221,8 +256,9 @@ extension AppModel {
                 epic.account = nil
                 epic.games = []
                 epic.refreshFailure = nil
+                epic.lookFailure = nil
                 epic.fetched = false
-                EpicGames.forgetList(in: paths)
+                EpicGames.forgetCache(in: paths)
             } catch {
                 errorMessage = "Couldn't sign out: \(error.localizedDescription)"
             }
@@ -231,10 +267,36 @@ extension AppModel {
 
     // MARK: Install and uninstall
 
+    /// Install on the page: asks first (`EpicInstallSheet`), since it puts a game of many gigabytes on the disk and may start with
+    /// a download of G-Player Wine.
+    func askToInstallEpicGame(_ game: EpicGame) {
+        guard epic.isSignedIn, !epic.isOccupied else { return }
+        epic.installRequest = game
+    }
+
+    /// What the install question says, for the size Legendary gave (nil while it hasn't, or when it can't).
+    func epicInstallDetails(sizeBytes: Int64?) -> EpicGames.InstallDetails {
+        let engines = installedEngines
+        let engineDownload = EngineCatalog.installedGPlayerWine(in: engines) == nil
+            ? EngineCatalog.crossover.downloadBytes(wineStagingInstalled: engines.contains { $0.id == EngineCatalog.wineStaging.id }) : nil
+        let place = EpicGames.space(in: spaces).map(EpicGames.installBase) ?? paths?.spaces
+        return EpicGames.installDetails(sizeBytes: sizeBytes, availableBytes: place.flatMap { DiskSpace.available(at: $0) },
+                                        spaceExists: EpicGames.space(in: spaces) != nil, engineDownloadBytes: engineDownload)
+    }
+
+    /// What the game takes once installed, from Legendary (about ten seconds); nil when it can't say.
+    func epicInstallSize(of game: EpicGame) async -> Int64? {
+        guard let paths else { return nil }
+        let legendary = Legendary(paths: paths)
+        guard legendary.isDownloaded else { return nil }
+        return await legendary.installSize(of: game.appName)
+    }
+
     /// Installs a game into the Epic Games space (made on G-Player Wine the first time), with progress in the sidebar and a Stop
-    /// that goes on from where it stopped next time. One at a time.
+    /// that goes on from where it stopped next time. One at a time. Called once the user has said yes to the question.
     func installEpicGame(_ game: EpicGame) {
         guard let paths, epic.isSignedIn, !epic.isOccupied else { return }
+        epic.installRequest = nil
         epic.busy = "Installing “\(game.title)”"
         epic.installing = game.appName
         Task {
@@ -247,11 +309,19 @@ extension AppModel {
         let legendary = Legendary(paths: paths)
         guard await prepareLegendary(legendary) else { return }
         var home = EpicGames.space(in: spaces)
-        if home == nil { home = await createSpace(name: EpicGames.spaceName, presetID: EpicGames.presetID) }
+        if home == nil {
+            // On G-Player Wine, never on whatever else is installed (`EpicGames.engineForSpace`); it is downloaded first when it isn't
+            // there, as the question said.
+            let wanted = EpicGames.engineForSpace(installed: installedEngines)
+            guard await ensureEngine(wanted) != nil else { return }
+            home = await createSpace(name: EpicGames.spaceName, engineInfo: wanted, presetID: EpicGames.presetID)
+        }
         guard let home else { return }
         let base = EpicGames.installBase(in: home)
         let title = game.title, appName = game.appName
-        let activity = begin("Installing “\(title)”", "Preparing", setup: true)
+        // Not "setup": quitting doesn't ask whether to stop setting up (that question is about the first run), and an install
+        // that is cut short goes on from where it stopped.
+        let activity = begin("Installing “\(title)”", "Preparing")
         defer { end(activity); cancellers[activity] = nil }
         try? FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
@@ -298,11 +368,16 @@ extension AppModel {
 
     /// Asks Legendary how to start the game, right now, and plans the launch with its answer. The answer holds a one-time code
     /// Epic gives the game to log in with, so this comes as late as possible and the game starts at once; the code is in no log
-    /// and no message (`LaunchSecrets`). Online when Epic answers, offline when it can't be reached.
-    func epicPlan(_ replan: @escaping EpicReplan, appName: String, engine: Engine, paths: LibraryPaths) async throws -> LaunchPlan {
+    /// and no message (`LaunchSecrets`). Online when Epic answers; when it can't be reached the game starts offline, and says so
+    /// (`startNotes`). The game's tile says what is awaited meanwhile (`startStatus`).
+    func epicPlan(_ replan: @escaping EpicReplan, for game: Game, appName: String, engine: Engine, paths: LibraryPaths) async throws -> LaunchPlan {
+        epic.startStatus[game.id] = EpicGames.askingEpic
+        epic.startNotes[game.id] = nil
+        defer { epic.startStatus[game.id] = nil }
         let legendary = Legendary(paths: paths)
         try await legendary.ensureInstalled()
         let answer = try await legendary.launchParameters(for: appName, wine: engine.wine)
+        if let why = answer.offlineBecause { epic.startNotes[game.id] = EpicGames.offlineNote(reason: why) }
         return try await Task.detached(priority: .userInitiated) { try replan(answer.launch) }.value
     }
 }

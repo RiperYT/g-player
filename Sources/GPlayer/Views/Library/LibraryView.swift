@@ -188,7 +188,7 @@ struct GameTile: View {
     }
 
     private var subtitle: String {
-        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : "Starting…" }
+        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…" }
         if model.isRunning(game) { return "Running" }
         if let d = game.lastPlayedAt { return "Played " + d.formatted(.relative(presentation: .named)) }
         if game.kind == .app { return "Launcher" }

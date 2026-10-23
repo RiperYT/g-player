@@ -1538,7 +1538,7 @@ final class AppModel {
         let toStart: LaunchPlan
         if let replan, case .legendary(let appName) = game.source {
             // As late as it can be: the code Epic gives the game to log in with lives for a few minutes.
-            do { toStart = try await epicPlan(replan, appName: appName, engine: engine, paths: paths) }
+            do { toStart = try await epicPlan(replan, for: game, appName: appName, engine: engine, paths: paths) }
             catch { return .failure(error) }
             if retryStopped(retry, game.id) { return .failure(CancellationError()) }
         } else {

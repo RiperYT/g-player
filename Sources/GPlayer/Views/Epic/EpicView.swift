@@ -7,6 +7,7 @@ struct EpicView: View {
     @State private var search = ""
 
     var body: some View {
+        @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -14,12 +15,15 @@ struct EpicView: View {
                     Text("Legendary is an open-source Epic client not made by Epic. Games with anti-cheat (EasyAntiCheat, BattlEye) don't run on a Mac.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
+                if let failure = model.epic.lookFailure {
+                    EpicFailureLine(text: failure) { Task { await model.refreshEpic() } }
+                }
                 if let account = model.epic.account {
                     EpicAccountRow(account: account)
                     EpicGameList(search: search)
                 } else if !model.epic.looked {
                     ProgressView().controlSize(.small)
-                } else {
+                } else if model.epic.lookFailure == nil {
                     EpicSignedOut()
                 }
             }
@@ -30,10 +34,11 @@ struct EpicView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { Task { await model.refreshEpic() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    .help("Ask Epic for your games")
-                    .disabled(!model.epic.isSignedIn || model.epic.isOccupied)
+                    .help("Look again, and ask Epic for your games")
+                    .disabled(model.epic.isOccupied)
             }
         }
+        .sheet(item: $model.epic.installRequest) { EpicInstallSheet(game: $0) }
         .onAppear { model.openEpicPage() }
     }
 }
@@ -43,11 +48,16 @@ private struct EpicSignedOut: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let downloads = model.legendaryNeedsDownload
         VStack(alignment: .leading, spacing: 12) {
             Label("Sign in to install your Epic games", systemImage: "person.crop.circle").font(.headline)
             Text("G-Player opens Epic's own sign-in page. You sign in there, with Epic, Google, Apple or whatever you use: your password goes to Epic and never to G-Player. Games install without Epic's launcher, which doesn't run under Wine yet.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button(model.epic.busy == nil ? "Sign In…" : "Getting Legendary…") { model.beginEpicSignIn() }
+            if downloads {
+                Label("Signing in first downloads \(Legendary.downloadSummary).", systemImage: "arrow.down.circle")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Button(model.epic.busy != nil ? "Getting Legendary…" : downloads ? "Download Legendary and Sign In…" : "Sign In…") { model.beginEpicSignIn() }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .disabled(model.epic.isOccupied)
         }
@@ -87,19 +97,25 @@ private struct EpicGameList: View {
     }
 
     var body: some View {
-        if let failure = model.epic.refreshFailure {
-            EpicListFailure(text: failure)
-        } else if !model.epic.fetched && model.epic.games.isEmpty {
-            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Getting your games…").foregroundStyle(.secondary) }
-        } else if model.epic.games.isEmpty {
-            ContentUnavailableView("No games found", systemImage: "shippingbox",
-                                   description: Text("Epic lists no Windows games for this account. Refresh to ask again."))
-        } else if shown.isEmpty {
-            ContentUnavailableView.search(text: search)
-        } else {
-            let installed = shown.filter { model.epicGame(for: $0) != nil }, others = shown.filter { model.epicGame(for: $0) == nil }
-            if !installed.isEmpty { EpicSection(title: "Installed", games: installed) }
-            if !others.isEmpty { EpicSection(title: "Not installed", games: others) }
+        // A failed fetch is a line above the list that was there (the cached one), with its Play and Uninstall.
+        VStack(alignment: .leading, spacing: 22) {
+            if let failure = model.epic.refreshFailure { EpicListFailure(text: failure) }
+            if !model.epic.games.isEmpty {
+                if shown.isEmpty {
+                    ContentUnavailableView.search(text: search)
+                } else {
+                    let installed = shown.filter { model.epicGame(for: $0) != nil }, others = shown.filter { model.epicGame(for: $0) == nil }
+                    if !installed.isEmpty { EpicSection(title: "Installed", games: installed) }
+                    if !others.isEmpty { EpicSection(title: "Not installed", games: others) }
+                }
+            } else if model.epic.refreshFailure == nil {
+                if !model.epic.fetched {
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Getting your games…").foregroundStyle(.secondary) }
+                } else {
+                    ContentUnavailableView("No games found", systemImage: "shippingbox",
+                                           description: Text("Epic lists no Windows games for this account. Refresh to ask again."))
+                }
+            }
         }
     }
 }
@@ -124,13 +140,28 @@ private struct EpicListFailure: View {
     let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            PathWarning(text: text)
-            if text == LegendaryFailure.signedOutMessage {
+        if text == LegendaryFailure.signedOutMessage {
+            VStack(alignment: .leading, spacing: 10) {
+                PathWarning(text: text)
                 Button("Sign In…") { model.beginEpicSignIn() }.buttonStyle(.borderedProminent).disabled(model.epic.isOccupied)
-            } else {
-                Button("Try Again") { Task { await model.refreshEpic() } }.disabled(model.epic.isOccupied)
             }
+        } else {
+            EpicFailureLine(text: text) { Task { await model.refreshEpic() } }
+        }
+    }
+}
+
+/// Something couldn't be done: why, in one line, and Try Again beside it (disabled while Legendary is busy).
+private struct EpicFailureLine: View {
+    @Environment(AppModel.self) private var model
+    let text: String
+    let tryAgain: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            PathWarning(text: text)
+            Spacer(minLength: 8)
+            Button("Try Again", action: tryAgain).disabled(model.epic.isOccupied)
         }
     }
 }
@@ -162,8 +193,8 @@ private struct EpicGameRow: View {
     private func subtitle(_ entry: Game?) -> String {
         if model.epic.installing == game.appName { return "Installing…" }
         guard let entry else { return "Not installed" }
-        if model.isPreparing(entry) { return "Starting…" }
-        if model.isRunning(entry) { return "Running" }
+        if model.isPreparing(entry) { return model.epic.startStatus[entry.id] ?? "Starting…" }
+        if model.isRunning(entry) { return model.epic.startNotes[entry.id].map { "Running · \($0.prefix(1).lowercased() + $0.dropFirst())" } ?? "Running" }
         return model.epic.installed[game.appName].map { $0.installSize > 0 ? "Installed · \($0.installSize.formattedBytes)" : "Installed" } ?? "Installed"
     }
 
@@ -171,7 +202,7 @@ private struct EpicGameRow: View {
         if model.epic.installing == game.appName {
             ProgressView().controlSize(.small)
         } else {
-            Button("Install") { model.installEpicGame(game) }
+            Button("Install…") { model.askToInstallEpicGame(game) }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.epic.isOccupied)
                 .help(model.epic.busy.map { "Wait for “\($0)” to finish. Epic installs one at a time." } ?? "Download and install")
