@@ -48,6 +48,7 @@ struct LibraryNoteBanner: View {
         case .gplayerWine: "sparkles"
         case .storeReady: "checkmark.circle"
         case .setupOnHold: "pause.circle"
+        case .wineMono: "info.circle"
         }
     }
 
@@ -56,6 +57,7 @@ struct LibraryNoteBanner: View {
         case .gplayerWine: "G-Player Wine is new and recommended"
         case .storeReady(let name): "\(name) is ready"
         case .setupOnHold(let pending): FirstRunSetup.pausedNote(pendingSpaces: pending).title
+        case .wineMono(let space): model.wineMonoNotes[space]?.title ?? ""
         }
     }
 
@@ -64,6 +66,7 @@ struct LibraryNoteBanner: View {
         case .gplayerWine: "Spaces you have keep what they run on. Open one to move it to G-Player Wine."
         case .storeReady(let name): "Open it from All Games, sign in, and your \(name) games appear here."
         case .setupOnHold(let pending): FirstRunSetup.pausedNote(pendingSpaces: pending).text
+        case .wineMono(let space): model.wineMonoNotes[space]?.text ?? ""
         }
     }
 }

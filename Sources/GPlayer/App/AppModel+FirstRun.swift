@@ -10,12 +10,15 @@ enum LibraryNote: Identifiable, Equatable {
     case storeReady(String)
     /// The first run waits because the user stopped a download (the first spaces still to make, as `FirstRunSetup` names them).
     case setupOnHold([String])
+    /// Wine Mono (.NET) isn't in this space, and why (`AppModel.wineMonoNotes`): the launcher is open, the Mac is offline.
+    case wineMono(UUID)
 
     var id: String {
         switch self {
         case .gplayerWine: "gplayer-wine"
         case .storeReady(let name): "ready-\(name)"
         case .setupOnHold: "setup-on-hold"
+        case .wineMono(let space): "wine-mono-\(space.uuidString)"
         }
     }
 }
@@ -80,6 +83,8 @@ extension AppModel {
         var notes: [LibraryNote] = []
         if firstRunPaused, !firstRunSpaces.isEmpty, !pausedNoteClosed { notes.append(.setupOnHold(firstRunSpaces)) }
         if FirstRunSetup.upgradeNoteApplies(spaces: spaces, seen: engineNoteSeen) { notes.append(.gplayerWine) }
+        // What an Epic launcher that is open, or a Mac that is offline, left undone: said where its tile is.
+        for space in spaces where wineMonoNotes[space.id] != nil { notes.append(.wineMono(space.id)) }
         // Until the store has been opened once: after that its games are in the library and the note has done its job.
         if let id = storeReadyID, let preset = AppPresets.preset(id), let launcher = launcherTile(of: preset),
            launcher.lastPlayedAt == nil {
@@ -93,6 +98,7 @@ extension AppModel {
         case .gplayerWine: engineNoteSeen = true
         case .storeReady: storeReadyID = nil
         case .setupOnHold: pausedNoteClosed = true
+        case .wineMono(let space): closeWineMonoNote(space)
         }
     }
 

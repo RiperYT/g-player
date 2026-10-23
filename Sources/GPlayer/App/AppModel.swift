@@ -183,7 +183,16 @@ final class AppModel {
     @ObservationIgnored private var engineInstalls: [String: Task<Engine?, Never>] = [:]
     @ObservationIgnored private var engineFailures: [String: Error] = [:]
     /// Wine Mono downloads running, by engine id (`ensureWineMono`).
-    @ObservationIgnored var monoInstalls: [String: Task<Bool, Never>] = [:]
+    @ObservationIgnored var monoInstalls: [String: Task<WineMonoFetch, Never>] = [:]
+    /// Spaces Wine Mono is being fetched or set up for, and how many such jobs: their engine's files are in use (`busySpaces`).
+    @ObservationIgnored var monoWork: [UUID: Int] = [:]
+    /// Spaces where Wine Mono's setup program runs, and those where the user stopped everything meanwhile (`stopAll`).
+    @ObservationIgnored var registeringMono: Set<UUID> = []
+    @ObservationIgnored var stoppedMono: Set<UUID> = []
+    /// What the user is told about Wine Mono not being in a space (`WineMono.note`), by space: the library and the space's page show it.
+    var wineMonoNotes: [UUID: WineMono.Note] = [:]
+    /// Spaces that were told, in this run, of something a start only repeats (`WineMono.showsNote`).
+    @ObservationIgnored var wineMonoNotesShown: Set<UUID> = []
     /// Engines whose download the user stopped (Stop in the sidebar), so the first run doesn't go on to the next one.
     @ObservationIgnored private var stoppedEngines: Set<String> = []
     /// The clean-up of what an earlier run left (`cleanEngineLeftovers`); an engine or component install waits for it, so it
@@ -596,7 +605,7 @@ final class AppModel {
             let all = WineProcesses.snapshot()
             return onEngine.filter { WineProcesses.isRunning(in: $0, processes: all) }.map(\.id)
         }.value
-        return onEngine.filter { running.contains($0.id) || installingSpaces.contains($0.id) }
+        return onEngine.filter { running.contains($0.id) || installingSpaces.contains($0.id) || (monoWork[$0.id] ?? 0) > 0 }
     }
 
     /// Removes an engine unless programs run on it. Returns the spaces that keep it busy (nothing is removed then).
@@ -875,6 +884,7 @@ final class AppModel {
     /// Works with Apple's toolkit turned off too, so a space that uses it can always be stopped.
     func stopAll(in space: Space) {
         guard let engine = engineManager?.engine(id: space.engineID) else { return }
+        if registeringMono.contains(space.id) { stoppedMono.insert(space.id) }      // the setup's program dies: not a failure
         for g in state.games(in: space) { autoLaunches[g.id] = nil }      // stopped on purpose: not a failure to learn from
         Task {
             await WineLauncher.killAll(engine: engine, space: space)
@@ -934,7 +944,16 @@ final class AppModel {
                 return WineMono.plan(wanted: wanted, inEngine: engine.hasWineMono, registered: false)
             }.value
             let dotNet: Bool
-            if let monoPlan { dotNet = await self.prepareWineMono(monoPlan, engine: engine, in: space) } else { dotNet = false }
+            if let monoPlan {
+                // No program exists yet to start without .NET: the installer runs, and the launcher's first start tries again.
+                let outcome = await self.prepareWineMono(
+                    monoPlan, engine: engine, in: space, program: preset.name, purpose: preset.dotNetReason ?? "this app",
+                    consequence: "The installer of \(preset.name) runs without .NET, and its first start tries again.")
+                if case .stopped(everything: true) = outcome { return }
+                dotNet = outcome == .ready
+            } else {
+                dotNet = false
+            }
             guard self.activities.contains(where: { $0.id == activity && !$0.stopping }) else { return }
             let work = Task.detached {
                 try await PresetInstaller(paths: paths).install(preset, in: space, engine: engine, dotNetAvailable: dotNet) { [weak self] f, m in
@@ -1448,7 +1467,8 @@ final class AppModel {
             }
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
             let fixes = current.kind == .game ? self.fixes(for: current) : []
-            let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine), monoInstalled = engine.hasWineMono
+            let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine),
+                monoInstalled = engine.info.mono.map { engine.hasWineMono && WineMono.pathFits($0, in: engine.wineRoot) } ?? false
             // Steam's helpers left behind by a Steam that has gone would count as Steam running, and a new one can't start.
             if startsSteam { _ = await endOrphanedSteamHelpers(in: space) }
             var steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
@@ -1501,7 +1521,7 @@ final class AppModel {
             if case .legendary = current.source {
                 replan = { launch in
                     try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
-                                           launcher: launcher, legendary: launch)
+                                           launcher: launcher, legendary: launch, monoInstalled: monoInstalled)
                 }
             } else {
                 replan = nil
@@ -1576,8 +1596,20 @@ final class AppModel {
             }
             if !plan.registry.isEmpty { await applyRegistryNow(plan.registry, for: game.id, in: space, engine: engine) }
             // A launcher that runs .NET code (Epic's) gets Wine Mono: into the engine, into the space once. A launch that
-            // can't have it (the user said no, a failure, a Stop) starts with .NET off, as before.
-            if let mono = plan.wineMono, !mono.isReady { monoReady = await prepareWineMono(mono, engine: engine, in: space) }
+            // can't have it (the user said no, a failure, the launcher already open) starts with .NET off, as before; a Stop of
+            // everything in the space during the setup is a Stop of the start too.
+            if let mono = plan.wineMono {
+                if mono.isReady {
+                    clearWineMonoNote(in: space)
+                } else {
+                    let preset = AppPresets.preset(space.presetID)
+                    let outcome = await prepareWineMono(
+                        mono, engine: engine, in: space, program: preset?.name ?? game.title,
+                        purpose: preset?.dotNetReason ?? "this program", consequence: "\(game.title) starts without .NET.")
+                    if case .stopped(everything: true) = outcome { return .failure(CancellationError()) }
+                    monoReady = outcome == .ready
+                }
+            }
         }
         // Installing components and writing settings can take minutes: a Stop since then still prevents the start.
         if retryStopped(retry, game.id) { return .failure(CancellationError()) }
