@@ -67,3 +67,13 @@ issue (not fixed there yet).
   into 26.3.0-1 (retired), only over the exact file its release ships. Built with `make dlls/winecoreaudio.drv/winecoreaudio.so` in the engine's build tree;
   a rebuild differs from the bundled file only in debug-info time stamps.
 
+
+## cx-ncrypt-ecdsa-p256.patch
+
+Wine's own `ncrypt: Support ECDSA_P256` (commit 0a13e4af4bcc9deaa973bc6680f812899c81f8ee, Hans Leidekker, 2026-01-05),
+unchanged; it came after Wine 11.0, the base of CrossOver 26.3. `NCryptCreatePersistedKey` made only RSA keys, and Epic's
+launcher (2026) makes an ECDSA P-256 key to sign its Epic Online Services token requests (DPoP): "Failed to create
+persistent DPoP key (Status: 0x80090029)", every request failed, and the launcher went offline. Persistent keys are
+still not stored (Wine says so), so the launcher makes a new key each run. `tools/ncrypt-smoke/ncrypttest.c` makes a key,
+exports it, signs a hash and checks the signature. For G-Player Wine 26.3.0-2 the rebuilt ncrypt.dll (both bitnesses)
+goes in as an engine fix.

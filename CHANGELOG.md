@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **Epic's launcher stays signed in.** It signs its Epic Online Services token requests with an ECDSA key, which
+  G-Player Wine's Wine couldn't make: every request failed, the launcher went offline after a while, and a game started
+  then said it needs a signed-in launcher. G-Player puts Wine's own fix for it (ncrypt with ECDSA P-256) into G-Player
+  Wine 26.3.0-2, keeping the engine's files next to it.
 - **Epic's launcher can install games.** It waits for a file change notification before it installs, and G-Player Wine's
   wineserver had none on a Mac: Install did nothing. G-Player puts a wineserver built with file change notifications
   (libinotify) into G-Player Wine 26.3.0-2 by itself, keeping the engine's own one next to it. Quit G-Player and Epic's

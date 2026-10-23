@@ -132,8 +132,9 @@ import Testing
         #expect(fixes(for: EngineCatalog.crossoverRevision1).sorted() == [
             "lib/wine/i386-windows/ntdll.dll", "lib/wine/x86_64-unix/ntdll.so", "lib/wine/x86_64-unix/winecoreaudio.so",
             "lib/wine/x86_64-windows/ntdll.dll"])
-        // Revision 2 gets only its wineserver with file change notifications.
-        #expect(fixes(for: EngineCatalog.crossover) == ["bin/wineserver"])
+        // Revision 2 gets its wineserver with file change notifications and ncrypt with ECDSA keys.
+        #expect(fixes(for: EngineCatalog.crossover).sorted() == ["bin/wineserver", "lib/wine/i386-windows/ncrypt.dll",
+                                                                  "lib/wine/x86_64-windows/ncrypt.dll"])
         #expect(EngineFixes.ntdllNoExec.allSatisfy { $0.engineID == "wine-cx-26.3.0-1" } && EngineFixes.coreAudioVolume.engineID == "wine-cx-26.3.0-1")
         // Wine Staging keeps its two.
         #expect(fixes(for: EngineCatalog.wineStaging).sorted() == ["lib/libMoltenVK.dylib", "lib/wine/x86_64-windows/wow64cpu.dll"])

@@ -71,6 +71,12 @@ ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872, LGPL-2.1+) wit
 script are the complete corresponding source for these files (the source tarball published with G-Player Wine
 26.3.0-1 is the same tree before cx-nx-compat.patch and cx-coreaudio-stream-volume.patch).
 
+G-Player includes G-Player Wine 26.3.0-2's ncrypt with ECDSA P-256 keys,
+Sources/GPlayerCore/Resources/engine-fixes/cx2-ncrypt-x86_64.dll and cx2-ncrypt-i386.dll: the same CrossOver 26.3.0
+source and patches plus tools/wine-patches/cx-ncrypt-ecdsa-p256.patch (LGPL-2.1+; Wine commit
+0a13e4af4bcc9deaa973bc6680f812899c81f8ee by Hans Leidekker), by scripts/build-engine-cx.sh, which with that tarball and
+the patches is their complete corresponding source.
+
 G-Player includes G-Player Wine 26.3.0-2's wineserver built with file change notifications,
 Sources/GPlayerCore/Resources/engine-fixes/cx2-wineserver: the same CrossOver 26.3.0 source and patches, configured
 --with-inotify by scripts/build-engine-cx.sh against the header of libinotify-kqueue 20240724

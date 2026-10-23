@@ -91,7 +91,21 @@ public enum EngineFixes {
         resource: "engine-fixes/cx2-wineserver",
         requires: ["lib/libinotify.0.dylib"])
 
-    public static let all = [wow64cpu, moltenVK] + ntdllNoExec + [coreAudioVolume, wineserverNotifications]
+    /// G-Player Wine 26.3.0-2's ncrypt with ECDSA P-256 keys (tools/wine-patches/cx-ncrypt-ecdsa-p256.patch, Wine's own
+    /// change from after 11.0): Epic's launcher signs its Epic Online Services token requests (DPoP) with such a key, and
+    /// without one every request failed and the launcher went offline. Both bitnesses.
+    public static let ncryptECDSA = [
+        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/x86_64-windows/ncrypt.dll",
+                originalSHA256: "94f8d51c0707c555529cd30526bd71fed17d59ed3995788365eb1bf24dae0630",
+                fixedSHA256: "fb608fb5de9911bbd0cb1444cd12a4b6cba869ef5f4ff9846d15f1ab3108f5e5",
+                resource: "engine-fixes/cx2-ncrypt-x86_64.dll"),
+        FileFix(engineID: EngineCatalog.crossover.id, path: "lib/wine/i386-windows/ncrypt.dll",
+                originalSHA256: "14a13dfa6e4a057bc9376d5c4cacc7c42a0a8e7854dd6b8ca9efaa12b312df2c",
+                fixedSHA256: "070c85a658efe4b2291bf8379e461f73efb7bf5fc2952bdcf271a0b7330bdc9f",
+                resource: "engine-fixes/cx2-ncrypt-i386.dll"),
+    ]
+
+    public static let all = [wow64cpu, moltenVK] + ntdllNoExec + [coreAudioVolume, wineserverNotifications] + ncryptECDSA
 
     public enum Outcome: Equatable, Sendable {
         /// The fixed file was put in place; the original is kept next to it as `<name>.gcenx`.
