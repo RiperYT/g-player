@@ -95,8 +95,8 @@ private let sampleInstalled = """
     }
 
     @Test func aNameThatCouldBeAnOptionIsNotAnAppName() {
-        #expect(LegendaryCommand.isAppName("Sugar"))
-        #expect(LegendaryCommand.isAppName("9d2d0eb64d5c44529cece33fe2a46482"))
+        #expect(LegendaryCommand.isAppName("SampleApp"))
+        #expect(LegendaryCommand.isAppName("0123456789abcdef0123456789abcdef"))
         #expect(LegendaryCommand.isAppName("Sample_App-2.0"))
         for bad in ["", "-y", "--json", "a b", "a/b", "a;b", "é", String(repeating: "a", count: 101)] {
             #expect(!LegendaryCommand.isAppName(bad), "\(bad)")

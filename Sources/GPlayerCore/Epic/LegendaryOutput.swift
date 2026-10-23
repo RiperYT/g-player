@@ -10,7 +10,7 @@ public struct LegendaryStatus: Equatable, Sendable {
 /// A game the account owns and Legendary can install. Only what G-Player shows is kept; this is also what is cached, so the
 /// list is there at the next start without asking Epic.
 public struct EpicGame: Codable, Hashable, Sendable, Identifiable {
-    /// Legendary's name for the game ("Sugar"), what every command takes.
+    /// Legendary's name for the game ("SampleApp"), what every command takes.
     public let appName: String
     public let title: String
     /// Box art, from Epic's CDN.

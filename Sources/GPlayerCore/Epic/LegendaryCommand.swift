@@ -41,7 +41,7 @@ public enum LegendaryCommand {
         command(["launch", appName, "--json", "--wine", wine.path, "--skip-version-check"] + (offline ? ["--offline"] : []))
     }
 
-    /// True for a name Legendary gives a game ("Sugar", "9d2d0eb64d5c…"): it never starts with a dash, so it can't be taken
+    /// True for a name Legendary gives a game ("SampleApp", "0123456789ab…"): it never starts with a dash, so it can't be taken
     /// for an option.
     public static func isAppName(_ name: String) -> Bool {
         guard (1...100).contains(name.count), let first = name.unicodeScalars.first, first.isASCII,
