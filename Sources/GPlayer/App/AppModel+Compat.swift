@@ -61,7 +61,7 @@ extension AppModel {
     /// Reads the disk, so it runs off the main thread.
     nonisolated static func mainExecutable(of game: Game, in space: Space) -> URL? {
         switch game.source {
-        case .executable: return game.executableURL(in: space)
+        case .executable, .legendary: return game.executableURL(in: space)
         case .steam(let id):
             guard let folder = SteamLibrary.installFolder(appID: id, in: space) else { return nil }
             return ExecutableScanner.scan(folder, title: game.title, maxDepth: 4).first { $0.score > -40 }?.url
@@ -72,7 +72,7 @@ extension AppModel {
     /// The file name of the program a game starts, without reading the disk: its own .exe, or the one the analysis
     /// looked at.
     func programName(of game: Game) -> String? {
-        if case .executable = game.source, let path = game.executablePath, !path.isEmpty {
+        if game.source.startsProgramItself, let path = game.executablePath, !path.isEmpty {
             return (path as NSString).lastPathComponent
         }
         return game.analysis?.programPath.map { ($0 as NSString).lastPathComponent }

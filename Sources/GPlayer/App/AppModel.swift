@@ -1454,7 +1454,7 @@ final class AppModel {
                 update(latest)
             }
             // A launcher started again hands over to the open one and quits; the open one stays the running one.
-            if case .executable = game.source, running[game.id]?.isRunning != true { running[game.id] = program }
+            if game.source.startsProgramItself, running[game.id]?.isRunning != true { running[game.id] = program }
             // A program that died before it was recorded: its exit came first and found nothing to clear.
             if !program.isRunning { finished(game.id, status: program.process.terminationStatus) }
             // A store game starts through its launcher: "Starting…" until it shows up, and look for it soon.

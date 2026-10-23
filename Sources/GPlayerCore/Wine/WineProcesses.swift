@@ -282,7 +282,7 @@ public enum RunningGames {
             return Key(folder: nil, programName: game.executablePath.map { ($0 as NSString).lastPathComponent.lowercased() })
         }
         switch game.source {
-        case .executable:
+        case .executable, .legendary:
             guard let exe = game.executableURL(in: space) else { return Key(folder: nil, programName: nil) }
             let folder = exe.deletingLastPathComponent()
             let name = exe.lastPathComponent.lowercased()

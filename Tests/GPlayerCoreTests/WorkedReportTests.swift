@@ -117,6 +117,9 @@ import Testing
         epic.source = .epic(appName: "SampleCodeName", launchURI: "com.epicgames.launcher://apps/SampleCodeName?action=launch")
         #expect(report(epic).lines.contains("Store: Epic"))
         #expect(!report(epic).text.contains("SampleCodeName"))
+        epic.source = .legendary(appName: "SampleCodeName")
+        #expect(report(epic).lines.contains("Store: Epic"))
+        #expect(!report(epic).text.contains("SampleCodeName"))
 
         var added = plain()
         added.analysis = GameAnalysis(launchers: ["Ubisoft", "EA_App"])
