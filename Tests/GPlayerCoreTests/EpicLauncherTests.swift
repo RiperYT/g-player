@@ -279,4 +279,16 @@ import Testing
         #expect(EngineSwitch.launcherMoveDetail(presetID: "epic") == "Epic Games Launcher opens only on G-Player Wine. Moving asks first.")
         #expect(EngineSwitch.launcherMoveDetail(presetID: "steam") == nil && EngineSwitch.launcherMoveDetail(presetID: nil) == nil)
     }
+
+    // MARK: Words
+
+    @Test func theLauncherIsTheRecommendedWayAndSaysItRunsOnGPlayerWine() {
+        #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.")
+        #expect(!epic.summary.contains("loading screen"))
+        #expect(EpicWay.allCases == [.launcher, .legendary])
+        #expect(EpicWay.launcher.title == "Epic Games Launcher" && EpicWay.launcher.badge == "Recommended")
+        #expect(EpicWay.launcher.detail == epic.summary)
+        #expect(EpicWay.legendary.title == "Without the launcher" && EpicWay.legendary.badge == "Alternative")
+        #expect(EpicWay.legendary.detail.hasPrefix("Faster, through Legendary, an open-source Epic client not made by Epic"))
+    }
 }

@@ -85,7 +85,7 @@ public enum AppPresets {
 
     public static let epic = AppPreset(
         id: "epic", name: "Epic Games Launcher",
-        summary: "Epic's own launcher. Installs and starts, but under Wine it currently stops at its loading screen. The recommended Epic Games card installs your games without it.",
+        summary: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.",
         symbol: "shippingbox", experimental: true,
         installerURL: URL(string: "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi")!,
         installerFileName: "EpicGamesLauncherInstaller.msi", installerArguments: ["/qn"],

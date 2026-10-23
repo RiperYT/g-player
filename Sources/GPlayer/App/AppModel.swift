@@ -875,6 +875,13 @@ final class AppModel {
 
     func isInstalled(_ preset: AppPreset) -> Bool { presetSpace(preset).map(preset.isInstalled) ?? false }
 
+    /// Starts an installed store app: its tile in the library.
+    func openLauncher(of preset: AppPreset) {
+        guard let space = presetSpace(preset),
+              let tile = state.games.first(where: { $0.spaceID == space.id && $0.kind == .app }) else { return }
+        play(tile)
+    }
+
     func isInstalling(_ preset: AppPreset) -> Bool { installingPresets.contains(preset.id) }
 
     func installPreset(_ preset: AppPreset, engineInfo: EngineInfo? = nil) async {
