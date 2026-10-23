@@ -5,7 +5,7 @@ import Foundation
 public enum FirstRunSetup {
     /// What the first run's two engines need on this disk: unpacked, with room for the archive being unpacked.
     public static var diskBytes: Int64 { EngineCatalog.diskBytes(installing: EngineCatalog.firstRunInstalls) }
-    /// "3.3 GB" for both engines; less once one is installed.
+    /// "3.8 GB" for both engines; less once one is installed.
     public static func diskLabel(installed: [EngineInfo] = []) -> String {
         String(format: "%.1f GB", Double(EngineCatalog.firstRunDiskBytes(installed: installed)) / 1_000_000_000)
     }

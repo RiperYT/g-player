@@ -26,15 +26,15 @@ import Testing
         #expect(!DiskSpace.sameVolume(tmp.url, URL(fileURLWithPath: "/dev")))
     }
 
-    @Test func theFirstRunsEnginesNeedAboutThreePointThreeGigabytes() {
+    @Test func theFirstRunsEnginesNeedAboutThreePointEightGigabytes() {
         let both = EngineCatalog.firstRunDiskBytes(installed: [])
-        #expect(both > 3_000_000_000 && both < 3_600_000_000)
+        #expect(both > 3_600_000_000 && both < 4_000_000_000)
         // What is installed already isn't counted again; with both there, nothing is needed.
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.wineStaging]) < both - 700_000_000)
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.wineStaging, EngineCatalog.crossover]) == 0)
-        // One engine: what it takes unpacked, and room for its biggest archive.
+        // One engine: what it takes unpacked, and room for its files while it installs (both of Wine Staging's archives).
         let one = EngineCatalog.diskBytes(installing: [EngineCatalog.wineStaging])
-        #expect(one == EngineCatalog.wineStaging.installedBytes + 193_105_336)
+        #expect(one == EngineCatalog.wineStaging.installedBytes + 193_105_336 + 3_900_000)
     }
 
     @Test func everyEngineThatIsDownloadedSaysHowMuchRoomItTakes() {

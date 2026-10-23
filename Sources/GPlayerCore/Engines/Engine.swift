@@ -125,12 +125,27 @@ public struct EngineManager: Sendable {
     public func diskProblem(installing infos: [EngineInfo]) -> String? {
         guard !infos.isEmpty else { return nil }
         let names = infos.map(\.name).joined(separator: " and ")
-        return DiskSpace.problem(needing: EngineCatalog.diskBytes(installing: infos), available: DiskSpace.available(at: paths.root),
+        return DiskSpace.problem(needing: diskNeeded(installing: infos), available: DiskSpace.available(at: paths.root),
                                  for: "Installing \(names)")
     }
 
+    /// The free space installing `infos` needs now (`EngineCatalog.diskBytes`). One engine whose files an earlier try left in
+    /// its downloads folder (a late failure keeps them) doesn't need that room again: it is taken already.
+    func diskNeeded(installing infos: [EngineInfo]) -> Int64 {
+        let needed = EngineCatalog.diskBytes(installing: infos)
+        guard infos.count == 1, let info = infos.first else { return needed }
+        let taken = info.downloads.reduce(Int64(0)) { total, item in
+            let file = downloadFile(item, of: info)
+            return total + Files.size(of: file) + Files.size(of: FileDownloader.partialFile(for: file))
+        }
+        return max(0, needed - taken)
+    }
+
     /// Downloads, verifies and unpacks an engine. `progress` gets 0…1 and what to say ("Downloading 41 of 98 MB"). A download
-    /// that stops (Stop, a quit, a dropped connection) keeps what came and goes on from there the next time.
+    /// that stops (Stop, a quit, a dropped connection) keeps what came and goes on from there the next time. The files that
+    /// came whole and were checked stay in the engine's downloads folder until the whole install has succeeded, so one that
+    /// fails late (GStreamer's step, the last) starts again from them and downloads nothing twice. `EngineCatalog.diskBytes`
+    /// counts the room they take.
     public func install(_ info: EngineInfo, progress: @escaping @Sendable (Double, String) -> Void) async throws -> Engine {
         guard !info.downloads.isEmpty else {
             throw ShellError.failed("G-Player doesn't download \(info.name). Install it yourself from Apple if its license fits your use.")
@@ -185,7 +200,6 @@ public struct EngineManager: Sendable {
                 // After the runtime libraries (the item order): it never lists a name they have, and would replace it.
                 if let gstreamer { try await installGStreamer(from: file, manifest: gstreamer, into: staging.appendingPathComponent("wine")) }
             }
-            try? FileManager.default.removeItem(at: file)
         }
         await Files.clearQuarantine(staging)
         try Task.checkCancellation()

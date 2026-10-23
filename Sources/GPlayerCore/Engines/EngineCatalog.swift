@@ -32,8 +32,8 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// What the build is made from, when its own number says too little: G-Player Wine's "11.0" next to Wine
     /// Staging's "11.18" would look older than it is.
     public var basedOn: String? = nil
-    /// The room the unpacked engine takes on disk, measured and rounded up. Installing needs this plus the biggest
-    /// archive (`EngineCatalog.diskBytes`).
+    /// The room the unpacked engine takes on disk, measured and rounded up. Installing needs this plus the room its files
+    /// take while it runs (`installWorkBytes`, `EngineCatalog.diskBytes`).
     public var installedBytes: Int64 = 0
     /// The id of the engine that took this one's place, once G-Player retired it. A retired engine still runs the spaces that
     /// are on it and is looked after while it is installed, but is never offered, installed or used for a new space: spaces
@@ -45,6 +45,13 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// The name with its version, for rows and pickers: "Wine Staging 11.18", "G-Player Wine (Wine 11 from CrossOver 26.3)".
     public var displayName: String { basedOn.map { "\(name) (\($0))" } ?? "\(name) \(version)" }
     public var defaultBackend: GraphicsBackend { backends.first ?? .wined3d }
+    /// The room installing takes besides the unpacked engine while it runs, free again when it has succeeded: every archive it
+    /// downloads (they stay until then, so a late failure doesn't download again) and the biggest scratch room working on one
+    /// takes (`PinnedDownload.scratchBytes`). Every archive is counted, also the runtime libraries an installed Wine Staging
+    /// makes unnecessary: the figure only has to be enough.
+    public var installWorkBytes: Int64 {
+        downloads.reduce(0) { $0 + $1.approximateBytes } + (downloads.map(\.scratchBytes).max() ?? 0)
+    }
     /// What installing needs to download, leaving out the runtime libraries when an installed Wine Staging has them.
     public func downloadBytes(wineStagingInstalled: Bool) -> Int64 {
         downloads.filter { !(wineStagingInstalled && $0.role == .runtimeLibraries) }.reduce(0) { $0 + $1.approximateBytes }
@@ -129,9 +136,9 @@ public enum EngineCatalog {
             gstreamer,
         ],
         basedOn: "Wine 11 from CrossOver 26.3",
-        // Revision 1's 1.65 GB, and the GStreamer files copied from the package as they are (universal binaries: macOS
-        // has no `lipo` for users to cut them down with).
-        installedBytes: 1_690_000_000)
+        // Revision 1's 1.65 GB, and the GStreamer files copied from the package as they are (47.4 MB; universal binaries:
+        // macOS has no `lipo` for users to cut them down with).
+        installedBytes: 1_700_000_000)
 
     /// G-Player Wine revision 1, retired. Spaces made while it was the engine keep running on it until `EngineMigration`
     /// moves them to revision 2, which has the same Wine, the two fixes `EngineFixes` still puts into this one built in, and
@@ -242,15 +249,14 @@ public enum EngineCatalog {
         return total
     }
 
-    /// The free disk space installing `infos` one after the other needs: what they take once unpacked, and room for the
-    /// biggest archive with what working on it takes (`PinnedDownload.scratchBytes`), which is there while it unpacks and
-    /// deleted after.
+    /// The free disk space installing `infos` one after the other needs: what they take once unpacked, and room for the files
+    /// of the engine that needs most while it installs (`EngineInfo.installWorkBytes`: all its archives, kept until it has
+    /// succeeded, and the biggest scratch room working on one takes). That room is free again after each engine.
     public static func diskBytes(installing infos: [EngineInfo]) -> Int64 {
-        infos.reduce(0) { $0 + $1.installedBytes }
-            + (infos.flatMap(\.downloads).map { $0.approximateBytes + $0.scratchBytes }.max() ?? 0)
+        infos.reduce(0) { $0 + $1.installedBytes } + (infos.map(\.installWorkBytes).max() ?? 0)
     }
 
-    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 3.3 GB for both).
+    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 3.8 GB for both).
     public static func firstRunDiskBytes(installed: [EngineInfo]) -> Int64 {
         diskBytes(installing: firstRunInstalls.filter { first in !installed.contains { $0.id == first.id } })
     }

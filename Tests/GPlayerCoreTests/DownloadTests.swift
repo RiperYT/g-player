@@ -428,6 +428,97 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
     }
 }
 
+/// Installing from files that are in the engine's downloads folder already (nothing is fetched): what stays there until the
+/// install has ended, so that one that fails in its last step doesn't download everything again.
+@Suite struct EngineInstallKeepsDownloadsTests {
+    private let wine = "Wine Staging.app/Contents/Resources/wine/bin/wine"
+
+    private func manager(_ tmp: TempFolder) -> EngineManager { EngineManager(paths: LibraryPaths(root: tmp.url.appendingPathComponent("Lib"))) }
+
+    /// A tar of `files` (relative path: contents), the ones named in `executables` made executable.
+    private func archive(_ tmp: TempFolder, _ name: String, _ files: [String: String], executables: [String] = []) async throws -> Data {
+        let source = tmp.dir("source-\(name)")
+        for (path, text) in files { tmp.file("source-\(name)/\(path)", contents: Data(text.utf8)) }
+        for path in executables {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: source.appendingPathComponent(path).path)
+        }
+        let made = try await Shell.run(URL(fileURLWithPath: "/usr/bin/tar"), ["-cf", tmp.url.appendingPathComponent(name).path, "-C", source.path, "."])
+        try #require(made.succeeded, "\(made.stderr)")
+        return try Data(contentsOf: tmp.url.appendingPathComponent(name))
+    }
+
+    private func item(_ name: String, _ data: Data, role: PinnedDownload.Role = .engine) -> PinnedDownload {
+        PinnedDownload(url: URL(string: "https://stub.test/\(name)")!, fileName: name, sha256: sha(data),
+                       approximateBytes: Int64(data.count), role: role)
+    }
+
+    private func engine(_ downloads: [PinnedDownload], installedBytes: Int64 = 0) -> EngineInfo {
+        EngineInfo(id: "test-engine", name: "Test Wine", version: "1", kind: .wineStaging, summary: "", backends: [.wined3d],
+                   downloads: downloads, installedBytes: installedBytes)
+    }
+
+    private func keep(_ data: Data, _ item: PinnedDownload, _ info: EngineInfo, in manager: EngineManager) throws {
+        let file = manager.downloadFile(item, of: info)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: file)
+    }
+
+    @Test func anInstallThatFailsInItsLastStepKeepsEveryFileItHad() async throws {
+        let tmp = TempFolder()
+        let package = Data("not a package".utf8)
+        let list = "package gst-test.pkg \(sha(package))\nlib/a.dylib\n"
+        let main = try await archive(tmp, "engine.tar", [wine: "#!/bin/sh\n", "gstreamer-files.txt": list], executables: [wine])
+        let extra = try await archive(tmp, "extra.tar", ["extra.txt": "more"])
+        let items = [item("engine.tar", main), item("extra.tar", extra), item("gst-test.pkg", package, role: .gstreamer)]
+        let info = engine(items), manager = manager(tmp)
+        for (data, item) in zip([main, extra, package], items) { try keep(data, item, info, in: manager) }
+
+        let error = try await #require(throws: ShellError.self) { try await manager.install(info) { _, _ in } }
+        #expect(error.localizedDescription.contains("Couldn't unpack gst-test.pkg"))
+        // Nothing is installed, and nothing that came has to come again.
+        #expect(!manager.isInstalled(info))
+        for item in items { #expect(FileManager.default.fileExists(atPath: manager.downloadFile(item, of: info).path), "\(item.fileName)") }
+    }
+
+    @Test func aSuccessfulInstallKeepsEachFileUntilTheEndAndThenDeletesThem() async throws {
+        let tmp = TempFolder()
+        let main = try await archive(tmp, "engine.tar", [wine: "#!/bin/sh\n"], executables: [wine])
+        let extra = try await archive(tmp, "extra.tar", ["extra.txt": "more"])
+        let items = [item("engine.tar", main), item("extra.tar", extra)]
+        let info = engine(items), manager = manager(tmp)
+        for (data, item) in zip([main, extra], items) { try keep(data, item, info, in: manager) }
+
+        let firstWhileUnpackingTheSecond = LockedValue<Bool?>(nil)
+        let first = manager.downloadFile(items[0], of: info)
+        let installed = try await manager.install(info) { _, message in
+            if message == "Unpacking extra.tar" { firstWhileUnpackingTheSecond.set(FileManager.default.fileExists(atPath: first.path)) }
+        }
+        #expect(firstWhileUnpackingTheSecond.get() == true)         // not deleted as soon as it was unpacked
+        #expect(manager.isInstalled(info) && installed.info.id == info.id)
+        #expect(FileManager.default.fileExists(atPath: manager.folder(for: info).appendingPathComponent("extra.txt").path))
+        #expect(!FileManager.default.fileExists(atPath: manager.downloadFolder(for: info).path))
+    }
+
+    @Test func filesAnEarlierTryLeftAreNotCountedAgainByTheDiskCheck() async throws {
+        let tmp = TempFolder()
+        let main = Data(count: 4000), extra = Data(count: 1000)
+        let items = [item("engine.tar", main), item("extra.tar", extra)]
+        let info = engine(items, installedBytes: 10_000), manager = manager(tmp)
+        // Nothing there yet: the formula as it is.
+        #expect(manager.diskNeeded(installing: [info]) == EngineCatalog.diskBytes(installing: [info]))
+        #expect(EngineCatalog.diskBytes(installing: [info]) == 10_000 + 4000 + 1000)
+        // A whole file and the part of another are on the disk already.
+        try keep(main, items[0], info, in: manager)
+        try Data(count: 300).write(to: FileDownloader.partialFile(for: manager.downloadFile(items[1], of: info)))
+        #expect(manager.diskNeeded(installing: [info]) == 15_000 - 4000 - 300)
+        // Everything there: the unpacked engine is all that is left to make room for.
+        try keep(extra, items[1], info, in: manager)
+        #expect(manager.diskNeeded(installing: [info]) == 10_000 - 300)
+        // Several engines one after the other: no credit, the figure is the plain formula.
+        #expect(manager.diskNeeded(installing: [info, EngineCatalog.wineStaging]) == EngineCatalog.diskBytes(installing: [info, EngineCatalog.wineStaging]))
+    }
+}
+
 /// A value shared with a callback that runs on another thread.
 final class LockedValue<T>: @unchecked Sendable {
     private let lock = NSLock()

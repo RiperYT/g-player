@@ -22,16 +22,25 @@ import Testing
         #expect(!EngineCatalog.crossoverRevision1.downloads.contains { $0.role == .gstreamer })
     }
 
-    @Test func theDiskCheckCountsTheExpandedPackage() {
-        // G-Player Wine on its own: what it takes unpacked, and the GStreamer package with its expansion, the biggest
-        // thing there at one time (the archive of the engine itself is deleted by then).
+    @Test func theDiskCheckCountsEveryArchiveAndTheExpandedPackage() {
+        // G-Player Wine on its own: what it takes unpacked, every archive it downloads (they stay until it has installed, so a
+        // failure in the last step doesn't download them again) and the room GStreamer's package takes while it is expanded,
+        // the biggest scratch of the install.
         let gplayerWine = EngineCatalog.crossover
-        #expect(gplayerWine.installedBytes == 1_690_000_000)
-        #expect(EngineCatalog.diskBytes(installing: [gplayerWine]) == 1_690_000_000 + 156_581_817 + 705_000_000)
-        // Without a scratch size an archive counts as itself, as before.
-        #expect(EngineCatalog.diskBytes(installing: [EngineCatalog.wineStaging]) == 750_000_000 + 193_105_336)
+        let archives: Int64 = 285_662_140 + 193_105_336 + 3_900_000 + 156_581_817
+        #expect(gplayerWine.installedBytes == 1_700_000_000)
+        #expect(gplayerWine.downloads.map(\.approximateBytes).reduce(0, +) == archives)
+        #expect(gplayerWine.installWorkBytes == archives + 705_000_000)
+        #expect(EngineCatalog.diskBytes(installing: [gplayerWine]) == 1_700_000_000 + archives + 705_000_000)
+        // Without a scratch size an engine's room is its archives: Wine Staging's two.
+        let staging = EngineCatalog.wineStaging
+        #expect(staging.installWorkBytes == 193_105_336 + 3_900_000)
+        #expect(EngineCatalog.diskBytes(installing: [staging]) == 750_000_000 + 193_105_336 + 3_900_000)
         #expect(EngineCatalog.diskBytes(installing: []) == 0)
-        #expect(EngineCatalog.firstRunDiskBytes(installed: []) == 750_000_000 + 1_690_000_000 + 156_581_817 + 705_000_000)
+        // One after the other: every engine stays once unpacked, and the room for files is the biggest engine's, free again
+        // after each.
+        #expect(EngineCatalog.firstRunDiskBytes(installed: []) == 750_000_000 + 1_700_000_000 + archives + 705_000_000)
+        #expect(EngineCatalog.firstRunDiskBytes(installed: [staging]) == 1_700_000_000 + archives + 705_000_000)
     }
 
     // MARK: The list

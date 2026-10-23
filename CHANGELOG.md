@@ -18,8 +18,10 @@
   Whisky) stays on the old version until you say yes, since Wine updates its files on the first start: its page offers
   Move Bottle, and the old version stays while a bottle is on it. Before the first move G-Player keeps
   `library.json` as `library.json.before-engine-update-<date>`, in case you go back to an older G-Player.
-- The first run now says it needs about 3.3 GB free and downloads about 640 MB, since GStreamer is part of G-Player
-  Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
+- The first run now says it needs about 3.8 GB free and downloads about 640 MB, since GStreamer is part of G-Player
+  Wine. The disk check counts every archive and the room GStreamer's package takes while it is unpacked. The files an
+  engine install downloads stay until it has succeeded, so one that fails in its last step goes on from them next time
+  instead of downloading again.
 
 ## [0.4.2] - 2026-10-23
 
