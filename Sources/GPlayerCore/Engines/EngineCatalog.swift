@@ -4,7 +4,8 @@ import Foundation
 public struct PinnedDownload: Sendable, Hashable {
     /// What the archive is for: the engine itself, DXVK, or (G-Player Wine) the runtime libraries from Gcenx's
     /// build that Wine loads and GStreamer's official package for game videos, which G-Player's own archive leaves out.
-    public enum Role: Sendable, Hashable { case engine, dxvk, runtimeLibraries, gstreamer }
+    /// Wine Mono (`WineMonoPackage`) is never one of an engine's `downloads`: it is fetched when something needs it.
+    public enum Role: Sendable, Hashable { case engine, dxvk, runtimeLibraries, gstreamer, wineMono }
 
     public let url: URL
     public let fileName: String
@@ -39,6 +40,9 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// are on it and is looked after while it is installed, but is never offered, installed or used for a new space: spaces
     /// move to its replacement (`EngineMigration`).
     public var replacedBy: String? = nil
+    /// The Wine Mono this engine's Wine expects (the version in its `mscoree`), fetched into the engine when a program needs .NET
+    /// (`WineMono`). Nil: no Mono is known to go with this Wine, and G-Player leaves .NET off for it as before.
+    public var mono: WineMonoPackage? = nil
 
     public var isRetired: Bool { replacedBy != nil }
 
@@ -60,7 +64,7 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     public func limited(to ready: [GraphicsBackend]) -> EngineInfo {
         EngineInfo(id: id, name: name, version: version, kind: kind, summary: summary,
                    backends: backends.filter(ready.contains), downloads: downloads, basedOn: basedOn,
-                   installedBytes: installedBytes, replacedBy: replacedBy)
+                   installedBytes: installedBytes, replacedBy: replacedBy, mono: mono)
     }
     public func resolve(_ backend: GraphicsBackend) -> GraphicsBackend {
         backend == .auto || !backends.contains(backend) ? defaultBackend : backend
@@ -138,7 +142,23 @@ public enum EngineCatalog {
         basedOn: "Wine 11 from CrossOver 26.3",
         // Revision 1's 1.65 GB, and the GStreamer files copied from the package as they are (47.4 MB; universal binaries:
         // macOS has no `lipo` for users to cut them down with).
-        installedBytes: 1_700_000_000)
+        installedBytes: 1_700_000_000,
+        mono: wineMono10_4_1)
+
+    /// The Wine Mono 10.4.1 package: .NET for Wine, the version CrossOver 26.3's Wine expects (`WINE_MONO_VERSION "10.4.1"` in its
+    /// `dlls/mscoree`). It belongs to the engine revision, so a revision built against another Wine Mono names that one. Not
+    /// downloaded with the engine: G-Player fetches it into the engine's own folder (`share/wine/mono/wine-mono-10.4.1`) when a
+    /// program needs it (`WineMono`). The digest is the one on the wine-mono release at github.com/madewokherd/wine-mono.
+    /// Unpacked it takes 242 MB on disk (236 MB of files).
+    public static let wineMono10_4_1 = WineMonoPackage(
+        version: "10.4.1",
+        download: PinnedDownload(
+            url: URL(string: "https://dl.winehq.org/wine/wine-mono/10.4.1/wine-mono-10.4.1-x86.tar.xz")!,
+            fileName: "wine-mono-10.4.1-x86.tar.xz",
+            sha256: "a16606ef0724202e6a6848ece6e0cbba64d11e2f11aefe744af1d93c6d9f99bb",
+            approximateBytes: 39_590_692,
+            role: .wineMono),
+        installedBytes: 245_000_000)
 
     /// G-Player Wine revision 1, retired. Spaces made while it was the engine keep running on it until `EngineMigration`
     /// moves them to revision 2, which has the same Wine, the two fixes `EngineFixes` still puts into this one built in, and
@@ -161,7 +181,8 @@ public enum EngineCatalog {
         ],
         basedOn: crossover.basedOn,
         installedBytes: 1_650_000_000,
-        replacedBy: crossover.id)
+        replacedBy: crossover.id,
+        mono: crossover.mono)                                   // the same Wine: the same Wine Mono
 
     /// GStreamer's official macOS runtime package (LGPL-2.1+), which G-Player Wine's archive doesn't carry: the engine lists
     /// the files it needs (`gstreamer-files.txt`) and installing copies them out of this package, unchanged

@@ -39,6 +39,10 @@ public struct Engine: Sendable, Hashable {
         wineRoot.deletingLastPathComponent().appendingPathComponent("gstreamer-1.0-registry.x86_64.bin")
     }
 
+    /// Wine Mono is in this engine's folder, where its Wine looks for a shared one (`WineMono.isUnpacked`). False for an engine
+    /// that has no Mono of its own to go with (`EngineInfo.mono`).
+    public var hasWineMono: Bool { info.mono.map { WineMono.isUnpacked($0, in: wineRoot) } ?? false }
+
     /// The backends this engine can run right now: G-Player Wine runs D3DMetal only once it has been linked in
     /// completely from the user's Game Porting Toolkit, and DXVK and DXMT only when their DLLs are there.
     public var readyBackends: [GraphicsBackend] {
@@ -199,6 +203,8 @@ public struct EngineManager: Sendable {
             case .gstreamer:
                 // After the runtime libraries (the item order): it never lists a name they have, and would replace it.
                 if let gstreamer { try await installGStreamer(from: file, manifest: gstreamer, into: staging.appendingPathComponent("wine")) }
+            case .wineMono:
+                break                                           // never in an engine's downloads: `installWineMono` fetches it later
             }
         }
         await Files.clearQuarantine(staging)
@@ -261,10 +267,23 @@ public struct EngineManager: Sendable {
             let downloads = downloadFolder(for: info)
             guard fm.fileExists(atPath: downloads.path) else { continue }
             if isInstalled(info) { try? fm.removeItem(at: downloads); continue }
-            for file in (try? fm.contentsOfDirectory(at: downloads, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
-                let touched = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                if let touched, now.timeIntervalSince(touched) > partialLifetime { try? fm.removeItem(at: file) }
-            }
+            removeStaleFiles(in: downloads, now: now, lifetime: partialLifetime)
+        }
+        // A Wine Mono download goes once Wine Mono is in its engine; one that stopped before that is gone on with, as an engine's is.
+        for info in EngineCatalog.known {
+            guard let package = info.mono else { continue }
+            let downloads = wineMonoDownloadFolder(for: info)
+            guard fm.fileExists(atPath: downloads.path) else { continue }
+            if let installed = engine(info), WineMono.isUnpacked(package, in: installed.wineRoot) { try? fm.removeItem(at: downloads); continue }
+            removeStaleFiles(in: downloads, now: now, lifetime: partialLifetime)
+        }
+    }
+
+    private func removeStaleFiles(in folder: URL, now: Date, lifetime: TimeInterval) {
+        let fm = FileManager.default
+        for file in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
+            let touched = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let touched, now.timeIntervalSince(touched) > lifetime { try? fm.removeItem(at: file) }
         }
     }
 
@@ -318,5 +337,6 @@ public struct EngineManager: Sendable {
         guard info.kind != .gptk else { return }
         try FileManager.default.removeItem(at: folder(for: info))
         try? FileManager.default.removeItem(at: downloadFolder(for: info))      // a part of it that was left
+        try? FileManager.default.removeItem(at: wineMonoDownloadFolder(for: info))
     }
 }

@@ -11,6 +11,14 @@
   An Epic Games Launcher space on Wine Staging is offered **Move to G-Player Wine…** on its page, and new ones are made on
   G-Player Wine. Get Apps and the Epic Games page show both ways side by side: the launcher (recommended), and Epic Games
   without it, which is faster and goes through Legendary. Games the launcher starts inherit its graphics (DXMT).
+- **Epic's launcher installs Epic Online Services.** Games can be installed from Epic's launcher now: its first start no
+  longer ends with "Epic Online Services is not installed" (error II-E1007). Epic's installer for it has .NET steps, and
+  G-Player kept .NET off to spare you Wine's own download prompts. For this launcher G-Player now brings **Wine Mono**
+  (.NET for Wine, 10.4.1, the version G-Player Wine expects): the first time you open the launcher (or set it up) it
+  downloads Wine Mono (40 MB, checked against a pinned SHA-256, with progress and a Stop in the sidebar) into G-Player
+  Wine, where it takes about 240 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
+  gets it: other apps and games start as before, and Wine Staging has none. In a bottle of another app it asks first, like
+  every change G-Player makes there. A launcher that is already open keeps what it started with: quit it and open it again.
 - **Epic games without Epic's launcher.** **Epic Games** in the sidebar signs you in on Epic's own page (with Epic, Google,
   Apple or whatever you use: G-Player never sees your password, and the window keeps nothing) and lists the games your account
   owns. **Install** puts a game into a space of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop

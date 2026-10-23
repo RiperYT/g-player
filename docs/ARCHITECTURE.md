@@ -154,6 +154,15 @@ out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pk
 files an install downloads stay in `Downloads/<id>` until it has succeeded, so a failure in its last step doesn't download
 them again; `EngineCatalog.diskBytes` counts every archive and the room the expansion takes.
 
+Wine Mono, .NET for Wine, is not part of an engine's downloads: `EngineInfo.mono` names the release the engine's Wine expects
+(`EngineCatalog.wineMono10_4_1`, pinned like any other download), and `EngineManager.installWineMono` fetches it into the
+engine's `share/wine/mono/wine-mono-<version>` when a launcher that `needsDotNet` is set up or started: the same resumable,
+checksummed download as an engine's (kept in `Downloads/<id>-mono` until it has been unpacked), unpacked beside the engine and
+moved into place whole. `WineMono.register` installs its support package into a space once, and `LaunchPlanner` reads
+what is still to do (`LaunchPlan.wineMono`: fetch, register) from the engine folder and the space's `system.reg`; only when
+nothing is left is `mscoree` left on for the launch. `AppModel+WineMono` does the work from the space's queue, only where
+`Space.mayChange`.
+
 ## One engine
 
 People don't choose an engine. `EngineCatalog.firstRunInstalls` is G-Player Wine alone; its runtime libraries come out of
