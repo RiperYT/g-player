@@ -41,7 +41,7 @@ struct EpicSignInSheet: View {
             }
             .padding(12)
         }
-        .frame(width: 540, height: 680)
+        .frame(width: 500, height: 560)
     }
 
     /// The code is handed over and the sheet closes; the sign-in itself goes on in the sidebar.

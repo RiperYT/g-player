@@ -224,8 +224,9 @@ public struct Legendary: Sendable {
     /// `hasRoom` is asked once, with the game's size on disk, when Legendary reports it, which is before it starts downloading;
     /// a reason it returns stops the install with that reason as the error (Legendary checks the room itself too, in words of
     /// its own). It isn't asked when Legendary goes on with an install that was stopped: the files that came are already on the
-    /// disk, so the whole size isn't what is still needed, and Legendary's own check knows. Cancelling the task stops Legendary; what was downloaded stays, and installing again goes on from there. What
-    /// counts as done is the game showing up as installed: Legendary exits with 0 after some failures.
+    /// disk, so the whole size isn't what is still needed, and Legendary's own check knows. Cancelling the task stops Legendary;
+    /// what was downloaded stays, and installing again goes on from there. What counts as done is the game showing up as
+    /// installed: Legendary exits with 0 after some failures.
     public func install(_ appName: String, basePath: URL, log: URL? = nil, hasRoom: @escaping @Sendable (Int64) -> String? = { _ in nil },
                         status: @escaping @Sendable (LegendaryInstallStatus) -> Void) async throws {
         guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
