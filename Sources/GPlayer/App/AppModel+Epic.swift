@@ -141,6 +141,12 @@ extension AppModel {
         refreshPrograms()
     }
 
+    /// Opens the Epic Games page: Epic's games without the launcher live in Get Apps, as the second way on its Epic Games card.
+    func openEpicLibrary() {
+        selection = .apps
+        appsPath = [.epicLibrary]
+    }
+
     /// The Epic Games page opened: look once per run (signing in, installing and uninstalling keep what it shows up to date, and
     /// Refresh looks again), and ask Epic for the list once per run. Not tied to the page: leaving it doesn't stop Legendary
     /// halfway through the list.

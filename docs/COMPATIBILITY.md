@@ -257,16 +257,34 @@ in `kernelbase` and `advapi32`. The recipe, in `AppPreset.epic` (`engineRecipes`
   crashed, restarting service"); with Epic's own `EpicWebHelper.exe` there is no crash and the sign-in page loads. A space
   that was wrapped gets it back before the next start: `EpicWebHelper_real.exe` is copied over `EpicWebHelper.exe`, only
   where that file is exactly the wrapper G-Player ships, and only in a space G-Player may change. Nothing is deleted.
-- **D3DMetal if you added it, DXMT otherwise, for the launcher itself**, whatever its library entry says: D3DMetal when it
-  is ready on the engine (it also lets DirectX 12 games the launcher starts run), else DXMT (its `d3d11`, `d3d10core` and
-  `dxgi` go into the space as native copies, `dxgi,d3d11,d3d10core=n,b`). With either the launcher gets feature level 11_1,
-  creates its swap chain and doesn't restart, and its sign-in page loads with no network-service or GPU crash. Nothing
-  else works for the 2026 launcher: on **DXVK** its renderer fails `IDXGIFactory1::CreateSwapChain` (0x80004005) and the
-  launcher restarts itself about every 5 seconds with `-AllowSoftwareRendering`; on **WineD3D** (builtin, OpenGL 4.1) it
+- **DXMT for the launcher itself**, also when D3DMetal is added, whatever its library entry says (`dxgi,d3d11,d3d10core=n,b`:
+  DXMT's `d3d11`, `d3d10core` and `dxgi` go into the space as native copies). With DXMT the launcher gets feature level 11_1,
+  creates its swap chain and doesn't restart, its sign-in page loads, and `cef3.log` has no GPU errors; it idles at about 11% CPU.
+  With **D3DMetal** its web view's GPU process can't start (`gpu_init.cc: Passthrough is not supported, GL is disabled`: ANGLE's
+  Direct3D 11 path fails on it), so everything renders without the GPU and the launcher idles at about 34% CPU and feels
+  sluggish. Nothing else works for the 2026 launcher: on **DXVK** its renderer fails `IDXGIFactory1::CreateSwapChain` (0x80004005)
+  and the launcher restarts itself about every 5 seconds with `-AllowSoftwareRendering`; on **WineD3D** (builtin, OpenGL 4.1) it
   falls back to `-AllowSoftwareRendering` and crashes with an access violation reading address 0; `-opengl` crashes it too.
+- **Wine Mono, for Epic Online Services.** The launcher installs Epic Online Services (needed to install any game) by running
+  `Portal/Extras/EOS/EpicOnlineServicesInstaller.exe /upgrade productid=EpicGamesLauncher minversion=5.3.0 /quiet`. Its MSI has
+  managed custom actions (WiX's DTF, "SFXCA"), which fail without .NET: "SFXCA: Failed to load mscoree.dll (Error code 126)",
+  the installer exits 1603, and the launcher says "Epic Online Services is not installed … Error II-E1007". G-Player runs
+  every program with `WINEDLLOVERRIDES=mscoree,mshtml=` (no Wine Mono or Gecko download prompts), which is what makes
+  `mscoree.dll` unloadable. The recipe, checked in a copy of the launcher's space: **Wine Mono 10.4.1** (the version in
+  `dlls/mscoree` of CrossOver 26.3's Wine, `WINE_MONO_VERSION`) unpacked into the engine as a shared copy,
+  `<engine>/wine/share/wine/mono/wine-mono-10.4.1/`; its `support/winemono-support.msi` installed once in the space
+  (`msiexec /i Z:\…\winemono-support.msi /qn`; afterwards `system.reg` lists "Wine Mono Windows Support" 10.4.1); and
+  `mscoree` not disabled for that space's launches, with `mshtml=` kept. Then the EOS installer exits 0 and Epic Online
+  Services is in the space (files under `Program Files (x86)/Epic Games/Epic Online Services`, its service in the registry).
+  G-Player does it for a preset that declares `needsDotNet` (only Epic's), on an engine whose catalogue entry names a Wine Mono
+  (`EngineInfo.mono`; G-Player Wine, not Wine Staging): the pinned download (`EngineCatalog.wineMono10_4_1`) is fetched into the
+  engine when first needed, `WineMono.register` installs the support package once (found again by that registry entry, so an
+  engine with another Wine Mono registers its own), before the launcher's installer runs and before each start of the launcher.
+  A space that G-Player may not change (a bottle of another app, before the user allows it) is left as it is, and a launcher
+  that is already open is not touched: it keeps the environment it started with.
 - **Wine Staging** is set up as before (wrapper, the engine's usual graphics); it isn't known to help there.
 
-Games the launcher starts inherit its environment, so they run on its graphics (D3DMetal or DXMT) too; G-Player can't give
+Games the launcher starts inherit its environment, so they run on its graphics (DXMT) too; G-Player can't give
 a game started from inside the launcher graphics of its own. Epic Games without the launcher (Legendary) starts each game through
 G-Player's own launch, with its own.
 

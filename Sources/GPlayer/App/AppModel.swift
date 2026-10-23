@@ -17,7 +17,13 @@ struct BlockedLaunch: Identifiable {
 }
 
 enum SidebarItem: Hashable {
-    case allGames, recent, hidden, space(UUID), files, epic, apps
+    case allGames, recent, hidden, space(UUID), files, apps
+}
+
+/// A page Get Apps opens over its list of apps.
+enum AppsDestination: Hashable {
+    /// Epic Games without Epic's launcher, through Legendary: sign in, the library, install (`EpicView`).
+    case epicLibrary
 }
 
 /// Long work shown at the bottom of the sidebar (engine downloads, store setup, imports).
@@ -90,7 +96,12 @@ final class AppModel {
         // The Hidden item disappears with the last hidden game, so don't leave it selected.
         didSet { if selection == .hidden, state.hiddenGames.isEmpty { selection = .allGames } }
     }
-    var selection: SidebarItem? = .allGames
+    var selection: SidebarItem? = .allGames {
+        // A page Get Apps opened closes with it: coming back to Get Apps shows its list.
+        didSet { if selection != .apps { appsPath = [] } }
+    }
+    /// The pages open over Get Apps' list, innermost last (`openEpicLibrary`).
+    var appsPath: [AppsDestination] = []
     var selectedGameID: UUID?
     var searchText = ""
     var activities: [Activity] = []
@@ -171,6 +182,8 @@ final class AppModel {
     /// Engine downloads running, by engine id (`ensureEngine`), and why the last one of each failed.
     @ObservationIgnored private var engineInstalls: [String: Task<Engine?, Never>] = [:]
     @ObservationIgnored private var engineFailures: [String: Error] = [:]
+    /// Wine Mono downloads running, by engine id (`ensureWineMono`).
+    @ObservationIgnored var monoInstalls: [String: Task<Bool, Never>] = [:]
     /// Engines whose download the user stopped (Stop in the sidebar), so the first run doesn't go on to the next one.
     @ObservationIgnored private var stoppedEngines: Set<String> = []
     /// The clean-up of what an earlier run left (`cleanEngineLeftovers`); an engine or component install waits for it, so it
@@ -914,8 +927,17 @@ final class AppModel {
             // Stopped while waiting (the activity is gone), or set up by an earlier press of the same button.
             guard self.activities.contains(where: { $0.id == activity && !$0.stopping }),
                   !preset.isInstalled(in: space) else { return }
+            // A launcher that runs .NET code gets Wine Mono before its installer runs, so nothing the installer starts meets a Wine
+            // without it. A failure is shown, and the installer goes on without it: the launcher's first start tries again.
+            let monoPlan = await Task.detached { () -> WineMono.Plan? in
+                let wanted = preset.wineMono(on: engine.info)
+                return WineMono.plan(wanted: wanted, inEngine: engine.hasWineMono, registered: false)
+            }.value
+            let dotNet: Bool
+            if let monoPlan { dotNet = await self.prepareWineMono(monoPlan, engine: engine, in: space) } else { dotNet = false }
+            guard self.activities.contains(where: { $0.id == activity && !$0.stopping }) else { return }
             let work = Task.detached {
-                try await PresetInstaller(paths: paths).install(preset, in: space, engine: engine) { [weak self] f, m in
+                try await PresetInstaller(paths: paths).install(preset, in: space, engine: engine, dotNetAvailable: dotNet) { [weak self] f, m in
                     Task { @MainActor in self?.progress(activity, f, m) }
                 }
             }
@@ -1426,7 +1448,7 @@ final class AppModel {
             }
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
             let fixes = current.kind == .game ? self.fixes(for: current) : []
-            let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine)
+            let planned = current, verbose = verboseLogs, ready = readyBackends(of: engine), monoInstalled = engine.hasWineMono
             // Steam's helpers left behind by a Steam that has gone would count as Steam running, and a new one can't start.
             if startsSteam { _ = await endOrphanedSteamHelpers(in: space) }
             var steamWasRunning = startsSteam ? await Self.isSteamRunning(in: space) : false
@@ -1434,7 +1456,7 @@ final class AppModel {
             // Planning reads the game's folder (program names, .NET), so it runs off the main thread.
             let plan = try await Task.detached(priority: .userInitiated) {
                 try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
-                                       launcher: launcher)
+                                       launcher: launcher, monoInstalled: monoInstalled)
             }.value
             if let blockers = plan.compat?.blockers, !blockers.isEmpty, !skipped.contains(.blockers),
                !acknowledgedBlockers.contains(game.id) {
@@ -1537,6 +1559,7 @@ final class AppModel {
         // A try with other graphics that was stopped while it waited for the queue starts nothing.
         if retryStopped(retry, game.id) { return .failure(CancellationError()) }
         // Read now: the answer may have changed while this waited.
+        var monoReady = false
         if self.space(space.id)?.mayChange == true {
             let wanted = plan.components.filter { !(skippedComponents[space.id]?.contains($0) ?? false) }
             if !wanted.isEmpty {
@@ -1552,10 +1575,13 @@ final class AppModel {
                 }
             }
             if !plan.registry.isEmpty { await applyRegistryNow(plan.registry, for: game.id, in: space, engine: engine) }
+            // A launcher that runs .NET code (Epic's) gets Wine Mono: into the engine, into the space once. A launch that
+            // can't have it (the user said no, a failure, a Stop) starts with .NET off, as before.
+            if let mono = plan.wineMono, !mono.isReady { monoReady = await prepareWineMono(mono, engine: engine, in: space) }
         }
         // Installing components and writing settings can take minutes: a Stop since then still prevents the start.
         if retryStopped(retry, game.id) { return .failure(CancellationError()) }
-        let toStart: LaunchPlan
+        var toStart: LaunchPlan
         if let replan, case .legendary(let appName) = game.source {
             // As late as it can be: the code Epic gives the game to log in with lives for a few minutes.
             do { toStart = try await epicPlan(replan, for: game, appName: appName, engine: engine, paths: paths) }
@@ -1564,6 +1590,7 @@ final class AppModel {
         } else {
             toStart = plan
         }
+        if monoReady { toStart.tweaks.dotNetAvailable = true }
         let helpers = toStart.chromiumHelpers, unwrap = toStart.unwrapHelpers, backend = toStart.backend
         let allowed = self.space(space.id)?.mayChange == true
         let gameID = game.id, logName = game.title

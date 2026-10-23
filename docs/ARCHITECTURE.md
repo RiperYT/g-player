@@ -73,6 +73,11 @@ start Epic games without it, through [Legendary](https://github.com/legendary-gl
 the Mac downloads the pinned release (`Legendary.download`, `Tools/legendary-0.21.1/`) the first time the user signs in, and
 G-Player runs it as a separate program (`Legendary.run`).
 
+The page (`EpicView`) has no item in the sidebar: Get Apps has one Epic Games card with both ways to Epic (`EpicWay`), and the
+second one opens the page over its list, as a destination of Get Apps' `NavigationStack` (`AppModel.appsPath`,
+`AppsDestination.epicLibrary`; it closes when another sidebar item is chosen). `AppModel.openEpicLibrary` opens it from anywhere,
+as the Epic Games space's "Your Epic library…" does, and messages that point people there say `EpicGames.libraryPlace`.
+
 - **Isolated and checked.** `LEGENDARY_CONFIG_PATH` is `Tools/legendary-config` (0700), whose `config.ini` sets
   `default_platform = Windows` (Legendary's default on a Mac is `Mac`), `disable_auto_crossover` (G-Player passes `--wine` itself)
   and `disable_update_check`. The environment it gets is a short list (`Legendary.environment`), never a `CX_BOTTLE` or
@@ -154,6 +159,15 @@ out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pk
 files an install downloads stay in `Downloads/<id>` until it has succeeded, so a failure in its last step doesn't download
 them again; `EngineCatalog.diskBytes` counts every archive and the room the expansion takes.
 
+Wine Mono, .NET for Wine, is not part of an engine's downloads: `EngineInfo.mono` names the release the engine's Wine expects
+(`EngineCatalog.wineMono10_4_1`, pinned like any other download), and `EngineManager.installWineMono` fetches it into the
+engine's `share/wine/mono/wine-mono-<version>` when a launcher that `needsDotNet` is set up or started: the same resumable,
+checksummed download as an engine's (kept in `Downloads/<id>-mono` until it has been unpacked), unpacked beside the engine and
+moved into place whole. `WineMono.register` installs its support package into a space once, and `LaunchPlanner` reads
+what is still to do (`LaunchPlan.wineMono`: fetch, register) from the engine folder and the space's `system.reg`; only when
+nothing is left is `mscoree` left on for the launch. `AppModel+WineMono` does the work from the space's queue, only where
+`Space.mayChange`.
+
 ## One engine
 
 People don't choose an engine. `EngineCatalog.firstRunInstalls` is G-Player Wine alone; its runtime libraries come out of
@@ -209,7 +223,7 @@ quits G-Player with Sparkle's own quit event, and `applicationShouldTerminate` d
 `GPlayer --render-onboarding <folder>` (or `GPLAYER_RENDER_ONBOARDING=<folder>`) draws every onboarding step and the
 main screens a newcomer meets (the empty library, the library while the first run sets up and with its one-time notes, a
 new space, the New Space, Add Existing Space, Add Game, "Allow changes" and "didn't start" sheets, a launcher's page,
-Settings › Engines also as the D3DMetal button opens it) into PNGs, light and dark at 2x, prints their paths and exits,
+Get Apps with its Epic Games card and the Epic page opened over it, Settings › Engines also as the D3DMetal button opens it) into PNGs, light and dark at 2x, prints their paths and exits,
 in about ten seconds:
 
 ```bash

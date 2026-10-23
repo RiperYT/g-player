@@ -60,15 +60,19 @@ public struct LaunchPlan: Sendable, Equatable {
     public var needsFreshLauncher: Bool = false
     /// What Steam runs with when this plan starts it: set for a Steam game and for Steam itself, nil for other programs.
     public var launcherSettings: LauncherSettings? = nil
+    /// Wine Mono, for a program of a launcher that runs .NET code (`AppPreset.needsDotNet`): what is still to be done for it before
+    /// the start. Once that is done `tweaks.dotNetAvailable` is on; until then it is on only when nothing is left to do.
+    public var wineMono: WineMono.Plan? = nil
 }
 
 extension LaunchPlan {
     /// True when carrying out the plan writes into the space: components, registry values, Steam's helper wrapper,
-    /// or DXVK's or DXMT's DLLs (copied over Wine's own when the backend is one of them). An external space needs the
-    /// user's consent for any of these.
+    /// DXVK's or DXMT's DLLs (copied over Wine's own when the backend is one of them), or Wine Mono's support package. An
+    /// external space needs the user's consent for any of these.
     public func writesToSpace(engine: EngineInfo) -> Bool {
         let resolved = engine.resolve(backend)
         return !components.isEmpty || !registry.isEmpty || !chromiumHelpers.isEmpty || resolved == .dxvk || resolved == .dxmt
+            || wineMono?.register == true
     }
 }
 
@@ -78,7 +82,7 @@ public enum LaunchPlanner {
         public var errorDescription: String? {
             switch self {
             case .missingExecutable(let t): "\(t) has no program to start. Choose one in its settings."
-            case .epicFilesMissing(let t): "\(t)'s files aren't where Epic Games installed them. Open Epic Games in the sidebar to repair or remove it."
+            case .epicFilesMissing(let t): "\(t)'s files aren't where Epic Games installed them. Open \(EpicGames.libraryPlace) to repair or remove it."
             case .launcherMissing(let n): "\(n) isn't installed in this space yet."
             }
         }
@@ -95,10 +99,11 @@ public enum LaunchPlanner {
     ///   - legendary: how Legendary says to start an Epic game it installed, which holds a one-time code (so it is asked for
     ///     right before the start, and the plan made with it is used at once). Without it the plan has everything but that:
     ///     what the checks before a launch need (the layers, components, the program).
+    ///   - monoInstalled: Wine Mono is in the installed engine (`Engine.hasWineMono`); only a launcher that needs .NET asks.
     public static func plan(for game: Game, in space: Space, fixes: [GameFix] = [], verboseLogs: Bool = false,
                             programNames: [String]? = nil, screen: CGSize? = nil,
                             ready: [GraphicsBackend]? = nil, launcher: LauncherSettings? = nil,
-                            legendary: LegendaryLaunch? = nil) throws -> LaunchPlan {
+                            legendary: LegendaryLaunch? = nil, monoInstalled: Bool = false) throws -> LaunchPlan {
         let preset = AppPresets.preset(space.presetID)
         let catalogued = EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging
         let engine = ready.map { catalogued.limited(to: $0) } ?? catalogued
@@ -109,7 +114,11 @@ public enum LaunchPlanner {
             engine: engine, analysis: game.analysis, fixes: fixes, options: game.launchOptions,
             userBackend: game.graphics, isStoreGame: game.storeKey != nil, programNames: names,
             autoGraphics: game.autoGraphics))
-        let dotNet = hasDotNet(space)
+        // A launcher that runs .NET code gets Wine Mono (`WineMono`); until it is in place `mscoree` stays off as for any space.
+        let mono = preset?.wineMono(on: engine)
+        let wineMono = WineMono.plan(wanted: mono, inEngine: monoInstalled,
+                                     registered: mono.map { WineMono.isRegistered($0, in: space) } ?? false)
+        let dotNet = hasDotNet(space) || wineMono?.isReady == true
 
         var environment = preset?.environment ?? [:]
         for (k, v) in legendary?.environment ?? [:] { environment[k] = v }           // Legendary's: only what a game may get
@@ -163,7 +172,7 @@ public enum LaunchPlanner {
             args = CompatResolver.apply(compat?.replacements ?? [], to: args)
             return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
                               tweaks: tweaks, chromiumHelpers: helpers, unwrapHelpers: unwrap, components: compat?.components ?? [],
-                              registry: registry, compat: compat, launcherSettings: launcherSettings)
+                              registry: registry, compat: compat, launcherSettings: launcherSettings, wineMono: wineMono)
 
         case .legendary:
             // TODO: some Epic games want Epic's launcher (EpicGamesLauncher.exe) as their parent; a stand-in isn't made yet.
@@ -177,7 +186,7 @@ public enum LaunchPlanner {
                 + (legendary?.eglParameters ?? [])
             return LaunchPlan(arguments: args, workingDirectory: legendary?.workingDirectoryURL ?? exe.deletingLastPathComponent(),
                               backend: backend, tweaks: tweaks, chromiumHelpers: helpers, unwrapHelpers: unwrap,
-                              components: compat?.components ?? [], registry: registry, compat: compat)
+                              components: compat?.components ?? [], registry: registry, compat: compat, wineMono: wineMono)
 
         case .steam(let appID):
             let steam = AppPresets.steam
@@ -200,7 +209,7 @@ public enum LaunchPlanner {
                                                    environment: environment, verboseLogs: verboseLogs, dotNetAvailable: dotNet),
                               chromiumHelpers: steam.chromiumHelpers, components: compat?.components ?? [],
                               registry: registry, compat: compat, needsFreshLauncher: settings != running,
-                              launcherSettings: settings)
+                              launcherSettings: settings, wineMono: wineMono)
 
         case .epic(_, let uri):
             let epic = AppPresets.epic
@@ -212,7 +221,7 @@ public enum LaunchPlanner {
                               workingDirectory: exe.deletingLastPathComponent(), backend: backend,
                               tweaks: tweaks, chromiumHelpers: epic.helpersToWrap(on: engine.kind),
                               unwrapHelpers: epic.helpersToUnwrap(on: engine.kind), components: compat?.components ?? [],
-                              registry: registry, compat: compat)
+                              registry: registry, compat: compat, wineMono: wineMono)
         }
     }
 
@@ -227,8 +236,8 @@ public enum LaunchPlanner {
         return groups.filter { !user.contains($0[0]) }.flatMap { $0 }
     }
 
-    /// What a store launcher runs with. A launcher whose preset pins graphics on this engine kind (Epic's on G-Player Wine: D3DMetal
-    /// when the engine has it ready, else DXMT) gets those, whatever was chosen. Otherwise, when the user chose nothing: on
+    /// What a store launcher runs with. A launcher whose preset pins graphics on this engine kind (Epic's on G-Player Wine: DXMT,
+    /// also with D3DMetal ready) gets those, whatever was chosen. Otherwise, when the user chose nothing: on
     /// G-Player Wine with D3DMetal, D3DMetal, which most games it starts take (64-bit DirectX 10–12), so they don't need it
     /// restarted; the engine's default otherwise. `engine` has only the backends that are ready (`ready` of `plan`).
     static func launcherBackend(on engine: EngineInfo, chosen: GraphicsBackend, preset: AppPreset? = nil) -> GraphicsBackend {

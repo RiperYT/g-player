@@ -27,6 +27,10 @@ public struct AppPreset: Identifiable, Sendable, Hashable {
     public var engineRecipes: [EngineInfo.Kind: EngineRecipe] = [:]
     /// The launcher doesn't open on Wine Staging: its space is made on G-Player Wine, and one on another engine is offered the move.
     public var needsGPlayerWine = false
+    /// The launcher runs managed (.NET) code: Epic's launcher installs Epic Online Services with an installer whose custom actions
+    /// are .NET, and without Wine Mono that fails with "Epic Online Services is not installed" (error II-E1007). Its programs run
+    /// with Wine Mono in place (`WineMono`), on an engine that has one to go with it.
+    public var needsDotNet = false
 
     /// What a launcher does differently on one engine kind. The defaults are the usual setup.
     public struct EngineRecipe: Sendable, Hashable {
@@ -40,6 +44,9 @@ public struct AppPreset: Identifiable, Sendable, Hashable {
     /// A start of the launcher on this engine kind is replaced by the offer to move its space to G-Player Wine: elsewhere it
     /// never gets past its loading screen.
     public func offersMoveBeforeStart(on engine: EngineInfo.Kind) -> Bool { needsGPlayerWine && engine != .crossover }
+
+    /// The Wine Mono this launcher's programs need on `engine`, or nil when it doesn't need .NET or the engine has no Mono of its own.
+    public func wineMono(on engine: EngineInfo) -> WineMonoPackage? { needsDotNet ? engine.mono : nil }
 
     /// The helpers to wrap before a start on this engine kind.
     public func helpersToWrap(on engine: EngineInfo.Kind) -> [String] {
@@ -106,9 +113,13 @@ public enum AppPresets {
         launchArguments: ["-SkipBuildPatchPrereq"],
         dllOverrides: [], environment: qtWebEngine, discovery: .epic,
         // On G-Player Wine its web helper runs as Epic made it (wrapped, its network service crashes again and again), and its
-        // renderer needs D3DMetal, or DXMT without it: on DXVK it can't make its swap chain and restarts itself, and on WineD3D
-        // (OpenGL 4.1) it falls back to software rendering and crashes. On Wine Staging nothing changes: it doesn't open there.
-        engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.d3dmetal, .dxmt])], needsGPlayerWine: true)
+        // renderer runs on DXMT, also when D3DMetal is added: on DXVK it can't make its swap chain and restarts itself, on WineD3D
+        // (OpenGL 4.1) it falls back to software rendering and crashes, and on D3DMetal its web view's GPU process can't start
+        // (ANGLE's Direct3D 11 path fails: "Passthrough is not supported, GL is disabled"), so it renders in software and idles
+        // at about 34% CPU where DXMT idles at about 11%. On Wine Staging nothing changes: it doesn't open there.
+        engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.dxmt])], needsGPlayerWine: true,
+        // Its Epic Online Services installer has .NET custom actions, which need Wine Mono.
+        needsDotNet: true)
 
     public static let gog = AppPreset(
         id: "gog", name: "GOG Galaxy",

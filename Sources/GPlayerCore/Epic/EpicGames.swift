@@ -7,6 +7,9 @@ public enum EpicGames {
     public static let spaceName = "Epic Games"
     /// Matches no `AppPreset`: this space has no launcher to start or wrap, only games.
     public static let presetID = "legendary"
+    /// Where the page of the account and its games is, for messages that send people there: it opens from the Epic Games card in
+    /// Get Apps, and from the Epic Games space's page.
+    public static let libraryPlace = "Get Apps › Epic Games"
 
     public static func space(in spaces: [Space]) -> Space? {
         spaces.first { $0.presetID == presetID && $0.origin == .managed }

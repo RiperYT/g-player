@@ -16,9 +16,9 @@ public enum LegendaryFailure {
         case other
     }
 
-    public static let signedOutMessage = "You're signed out of Epic Games. Sign in again from Epic Games in the sidebar."
+    public static let signedOutMessage = "You're signed out of Epic Games. Sign in again from \(EpicGames.libraryPlace)."
 
-    public static let installMissingMessage = "Legendary can't find the game's files where it recorded them. If your library moved, open the game on Epic Games in the sidebar and choose Repair."
+    public static let installMissingMessage = "Legendary can't find the game's files where it recorded them. If your library moved, open the game in \(EpicGames.libraryPlace) and choose Repair."
 
     /// What Legendary's log (stderr) says went wrong. Its stdout is not looked at: it can hold a game's description.
     public static func kind(stderr text: String) -> Kind {

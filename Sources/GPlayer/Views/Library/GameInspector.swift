@@ -105,7 +105,7 @@ struct GameInspector: View {
             Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
                 .buttonStyle(.link).foregroundStyle(.red)
                 .disabled(block != nil).help(block ?? "")
-            Text("Deletes the game's files from its space. Install it again from Epic Games in the sidebar.")
+            Text("Deletes the game's files from its space. Install it again from \(EpicGames.libraryPlace).")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -189,7 +189,7 @@ struct GameInspector: View {
             if let pinned = AppPresets.preset(space.presetID)?.launcherBackend(on: info.kind, ready: info.backends) {
                 // A launcher that only opens with some graphics on this engine: G-Player picks them, nothing to choose.
                 Text(pinned.displayName)
-                Text("Chosen for \(game.title). The other graphics don't open it.")
+                Text("Chosen for \(game.title). With the other graphics it doesn't open, or it's slow.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },

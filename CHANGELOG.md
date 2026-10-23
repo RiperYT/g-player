@@ -4,17 +4,26 @@
 
 - **Epic's own launcher opens on G-Player Wine.** The Epic Games Launcher no longer stops at its loading screen: it reaches
   Epic's sign-in page. G-Player starts it on G-Player Wine with Epic's own web helper (the Chromium helper wrapper made its
-  network service crash again and again there) and on D3DMetal when you have added it, DXMT otherwise, whatever its library
-  entry says (DXVK and WineD3D don't open it); a space that already has the wrapper in Epic's helper gets Epic's helper back
+  network service crash again and again there) and on DXMT, also when you have added D3DMetal, whatever its library entry
+  says: DXVK and WineD3D don't open it, and with D3DMetal its web view can't start its GPU process, so it renders in software
+  and feels sluggish. A space that already has the wrapper in Epic's helper gets Epic's helper back
   before the next start, and nothing is deleted.
   An Epic Games Launcher space on Wine Staging is offered **Move to G-Player Wine…** on its page, and new ones are made on
-  G-Player Wine. Get Apps and the Epic Games page show both ways side by side: the launcher (recommended), and Epic Games
-  without it, which is faster and goes through Legendary. Games the launcher starts inherit its graphics, so DirectX 12 games it starts run
-  with D3DMetal.
-- **Epic games without Epic's launcher.** **Epic Games** in the sidebar signs you in on Epic's own page (with Epic, Google,
-  Apple or whatever you use: G-Player never sees your password, and the window keeps nothing) and lists the games your account
-  owns. **Install** puts a game into a space of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop
-  in the sidebar; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
+  G-Player Wine. Games the launcher starts inherit its graphics (DXMT). Get Apps has one **Epic Games** card with both ways to
+  Epic's games: Epic Games Launcher (recommended), and Without the launcher, which is faster and goes through Legendary.
+- **Epic's launcher installs Epic Online Services.** Games can be installed from Epic's launcher now: its first start no
+  longer ends with "Epic Online Services is not installed" (error II-E1007). Epic's installer for it has .NET steps, and
+  G-Player kept .NET off to spare you Wine's own download prompts. For this launcher G-Player now brings **Wine Mono**
+  (.NET for Wine, 10.4.1, the version G-Player Wine expects): the first time you open the launcher (or set it up) it
+  downloads Wine Mono (40 MB, checked against a pinned SHA-256, with progress and a Stop in the sidebar) into G-Player
+  Wine, where it takes about 240 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
+  gets it: other apps and games start as before, and Wine Staging has none. In a bottle of another app it asks first, like
+  every change G-Player makes there. A launcher that is already open keeps what it started with: quit it and open it again.
+- **Epic games without Epic's launcher.** The card's second way, **Without the launcher**, opens the Epic Games page over Get
+  Apps (with a back button). It signs you in on Epic's own page (with Epic, Google, Apple or whatever you use: G-Player never
+  sees your password, and the window keeps nothing) and lists the games your account owns. **Install** puts a game into a space
+  of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop in the sidebar; that space is in Spaces
+  like any other and links back to the page with **Your Epic library…**, and the games in it show in All Games; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
   one-time code each time, or starting offline when Epic can't be reached; **Uninstall…** and **Sign Out** undo them. It
   works through [Legendary](https://github.com/legendary-gl/legendary) 0.21.1 (GPL-3.0), an open-source Epic client that is
   not part of G-Player: the first time you sign in, G-Player downloads it (15 MB) from its GitHub release and checks it

@@ -10,8 +10,10 @@ public struct PresetInstaller: Sendable {
     /// A store installer that runs longer than this is stopped, so a hung one can't block the space.
     public static let installerTimeout: TimeInterval = 30 * 60
 
-    /// Installs `preset` into `space` (made beforehand with `SpaceManager.create`).
-    public func install(_ preset: AppPreset, in space: Space, engine: Engine, progress: @escaping Progress) async throws {
+    /// Installs `preset` into `space` (made beforehand with `SpaceManager.create`). `dotNetAvailable`: Wine Mono is in place, so the
+    /// installer runs with `mscoree` on (`WineMono`).
+    public func install(_ preset: AppPreset, in space: Space, engine: Engine, dotNetAvailable: Bool = false,
+                        progress: @escaping Progress) async throws {
         let installer = paths.downloads.appendingPathComponent(preset.installerFileName)
         progress(0, "Downloading \(preset.name)")
         try await FileDownloader.download(preset.installerURL, to: installer) { f in progress(f * 0.4, "Downloading \(preset.name)") }
@@ -21,8 +23,8 @@ public struct PresetInstaller: Sendable {
         let status = try await WineLauncher.runAndWait(
             engine: engine, space: space,
             arguments: WineLauncher.arguments(toOpen: installer, extra: preset.installerArguments),
-            workingDirectory: paths.downloads, logsFolder: paths.logs, logName: "Install \(preset.name)",
-            timeout: Self.installerTimeout)
+            workingDirectory: paths.downloads, tweaks: LaunchTweaks(dotNetAvailable: dotNetAvailable),
+            logsFolder: paths.logs, logName: "Install \(preset.name)", timeout: Self.installerTimeout)
         try Task.checkCancellation()
         await WineLauncher.waitForAll(engine: engine, space: space, timeout: 120)
         try Task.checkCancellation()
