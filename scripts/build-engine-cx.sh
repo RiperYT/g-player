@@ -2,7 +2,7 @@
 # Builds G-Player Wine: Wine 11 from CodeWeavers' CrossOver source, ready for Apple's D3DMetal, with
 # DXMT (Direct3D 10/11 on Metal) beside it. Steam runs on it, and DirectX 12 games run through D3DMetal in the same
 # space, so they can sign in online.
-#   scripts/build-engine-cx.sh [revision]      -> $OUT_DIR/g-player-engine-cx<version>-<revision>.tar.xz
+#   scripts/build-engine-cx.sh <revision>      -> $OUT_DIR/g-player-engine-cx<version>-<revision>.tar.xz
 #                                                 ...-wine-source.tar.xz, the exact Wine source it was built from,
 #                                                 and ...-dxmt-source.tar.xz, DXMT's
 #
@@ -24,7 +24,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-REVISION="${1:-1}"
+# No default: a revision that is already published must never be built again with other contents.
+REVISION="${1:?usage: scripts/build-engine-cx.sh <revision>, e.g. 2}"
 WORK="${WORK_DIR:-$REPO/build/engine-cx}"; OUT="${OUT_DIR:-$REPO/build/engine-dist}"
 CACHE="$WORK/dl"
 mkdir -p "$CACHE" "$OUT"
