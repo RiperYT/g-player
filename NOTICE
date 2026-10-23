@@ -70,6 +70,14 @@ ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872, LGPL-2.1+) wit
 script are the complete corresponding source for these files (the source tarball published with G-Player Wine
 26.3.0-1 is the same tree before cx-nx-compat.patch and cx-coreaudio-stream-volume.patch).
 
+G-Player includes G-Player Wine 26.3.0-2's wineserver built with file change notifications,
+Sources/GPlayerCore/Resources/engine-fixes/cx2-wineserver: the same CrossOver 26.3.0 source and patches, configured
+--with-inotify by scripts/build-engine-cx.sh against the header of libinotify-kqueue 20240724
+(https://github.com/libinotify-kqueue/libinotify-kqueue, MIT, Copyright (c) 2011-2014 Dmitry Matveev, 2014-2021
+Vladimir Kondratyev; tarball SHA-256 120398ff95336d04f3ce7ac820e0490059625976264100dcc9af9d11e992b0ca). Those tarballs,
+the patches and the build script are its complete corresponding source. It loads libinotify from the runtime libraries
+G-Player copies from Gcenx's Wine Staging download; it isn't part of G-Player.
+
 G-Player includes one more modified Wine file, Sources/GPlayerCore/Resources/engine-fixes/wow64cpu.dll, built from the
 Wine 11.18 source tarball (https://dl.winehq.org/wine/source/11.x/wine-11.18.tar.xz, SHA-256
 c6282f6d4daecf11f3ab9f9a2b6c598f67be7e28c363ba2cae8a3c44b611e7a4, LGPL-2.1+) with

@@ -52,6 +52,11 @@ DXMT_LICENSES="LICENSE:b87c35aef7b2cf14de854118ca55ce5c4b284c85b5f002421fb8d46d8
 # copies them on the user's Mac from the runtime package (`EngineCatalog.gstreamer`), as with Gcenx's libraries.
 # The plugins are CrossOver's set plus osxaudio, whose atdec decodes AAC and MP3 through Apple's AudioToolbox. No
 # FFmpeg: H.264 and HEVC go to Apple's VideoToolbox through applemedia.
+# libinotify-kqueue's header, for wineserver's file change notifications (ReadDirectoryChangesW, which Epic's launcher
+# waits on before it installs a game). The library itself is Gcenx's (libinotify.0.dylib, in the runtime libraries).
+INOTIFY_NAME="libinotify-kqueue-20240724.tar.gz"
+INOTIFY_URL="https://github.com/libinotify-kqueue/libinotify-kqueue/archive/refs/tags/20240724.tar.gz"
+INOTIFY_SHA="120398ff95336d04f3ce7ac820e0490059625976264100dcc9af9d11e992b0ca"
 GST_VERSION="1.28.8"
 GST_URL="https://gstreamer.freedesktop.org/data/pkg/osx/$GST_VERSION"
 GST_RUNTIME_NAME="gstreamer-1.0-$GST_VERSION-universal.pkg"
@@ -77,6 +82,7 @@ fetch "$DXMT_NAME" "$DXMT_URL" "$DXMT_SHA"
 for pair in $DXMT_LICENSES; do
   fetch "dxmt-${DXMT_COMMIT:0:9}-${pair%%:*}" "https://raw.githubusercontent.com/3Shain/dxmt/$DXMT_COMMIT/${pair%%:*}" "${pair#*:}"
 done
+fetch "$INOTIFY_NAME" "$INOTIFY_URL" "$INOTIFY_SHA"
 fetch "$GST_RUNTIME_NAME" "$GST_URL/$GST_RUNTIME_NAME" "$GST_RUNTIME_SHA"
 fetch "$GST_DEVEL_NAME" "$GST_URL/$GST_DEVEL_NAME" "$GST_DEVEL_SHA"
 
@@ -87,13 +93,16 @@ RLIB="$(ls -d "$WORK"/runtime/*.app/Contents/Resources/wine/lib)"
 cp "$REPO/Sources/GPlayerCore/Resources/engine-fixes/libMoltenVK.dylib" "$RLIB/libMoltenVK.dylib"
 # Link-time copies carry `@rpath/libX.N.dylib` ids so configure records versioned sonames.
 DEPS="$WORK/deps"; rm -rf "$DEPS" && mkdir -p "$DEPS/lib" "$DEPS/include"
-for pair in libgnutls:libgnutls.30 libfreetype:libfreetype.6 libSDL2:libSDL2-2.0.0 libMoltenVK:libMoltenVK; do
+for pair in libgnutls:libgnutls.30 libfreetype:libfreetype.6 libSDL2:libSDL2-2.0.0 libinotify:libinotify.0 libMoltenVK:libMoltenVK; do
   cp "$RLIB/${pair#*:}.dylib" "$DEPS/lib/${pair%%:*}.dylib"; chmod u+w "$DEPS/lib/${pair%%:*}.dylib"
   install_name_tool -id "@rpath/${pair#*:}.dylib" "$DEPS/lib/${pair%%:*}.dylib" 2>/dev/null
 done
 ln -s "$BREW/opt/freetype/include/freetype2" "$DEPS/include/freetype2"
 ln -s "$BREW/opt/gnutls/include/gnutls" "$DEPS/include/gnutls"
 ln -s "$BREW/opt/sdl2/include/SDL2" "$DEPS/include/SDL2"
+mkdir -p "$DEPS/include/sys"
+tar -xzf "$CACHE/$INOTIFY_NAME" -C "$DEPS" --strip-components 1 "libinotify-kqueue-20240724/sys/inotify.h"
+mv "$DEPS/sys/inotify.h" "$DEPS/include/sys/inotify.h" && rmdir "$DEPS/sys"
 
 # GStreamer: headers and libraries to link against (devel), and what the user's Mac will get (runtime). The packages
 # are expanded, never installed. Each one is made of sub-packages whose payloads share one tree, the framework's
@@ -127,15 +136,16 @@ if [ "${RESUME:-0}" != 1 ] || [ ! -f "$WORK/build/Makefile" ]; then
       FREETYPE_CFLAGS="-I$DEPS/include/freetype2" FREETYPE_LIBS="-L$DEPS/lib -lfreetype" \
       GNUTLS_CFLAGS="-I$DEPS/include" GNUTLS_LIBS="-L$DEPS/lib -lgnutls" \
       SDL2_CFLAGS="-I$DEPS/include/SDL2 -D_THREAD_SAFE" SDL2_LIBS="-L$DEPS/lib -lSDL2" \
+      INOTIFY_CFLAGS="-I$DEPS/include" INOTIFY_LIBS="-L$DEPS/lib -linotify" \
       GSTREAMER_CFLAGS="-I$GST_SDK/include/gstreamer-1.0 -I$GST_SDK/include/glib-2.0 -I$GST_SDK/lib/glib-2.0/include" \
       GSTREAMER_LIBS="-L$GST_SDK/lib -lgstvideo-1.0 -lgstaudio-1.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0 -lintl" \
-      LDFLAGS="-L$DEPS/lib -Wl,-rpath,@loader_path/../../" \
+      LDFLAGS="-L$DEPS/lib -Wl,-rpath,@loader_path/../../ -Wl,-rpath,@loader_path/../lib" \
       ac_cv_func_pipe2=no \
       ../sources/wine/configure --build=x86_64-apple-darwin --host=x86_64-apple-darwin --prefix="$WORK/stage" \
         --enable-archs=i386,x86_64 --disable-tests --disable-win16 \
         --with-mingw --with-freetype --with-gnutls --with-sdl --with-vulkan --with-coreaudio --with-opencl --with-unwind \
         --without-x --without-wayland --without-alsa --without-oss --without-udev --without-v4l2 --without-capi \
-        --without-inotify --without-pulse --without-dbus --without-netapi --without-krb5 --without-gssapi \
+        --with-inotify --without-pulse --without-dbus --without-netapi --without-krb5 --without-gssapi \
         --without-fontconfig --without-sane --without-gphoto --with-gstreamer --without-ffmpeg --without-usb \
         > configure.out 2>&1 ) || { echo "configure failed; see $WORK/build/configure.out" >&2; exit 1; }
 fi
@@ -160,6 +170,10 @@ for bin in "$WORK"/stage/bin/wine "$WORK"/stage/bin/wineserver "$WORK"/stage/lib
     | grep -vE "$GUARDED_WEAK" || true)"
   [ -z "$unguarded" ] || { echo "$(basename "$bin") weak-imports $unguarded: check it is guarded, or pin it off in configure" >&2; exit 1; }
 done
+# wineserver loads libinotify (Gcenx's copy in wine/lib) through @loader_path/../lib.
+inotify="$(otool -L "$WORK/stage/bin/wineserver"; otool -l "$WORK/stage/bin/wineserver")"
+[[ "$inotify" == *"@rpath/libinotify.0.dylib"* && "$inotify" == *"path @loader_path/../lib "* ]] \
+  || { echo "wineserver doesn't load libinotify from wine/lib; see $WORK/build/configure.out" >&2; exit 1; }
 [ -f "$WORK/stage/lib/wine/x86_64-unix/winegstreamer.so" ] \
   || { echo "winegstreamer wasn't built; see $WORK/build/configure.out" >&2; exit 1; }
 
@@ -175,7 +189,7 @@ cp "$RLIB/libMoltenVK.dylib" "$W/lib/"
 for so in ntdll win32u bcrypt winebus; do
   otool -l "$W/lib/wine/x86_64-unix/$so.so" | grep -q "path @loader_path/../../ " || { echo "no rpath in $so.so" >&2; exit 1; }
 done
-for lib in libfreetype.6.dylib libgnutls.30.dylib libSDL2-2.0.0.dylib; do
+for lib in libfreetype.6.dylib libgnutls.30.dylib libSDL2-2.0.0.dylib libinotify.0.dylib; do
   [ -f "$RLIB/$lib" ] || { echo "Gcenx's build no longer has $lib, which this engine expects at install" >&2; exit 1; }
 done
 for bin in "$W"/bin/wine "$W"/bin/wineserver "$W"/lib/wine/x86_64-unix/*; do

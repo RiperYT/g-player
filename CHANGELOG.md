@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **Epic's launcher can install games.** It waits for a file change notification before it installs, and G-Player Wine's
+  wineserver had none on a Mac: Install did nothing. G-Player puts a wineserver built with file change notifications
+  (libinotify) into G-Player Wine 26.3.0-2 by itself, keeping the engine's own one next to it. Quit G-Player and Epic's
+  launcher once after updating.
 - **Epic's own launcher opens on G-Player Wine.** The Epic Games Launcher no longer stops at its loading screen: it reaches
   Epic's sign-in page. G-Player starts it on G-Player Wine with Epic's own web helper (the Chromium helper wrapper made its
   network service crash again and again there) and on DXMT, also when you have added D3DMetal, whatever its library entry

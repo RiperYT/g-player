@@ -26,6 +26,29 @@ import Testing
         #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .alreadyApplied)
     }
 
+    /// The fixed wineserver loads libinotify: an engine without it keeps its own wineserver, and the fixed one stays
+    /// executable.
+    @Test func aFixThatNeedsAnotherFileWaitsForItAndKeepsTheFileExecutable() throws {
+        let tmp = TempFolder()
+        let original = Data("server".utf8), fixed = Data("server+inotify".utf8)
+        let root = tmp.url.appendingPathComponent("wine")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        let target = root.appendingPathComponent("lib/x.dll")
+        try original.write(to: target)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: target.path)
+        let source = tmp.file("fixed.dll", contents: fixed)
+        var f = fix(original: original, fixed: fixed)
+        f.requires = ["lib/libinotify.0.dylib"]
+
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .unavailable)
+        #expect(try Data(contentsOf: target) == original)
+        try Data("lib".utf8).write(to: root.appendingPathComponent("lib/libinotify.0.dylib"))
+        #expect(EngineFixes.apply(f, wineRoot: root, resources: { _ in source }) == .applied)
+        #expect(try Data(contentsOf: target) == fixed)
+        let mode = try FileManager.default.attributesOfItem(atPath: target.path)[.posixPermissions] as? Int
+        #expect(mode == 0o755)
+    }
+
     @Test func anOlderFixIsReplacedAndTheOriginalStaysTheBackup() throws {
         let tmp = TempFolder()
         let original = Data("gcenx".utf8), older = Data("fixed v1".utf8), fixed = Data("fixed v2".utf8)
@@ -109,7 +132,8 @@ import Testing
         #expect(fixes(for: EngineCatalog.crossoverRevision1).sorted() == [
             "lib/wine/i386-windows/ntdll.dll", "lib/wine/x86_64-unix/ntdll.so", "lib/wine/x86_64-unix/winecoreaudio.so",
             "lib/wine/x86_64-windows/ntdll.dll"])
-        #expect(fixes(for: EngineCatalog.crossover).isEmpty)
+        // Revision 2 gets only its wineserver with file change notifications.
+        #expect(fixes(for: EngineCatalog.crossover) == ["bin/wineserver"])
         #expect(EngineFixes.ntdllNoExec.allSatisfy { $0.engineID == "wine-cx-26.3.0-1" } && EngineFixes.coreAudioVolume.engineID == "wine-cx-26.3.0-1")
         // Wine Staging keeps its two.
         #expect(fixes(for: EngineCatalog.wineStaging).sorted() == ["lib/libMoltenVK.dylib", "lib/wine/x86_64-windows/wow64cpu.dll"])

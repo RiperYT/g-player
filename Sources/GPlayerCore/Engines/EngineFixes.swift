@@ -19,6 +19,9 @@ public enum EngineFixes {
         /// Earlier fixed files this one replaces (an older version of the same fix). The engine's original stays the
         /// backup, so the file can still go back to it.
         public var replaces: [String] = []
+        /// Files the fixed one needs in the engine (relative to the wine root), such as a library it loads: without them
+        /// the engine's own file stays.
+        public var requires: [String] = []
     }
 
     /// wow64cpu with the Rosetta 2 far-jump workaround: 32-bit programs stop crashing at random (WineHQ 60494).
@@ -77,7 +80,18 @@ public enum EngineFixes {
         // The first version wrapped 32-bit peaks around and didn't apply a program's capture volume.
         replaces: ["728e0db3d81eb021b76d60c052ee727d018d2c97b403b511111805f612850d6b"])
 
-    public static let all = [wow64cpu, moltenVK] + ntdllNoExec + [coreAudioVolume]
+    /// G-Player Wine 26.3.0-2's wineserver built with libinotify (the same source and configuration, `--with-inotify`), so
+    /// file change notifications work (ReadDirectoryChangesW): Epic's launcher waits for one before it installs a game, and
+    /// never got it. It loads Gcenx's libinotify, which every install of the engine has among its runtime libraries.
+    public static let wineserverNotifications = FileFix(
+        engineID: EngineCatalog.crossover.id,
+        path: "bin/wineserver",
+        originalSHA256: "4b804a715b3083e9c9b11547a5aafcdf83dc6063ca57d8194cfe5cecbd517d33",
+        fixedSHA256: "4036ee29fb73b92943d43067e6ca5336f4b0b6dd136c26576e7f3e85933c442a",
+        resource: "engine-fixes/cx2-wineserver",
+        requires: ["lib/libinotify.0.dylib"])
+
+    public static let all = [wow64cpu, moltenVK] + ntdllNoExec + [coreAudioVolume, wineserverNotifications]
 
     public enum Outcome: Equatable, Sendable {
         /// The fixed file was put in place; the original is kept next to it as `<name>.gcenx`.
@@ -106,7 +120,8 @@ public enum EngineFixes {
         if current == fix.fixedSHA256 || fix.alsoFixed.contains(current) { return .alreadyApplied }
         let upgrade = fix.replaces.contains(current)
         guard current == fix.originalSHA256 || upgrade else { return .unknownOriginal }
-        guard let source = resources(fix.resource), (try? Files.sha256(of: source)) == fix.fixedSHA256 else { return .unavailable }
+        guard let source = resources(fix.resource), (try? Files.sha256(of: source)) == fix.fixedSHA256,
+              fix.requires.allSatisfy({ fm.fileExists(atPath: wineRoot.appendingPathComponent($0).path) }) else { return .unavailable }
         let backup = target.appendingPathExtension("gcenx")
         let staged = target.appendingPathExtension("gplayer-new")
         do {
@@ -128,6 +143,10 @@ public enum EngineFixes {
                 throw CocoaError(.fileWriteNoPermission)
             }
             guard try Files.sha256(of: staged) == fix.fixedSHA256 else { throw CocoaError(.fileWriteUnknown) }
+            // As the engine's file was: a program (wineserver) stays executable.
+            if let mode = try fm.attributesOfItem(atPath: target.path)[.posixPermissions] {
+                try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: staged.path)
+            }
             // A rename, so programs that have the old file open keep it and new ones get the fixed one.
             _ = try fm.replaceItemAt(target, withItemAt: staged)
             return .applied
