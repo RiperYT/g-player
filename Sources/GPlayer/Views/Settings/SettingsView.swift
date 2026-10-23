@@ -99,6 +99,7 @@ struct EngineSection: View {
             } else if model.isUpdating(info) {
                 EngineUpdateStatus(info: info)
             } else {
+                if let line = model.updateFailureLine(for: info) { PathWarning(text: line) }
                 let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
                     .disabled(model.isEngineBusy || model.libraryProblem != nil)

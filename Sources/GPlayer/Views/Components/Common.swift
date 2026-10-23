@@ -34,7 +34,8 @@ struct ActivityPanel: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if !model.activities.isEmpty {
+        let notices = model.updateNotices
+        if !model.activities.isEmpty || !notices.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(model.activities) { a in
                     VStack(alignment: .leading, spacing: 4) {
@@ -55,12 +56,31 @@ struct ActivityPanel: View {
                         }
                     }
                 }
+                ForEach(notices, id: \.id) { EngineUpdateNotice(id: $0.id, line: $0.line) }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .padding(10)
         }
+    }
+}
+
+/// A background engine update that failed: the one line, and a button that hides it from the sidebar.
+private struct EngineUpdateNotice: View {
+    @Environment(AppModel.self) private var model
+    let id: String
+    let line: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(line).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button { model.closeUpdateNotice(id) } label: { Image(systemName: "xmark.circle.fill") }
+                .buttonStyle(.plain).foregroundStyle(.secondary).help("Hide").accessibilityLabel("Hide")
+        }
+        .font(.caption)
     }
 }
 

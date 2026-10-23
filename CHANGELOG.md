@@ -11,7 +11,8 @@
   when they run on DXMT. DXMT compiles its shaders again the first time each game runs.
 - **G-Player Wine updates by itself, and your spaces follow.** G-Player downloads the new G-Player Wine (about 450 MB) in
   the background after you update the app, and says so in the sidebar and in Settings › Engines. Your games keep working
-  on the old version meanwhile, offline too; if the download fails, G-Player tries again the next time it opens. A space
+  on the old version meanwhile, offline too; if the download fails, both say so in one line and G-Player tries again the
+  next time it opens. A space
   moves to the new version once nothing runs in it, with its files, Steam login and what G-Player learned about each
   game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose old version is gone installs
   the new one when you start something in it, instead of switching to Wine Staging. A bottle of another app (CrossOver,

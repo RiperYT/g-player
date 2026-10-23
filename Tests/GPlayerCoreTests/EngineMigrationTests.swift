@@ -336,8 +336,37 @@ import Testing
         #expect(plan(state.spaces, installed: [new, staging]).isEmpty)
     }
 
-    @Test func theUpdateNoteIsOnePlainSentence() {
+    @Test func theUpdateNoteSaysWhyItRunsAndWhatComesOfIt() {
         #expect(EngineMigration.updateNote(for: new)
-                == "Updating G-Player Wine (adds video playback in games). Your games keep working meanwhile.")
+                == "Updating G-Player Wine (adds video playback in games). Your games keep working meanwhile. "
+                + "Spaces switch over by themselves once nothing runs in them, and the old version is then removed.")
+    }
+
+    // MARK: When the update fails
+
+    @Test func aFailedUpdateIsOneLineWithTheReasonAndWhatHappensNext() {
+        #expect(EngineMigration.updateFailure(for: new, reason: "The Internet connection appears to be offline.")
+                == "Couldn't update G-Player Wine: the Internet connection appears to be offline. G-Player tries again next time it opens.")
+        #expect(EngineMigration.updateFailure(for: new, reason: "g-player-engine-cx26.3.0-2.tar.xz didn't match its checksum. Try again.")
+                == "Couldn't update G-Player Wine: g-player-engine-cx26.3.0-2.tar.xz didn't match its checksum. G-Player tries again next time it opens.")
+        // Nothing to say about why: still a line, still the promise.
+        #expect(EngineMigration.updateFailure(for: new, reason: "")
+                == "Couldn't update G-Player Wine: something went wrong. G-Player tries again next time it opens.")
+    }
+
+    @Test func aReasonIsItsFirstSentenceInAFewWords() {
+        let short = EngineMigration.shortReason
+        #expect(short("The request timed out.", 90) == "the request timed out")
+        // Only the first sentence, only the first line.
+        #expect(short("Installing G-Player Wine needs about 3.0 GB free, and this disk has 1.2 GB. Free some space, then try again.", 200)
+                == "installing G-Player Wine needs about 3.0 GB free, and this disk has 1.2 GB")
+        #expect(short("Couldn't unpack engine.tar.xz: tar: Error opening archive\nmore", 200) == "couldn't unpack engine.tar.xz: tar: Error opening archive")
+        // A name or an acronym keeps its capital.
+        #expect(short("G-Player Wine was unpacked but can't be found.", 90) == "G-Player Wine was unpacked but can't be found")
+        #expect(short("URLSession failed.", 90) == "URLSession failed")
+        // Long ones are cut at a word.
+        #expect(short(String(repeating: "word ", count: 40) + "end.", 30) == "word word word word word word…")
+        #expect(short(String(repeating: "x", count: 50), 30) == String(repeating: "x", count: 30) + "…")      // no word to cut at
+        #expect(short("   ", 90) == "something went wrong" && short("....", 90) == "something went wrong")
     }
 }

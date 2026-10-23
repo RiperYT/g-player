@@ -124,6 +124,11 @@ final class AppModel {
     /// Engines downloading in the background to take over from a retired one (`migrateEngines`): their download shows no errors,
     /// and says why it runs.
     private(set) var updatingEngines: Set<String> = []
+    /// Why the background update of an engine failed in this run (its error's text), by engine id, until it is tried again or
+    /// has come. Settings › Engines and the sidebar say so in one line (`EngineMigration.updateFailure`).
+    private(set) var engineUpdateFailures: [String: String] = [:]
+    /// Engines whose failed update the user hid from the sidebar.
+    private(set) var closedUpdateNotices: Set<String> = []
     /// The replacements the background update has tried in this run, whether they came, failed or were stopped: a failed one
     /// is tried again at the next start, not before.
     @ObservationIgnored var engineUpdatesTried: Set<String> = []
@@ -496,6 +501,21 @@ final class AppModel {
     /// The engine is downloading in the background to replace a retired one (Settings says why).
     func isUpdating(_ info: EngineInfo) -> Bool { updatingEngines.contains(info.id) }
 
+    /// The line to show where the engine's download is offered: its background update failed, and is tried again at the next
+    /// start. Nil while it hasn't failed, is under way, or has come.
+    func updateFailureLine(for info: EngineInfo) -> String? {
+        guard !updatingEngines.contains(info.id), !isInstalled(info), let reason = engineUpdateFailures[info.id] else { return nil }
+        return EngineMigration.updateFailure(for: info, reason: reason)
+    }
+
+    /// The failed updates the sidebar still shows.
+    var updateNotices: [(id: String, line: String)] {
+        EngineCatalog.all.filter { !closedUpdateNotices.contains($0.id) }
+            .compactMap { info in updateFailureLine(for: info).map { (info.id, $0) } }
+    }
+
+    func closeUpdateNotice(_ id: String) { closedUpdateNotices.insert(id) }
+
     private func installEngine(_ info: EngineInfo, with manager: EngineManager, updating: Bool) async -> Engine? {
         await leftoversCleaning?.value
         // An update nobody asked for isn't "setup" to quit over: what came is kept, and it goes on at the next start.
@@ -503,6 +523,8 @@ final class AppModel {
                              note: updating ? EngineMigration.updateNote(for: info) : nil)
         defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil; updatingEngines.remove(info.id) }
         engineFailures[info.id] = nil
+        engineUpdateFailures[info.id] = nil
+        closedUpdateNotices.remove(info.id)
         stoppedEngines.remove(info.id)
         // What came stays on disk, so downloading again goes on from there.
         setStop(activity, help: "Stop downloading \(info.name). What came is kept, and the download goes on from there next time.") { [weak self] in
@@ -522,7 +544,8 @@ final class AppModel {
             return nil
         } catch {
             engineFailures[info.id] = error
-            if !updating { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
+            if updating { engineUpdateFailures[info.id] = error.localizedDescription }       // no alert: a line says so
+            else { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
             return nil
         }
     }

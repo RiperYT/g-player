@@ -157,8 +157,29 @@ public enum EngineMigration {
         }
     }
 
-    /// The one sentence that says why a replacement is downloading in the background.
+    /// What says why a replacement is downloading in the background, and what comes of it.
     public static func updateNote(for info: EngineInfo) -> String {
-        "Updating \(info.name) (adds video playback in games). Your games keep working meanwhile."
+        "Updating \(info.name) (adds video playback in games). Your games keep working meanwhile. "
+            + "Spaces switch over by themselves once nothing runs in them, and the old version is then removed."
+    }
+
+    /// The one line for a background update that failed, in Settings › Engines and in the sidebar: what failed, why in a few
+    /// words, and that it is tried again.
+    public static func updateFailure(for info: EngineInfo, reason: String) -> String {
+        "Couldn't update \(info.name): \(shortReason(reason)). G-Player tries again next time it opens."
+    }
+
+    /// An error's text in a few words: its first sentence, without the full stop, starting in lower case unless that would
+    /// break a name or an acronym ("G-Player", "URLSession"), and cut at a word after `limit` characters.
+    static func shortReason(_ text: String, limit: Int = 90) -> String {
+        var reason = text.split(whereSeparator: \.isNewline).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        if let stop = reason.range(of: ". ") { reason = String(reason[..<stop.lowerBound]) }
+        while reason.hasSuffix(".") || reason.hasSuffix(":") { reason.removeLast() }
+        guard !reason.isEmpty else { return "something went wrong" }
+        let letters = Array(reason)
+        if letters.count > 1, letters[0].isUppercase, letters[1].isLowercase { reason = letters[0].lowercased() + String(reason.dropFirst()) }
+        guard reason.count > limit else { return reason }
+        let cut = reason.prefix(limit)
+        return (cut.lastIndex(of: " ").map { String(cut[..<$0]) } ?? String(cut)) + "…"
     }
 }
