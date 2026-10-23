@@ -111,13 +111,14 @@ extension AppModel {
     func noteStoreReady(_ preset: AppPreset, in space: Space) {
         guard preset.id == AppPresets.steam.id, let tile = launcherTile(of: preset) else { return }
         storeReadyID = preset.id
-        let here: Bool
+        let place: StoreReadyMove.Place
         switch selection {
-        case .apps?, .space(space.id)?: here = true
-        case .allGames?, nil: here = selectedGameID == nil
-        default: here = false
+        case .apps?: place = appsPath.isEmpty ? .getApps : .getAppsPage
+        case .space(space.id)?: place = .storeSpace
+        case .allGames?, nil: place = .allGames(gameSelected: selectedGameID != nil)
+        default: place = .elsewhere
         }
-        guard here else { return }
+        guard StoreReadyMove.movesToTile(from: place) else { return }
         selection = .allGames
         selectedGameID = tile.id
     }

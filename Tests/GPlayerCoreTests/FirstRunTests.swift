@@ -216,3 +216,19 @@ import Testing
         #expect(FirstRunSetup.pausedNote(pendingSpaces: []).text.contains("the first spaces"))
     }
 }
+
+@Suite struct StoreReadyMoveTests {
+    @Test func theLibraryFollowsTheSetupOnlyForSomeoneWhoWaitsForIt() {
+        // Install was pressed on Get Apps, or the store's own space is open: its tile is where they want to be.
+        #expect(StoreReadyMove.movesToTile(from: .getApps))
+        #expect(StoreReadyMove.movesToTile(from: .storeSpace))
+        // All Games with nothing selected: the tile is selected. With a game selected, that game stays.
+        #expect(StoreReadyMove.movesToTile(from: .allGames(gameSelected: false)))
+        #expect(!StoreReadyMove.movesToTile(from: .allGames(gameSelected: true)))
+    }
+
+    @Test func someoneOnTheEpicPageInGetAppsIsNotTakenToAllGames() {
+        #expect(!StoreReadyMove.movesToTile(from: .getAppsPage))
+        #expect(!StoreReadyMove.movesToTile(from: .elsewhere))
+    }
+}
