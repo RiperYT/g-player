@@ -98,10 +98,17 @@ enum SnapshotRenderer {
                                     note: EngineMigration.shortUpdateNote(for: EngineCatalog.crossover))
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
+            // Get Apps: one Epic Games card with both ways, and the Epic page (the Legendary way) opened over its list.
+            Shot(name: "get-apps", size: mainSize) { box in
+                box.libraryWithGames()
+                box.model.selection = .apps
+                return AnyView(MainWindow(detail: AppsView()).environment(box.model))
+            },
             Shot(name: "epic-signed-out", size: mainSize) { box in
                 box.libraryWithGames()
                 box.model.epic.looked = true
-                return AnyView(MainWindow(detail: EpicView()).environment(box.model))
+                box.model.openEpicLibrary()
+                return AnyView(MainWindow(detail: AppsView()).environment(box.model))
             },
             Shot(name: "epic-signed-in", size: mainSize) { box in
                 box.libraryWithGames()
@@ -111,7 +118,19 @@ enum SnapshotRenderer {
                                         EpicGame(appName: "OtherApp", title: "Another Sample Game")]
                 box.model.epic.fetched = true
                 box.model.epic.installedKnown = true
-                return AnyView(MainWindow(detail: EpicView()).environment(box.model))
+                box.model.openEpicLibrary()
+                return AnyView(MainWindow(detail: AppsView()).environment(box.model))
+            },
+            // The Epic Games space, where Legendary installs games, links to the page of the account and its games.
+            Shot(name: "main-space-epic-games", size: mainSize) { box in
+                let space = box.epicGamesSpace()
+                return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
+            },
+            // Wine Mono on its way into the engine, the first time Epic's launcher starts.
+            Shot(name: "main-library-downloading-wine-mono", size: mainSize) { box in
+                box.libraryWithGames()
+                _ = box.model.begin(WineMono.downloadTitle, "Downloading 12 of 40 MB", progress: 0.3, setup: true)
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
             Shot(name: "main-library-notes", size: mainSize) { box in
                 box.libraryWithGames()
@@ -293,6 +312,19 @@ enum SnapshotRenderer {
             try? FileManager.default.createDirectory(at: folder.appendingPathComponent("drive_c/windows"), withIntermediateDirectories: true)
             FileManager.default.createFile(atPath: folder.appendingPathComponent("system.reg").path, contents: Data())
             let space = Space(name: "Main", path: folder.path, engineID: engine.id, origin: .managed)
+            model.mutate { $0.spaces.append(space) }
+            model.selection = .space(space.id)
+            return space
+        }
+
+        /// The space Legendary installs Epic games into, as it is made the first time: a prefix with nothing in it.
+        func epicGamesSpace() -> Space {
+            finishedOnboarding()
+            let folder = model.paths!.spaces.appendingPathComponent(EpicGames.spaceName, isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder.appendingPathComponent("drive_c/windows"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: folder.appendingPathComponent("system.reg").path, contents: Data())
+            let space = Space(name: EpicGames.spaceName, path: folder.path, engineID: EngineCatalog.crossover.id, origin: .managed,
+                              presetID: EpicGames.presetID, colorIndex: 2)
             model.mutate { $0.spaces.append(space) }
             model.selection = .space(space.id)
             return space

@@ -301,7 +301,7 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         let second = message { try LaunchPlanner.plan(for: game(s), in: s, legendary: launch) }
         for text in [first, second] {
             let text = try #require(text)
-            #expect(text.contains("Open Epic Games in the sidebar") && !text.contains("settings"), "\(text)")
+            #expect(text.contains("Open Get Apps › Epic Games") && !text.contains("sidebar") && !text.contains("settings"), "\(text)")
         }
         #expect(first?.contains("Sample Game") == true)
         // A program the user added still says how to choose another.

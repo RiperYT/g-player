@@ -326,6 +326,17 @@ import Testing
     }
 }
 
+@Suite struct EpicPlaceTests {
+    @Test func theEpicPageIsInGetAppsAndNoMessageSendsPeopleToTheSidebarForIt() {
+        #expect(EpicGames.libraryPlace == "Get Apps › Epic Games")
+        for text in [LegendaryFailure.signedOutMessage, LegendaryFailure.installMissingMessage] {
+            #expect(text.contains(EpicGames.libraryPlace) && !text.contains("sidebar"), "\(text)")
+        }
+        // The space Legendary installs into is no launcher's: its page links to Epic's, and it is found again by this id.
+        #expect(AppPresets.preset(EpicGames.presetID) == nil)
+    }
+}
+
 @Suite struct EpicLauncherMoveTests {
     /// Started on Wine Staging, Epic's launcher only ever showed its loading screen: the move is offered instead.
     @Test func epicsLauncherOffersTheMoveOffGPlayerWine() {

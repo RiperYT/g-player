@@ -105,7 +105,7 @@ struct GameInspector: View {
             Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
                 .buttonStyle(.link).foregroundStyle(.red)
                 .disabled(block != nil).help(block ?? "")
-            Text("Deletes the game's files from its space. Install it again from Epic Games in the sidebar.")
+            Text("Deletes the game's files from its space. Install it again from \(EpicGames.libraryPlace).")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

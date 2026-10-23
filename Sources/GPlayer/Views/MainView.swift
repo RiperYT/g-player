@@ -19,7 +19,6 @@ struct MainView: View {
                 case .hidden: LibraryView(filter: .hidden)
                 case .space(let id): if let s = model.space(id) { SpaceView(space: s) } else { LibraryView(filter: .all) }
                 case .files: FilesView()
-                case .epic: EpicView()
                 case .apps: AppsView()
                 }
             }
@@ -148,7 +147,6 @@ struct Sidebar: View {
             }
             Section("Browse") {
                 Label("Files", systemImage: "folder").tag(SidebarItem.files)
-                Label("Epic Games", systemImage: "shippingbox").tag(SidebarItem.epic)
                 Label("Get Apps", systemImage: "square.and.arrow.down.on.square").tag(SidebarItem.apps)
             }
         }

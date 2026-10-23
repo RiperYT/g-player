@@ -120,6 +120,7 @@ struct SpaceView: View {
                 }
             }
             PathRow(url: space.url)
+            if space.presetID == EpicGames.presetID { EpicLibraryLink() }
             HStack(spacing: 18) {
                 if case .picker(let selected) = model.engineOffer(for: space) {
                     Picker("Engine", selection: Binding(get: { selected }, set: { if $0 != selected { askToSwitch(to: $0) } })) {
@@ -219,6 +220,16 @@ struct SpaceView: View {
         let s = space
         found = await Task.detached { ShortcutScanner.programs(in: s) }.value
         size = await Task.detached { Files.allocatedSize(of: s.url) }.value
+    }
+}
+
+/// The Epic Games space holds the games installed through Legendary; the account and the rest of the library are on Epic's page.
+private struct EpicLibraryLink: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button { model.openEpicLibrary() } label: { Label("Your Epic library…", systemImage: "shippingbox") }
+            .buttonStyle(.link)
     }
 }
 

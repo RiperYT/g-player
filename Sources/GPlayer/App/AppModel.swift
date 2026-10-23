@@ -17,7 +17,13 @@ struct BlockedLaunch: Identifiable {
 }
 
 enum SidebarItem: Hashable {
-    case allGames, recent, hidden, space(UUID), files, epic, apps
+    case allGames, recent, hidden, space(UUID), files, apps
+}
+
+/// A page Get Apps opens over its list of apps.
+enum AppsDestination: Hashable {
+    /// Epic Games without Epic's launcher, through Legendary: sign in, the library, install (`EpicView`).
+    case epicLibrary
 }
 
 /// Long work shown at the bottom of the sidebar (engine downloads, store setup, imports).
@@ -90,7 +96,12 @@ final class AppModel {
         // The Hidden item disappears with the last hidden game, so don't leave it selected.
         didSet { if selection == .hidden, state.hiddenGames.isEmpty { selection = .allGames } }
     }
-    var selection: SidebarItem? = .allGames
+    var selection: SidebarItem? = .allGames {
+        // A page Get Apps opened closes with it: coming back to Get Apps shows its list.
+        didSet { if selection != .apps { appsPath = [] } }
+    }
+    /// The pages open over Get Apps' list, innermost last (`openEpicLibrary`).
+    var appsPath: [AppsDestination] = []
     var selectedGameID: UUID?
     var searchText = ""
     var activities: [Activity] = []
