@@ -27,10 +27,7 @@ public enum WineLauncher {
         FileManager.default.createFile(atPath: log.path, contents: nil)
         let handle = try FileHandle(forWritingTo: log)
         let env = WineEnvironment.make(engine: engine, space: space, backend: backend, tweaks: tweaks)
-        let header = "G-Player launch\nengine: \(engine.info.name) \(engine.info.version)\nspace: \(space.path)\n"
-            + "backend: \(engine.resolve(backend).displayName)\ncommand: \(arguments.joined(separator: " "))\n"
-            + "WINEDLLOVERRIDES=\(env["WINEDLLOVERRIDES"] ?? "")\n\n"
-        handle.write(Data(header.utf8))
+        handle.write(Data(logHeader(engine: engine, space: space, backend: backend, arguments: arguments, environment: env).utf8))
 
         let process = Process()
         process.executableURL = Shell.tool("arch")
@@ -46,6 +43,15 @@ public enum WineLauncher {
         }
         try process.run()
         return RunningProgram(process: process, logFile: log)
+    }
+
+    /// The first lines of a launch's log. The command is written with the secrets of its arguments hidden (`LaunchSecrets`: the
+    /// one-time code an Epic game is started with); the program gets the real ones.
+    static func logHeader(engine: Engine, space: Space, backend: GraphicsBackend, arguments: [String],
+                          environment: [String: String]) -> String {
+        "G-Player launch\nengine: \(engine.info.name) \(engine.info.version)\nspace: \(space.path)\n"
+            + "backend: \(engine.resolve(backend).displayName)\ncommand: \(LaunchSecrets.masked(arguments).joined(separator: " "))\n"
+            + "WINEDLLOVERRIDES=\(environment["WINEDLLOVERRIDES"] ?? "")\n\n"
     }
 
     /// Runs a Wine tool (wineboot, reg, winecfg) and waits for it.
