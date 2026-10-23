@@ -59,5 +59,12 @@ public enum SetupQuit {
         reason.map { systemReasons.contains($0) } ?? false
     }
 
+    /// True when a question may stop the quit that is being handled. Not when the Mac is going down (`isSystemQuit`), and
+    /// not when the quit is Sparkle's, for an update the user just said yes to: the installer waits for G-Player to quit, and
+    /// a question that is answered with "Keep Setting Up" would leave it waiting.
+    public static func mayAsk(systemIsGoingDown: Bool, reason: UInt32?, updateIsInstalling: Bool) -> Bool {
+        !systemIsGoingDown && !isSystemQuit(reason: reason) && !updateIsInstalling
+    }
+
     static func fourCharCode(_ text: String) -> UInt32 { text.utf8.reduce(0) { ($0 << 8) | UInt32($1) } }
 }
