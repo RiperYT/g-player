@@ -142,6 +142,55 @@ import Testing
         #expect(plan([allowed], installed: [new]).switches.count == 1)
     }
 
+    // MARK: In use
+
+    func program(_ command: String, in space: Space, folder: String = "drive_c/windows/system32") -> WineProcess {
+        WineProcess(pid: 100, command: command, directory: space.path + "/" + folder)
+    }
+
+    @Test func aSpaceIsInUseWhileAnyProgramOfItsOwnRuns() {
+        let main = space("Main", on: old.id), other = space("Other", on: old.id)
+        #expect(!EngineMigration.isInUse(main, processes: [], activity: .init()))
+        // A game, a launcher, a tool: all are programs of the space.
+        let game = program(#"C:\Games\Made Up\game.exe"#, in: main, folder: "drive_c/Games/Made Up")
+        #expect(EngineMigration.isInUse(main, processes: [game], activity: .init()))
+        // Wine's own services stay as long as anything runs, and its Wine server may still wind down behind them: they hold the
+        // space too (the one thing that isn't a Windows program, the server, is caught by the engine's folder, see below).
+        for service in [#"C:\windows\system32\services.exe"#, #"C:\windows\system32\explorer.exe /desktop"#] {
+            #expect(EngineMigration.isInUse(main, processes: [program(service, in: main)], activity: .init()), "\(service)")
+        }
+        // Another space's programs are none of its business.
+        #expect(!EngineMigration.isInUse(main, processes: [program(#"C:\Games\game.exe"#, in: other)], activity: .init()))
+    }
+
+    @Test func aSpaceIsInUseWhileTheAppHasWorkBegunInIt() {
+        let main = space("Main", on: old.id)
+        typealias Activity = EngineMigration.SpaceActivity
+        let busy: [Activity] = [
+            .init(movingEngine: true), .init(installing: true), .init(queued: true), .init(launchesStarting: 1),
+            .init(launchesStarting: 3), .init(gameStarting: true), .init(gameRunning: true), .init(addingGame: true),
+        ]
+        for activity in busy { #expect(EngineMigration.isInUse(main, processes: [], activity: activity), "\(activity)") }
+        #expect(!EngineMigration.isInUse(main, processes: [], activity: .init(launchesStarting: 0)))
+        #expect(!Activity().isActive)
+    }
+
+    @Test func anEngineFolderMayGoOnlyWhenThePlanSaysSoAndNothingRunsFromIt() {
+        let folder = URL(fileURLWithPath: "/tmp/Library/Engines/\(old.id)")
+        let removal = EngineMigration.Plan(remove: [old.id])
+        func running(_ path: String) -> [ProcessExecutable] { [.init(pid: 7, path: path)] }
+        #expect(EngineMigration.mayRemove(old.id, plan: removal, folder: folder, executables: []))
+        #expect(EngineMigration.mayRemove(old.id, plan: removal, folder: folder, executables: running("/usr/bin/sleep")))
+        // Wine's own programs are not Windows programs, and still hold the folder: the loader and the server.
+        for name in ["wine64-preloader", "wine-preloader", "wineserver"] {
+            let path = folder.path + "/wine/bin/" + name
+            #expect(!EngineMigration.mayRemove(old.id, plan: removal, folder: folder, executables: running(path)), "\(name)")
+        }
+        // A fresh look that finds a space on the engine again says no, whatever runs.
+        #expect(!EngineMigration.mayRemove(old.id, plan: .init(), folder: folder, executables: []))
+        #expect(!EngineMigration.mayRemove(old.id, plan: .init(remove: ["another"]), folder: folder, executables: []))
+    }
+
     // MARK: Carrying it out
 
     @Test func theSpaceKeepsEverythingButItsEngineAndTheGamesKeepWhatWasLearned() {

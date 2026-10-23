@@ -98,6 +98,42 @@ import Testing
         #expect(env["WINEPREFIX"] == "/Users/me/Bottles/My Ігри" && env["HOME"] == "/Users/me")
     }
 
+    // MARK: Programs run from a folder
+
+    @Test func processesRunningFromAnEngineFolderAreFoundWhateverTheyAre() {
+        let folder = URL(fileURLWithPath: "/Users/me/Library/G-Player/Engines/wine-cx-26.3.0-1")
+        let inside = "/Users/me/Library/G-Player/Engines/wine-cx-26.3.0-1/wine/bin/"
+        let all = [
+            ProcessExecutable(pid: 10, path: inside + "wine64-preloader"),
+            ProcessExecutable(pid: 11, path: inside + "wineserver"),
+            ProcessExecutable(pid: 12, path: "/Users/me/Library/G-Player/Engines/wine-cx-26.3.0-2/wine/bin/wineserver"),   // the replacement
+            ProcessExecutable(pid: 13, path: "/Users/me/Library/G-Player/Engines/wine-cx-26.3.0-10/wine/bin/wineserver"),  // a longer name
+            ProcessExecutable(pid: 14, path: "/Users/me/Library/G-Player/Engines/wine-cx-26.3.0-1"),                       // the folder itself
+            ProcessExecutable(pid: 15, path: "/usr/bin/sleep"),
+        ]
+        #expect(WineProcesses.executables(inside: folder, from: all).map(\.pid) == [10, 11, 14])
+        #expect(WineProcesses.executables(inside: folder, from: []).isEmpty)
+    }
+
+    @Test func aFolderUnderVarIsFoundThroughPrivateAndWhateverTheCase() {
+        // The kernel says /private/var/…; a library kept as /var/… and typed in another case is still the same folder.
+        let folder = URL(fileURLWithPath: "/var/folders/xy/T/Lib/Engines/old")
+        let all = [ProcessExecutable(pid: 1, path: "/private/var/folders/xy/T/Lib/Engines/old/wine/bin/wineserver"),
+                   ProcessExecutable(pid: 2, path: "/var/folders/xy/T/LIB/engines/OLD/wine/bin/wine"),
+                   ProcessExecutable(pid: 3, path: "/var/folders/xy/T/Lib/Engines/older/wine/bin/wine")]
+        #expect(WineProcesses.executables(inside: folder, from: all).map(\.pid) == [1, 2])
+    }
+
+    @Test func theRealProcessTableListsTheProgramFileOfThisProcess() throws {
+        let mine = try #require(WineProcesses.executables().first { $0.pid == getpid() })
+        #expect(mine.path.hasPrefix("/") && FileManager.default.fileExists(atPath: mine.path))
+        // Its own folder holds it; another folder doesn't.
+        let folder = URL(fileURLWithPath: mine.path).deletingLastPathComponent()
+        #expect(WineProcesses.executables(inside: folder, from: WineProcesses.executables()).contains { $0.pid == getpid() })
+        let elsewhere = TempFolder()
+        #expect(!WineProcesses.executables(inside: elsewhere.url, from: WineProcesses.executables()).contains { $0.pid == getpid() })
+    }
+
     @Test func theRealSnapshotRuns() {
         let all = WineProcesses.snapshot()
         #expect(all.allSatisfy { $0.pid > 0 && WineProcesses.isWindowsProgram($0.command) })

@@ -24,6 +24,49 @@ public enum EngineMigration {
         public var isEmpty: Bool { switches.isEmpty && install.isEmpty && remove.isEmpty }
     }
 
+    /// What the app knows about a space besides the programs the process table shows: work it has begun there.
+    public struct SpaceActivity: Equatable, Sendable {
+        /// The space is being moved to another engine.
+        public var movingEngine: Bool
+        /// Installs or store setups are queued or running in it.
+        public var installing: Bool
+        /// Something is queued for it or holds its queue.
+        public var queued: Bool
+        /// Launches that have begun there and whose program hasn't started yet.
+        public var launchesStarting: Int
+        /// A game of the space is between pressing Play and its program starting, or is running.
+        public var gameStarting: Bool
+        public var gameRunning: Bool
+        /// Add Game is working in it (from choosing the space until the installer has quit or the game was copied).
+        public var addingGame: Bool
+
+        public init(movingEngine: Bool = false, installing: Bool = false, queued: Bool = false, launchesStarting: Int = 0,
+                    gameStarting: Bool = false, gameRunning: Bool = false, addingGame: Bool = false) {
+            self.movingEngine = movingEngine; self.installing = installing; self.queued = queued
+            self.launchesStarting = launchesStarting; self.gameStarting = gameStarting; self.gameRunning = gameRunning
+            self.addingGame = addingGame
+        }
+
+        public var isActive: Bool {
+            movingEngine || installing || queued || launchesStarting > 0 || gameStarting || gameRunning || addingGame
+        }
+    }
+
+    /// Something runs, starts or is queued in the space, so its engine's files are in use and it can't move. Programs count
+    /// whatever they are, Wine's own services too (`explorer.exe /desktop` and `services.exe` stay while anything else does);
+    /// the Wine server and the loader of the engine aren't Windows programs and don't show among them, which is why an
+    /// engine's folder is looked at once more before it is deleted (`mayRemove`).
+    public static func isInUse(_ space: Space, processes: [WineProcess], activity: SpaceActivity) -> Bool {
+        activity.isActive || !WineProcesses.programs(in: space, from: processes).isEmpty
+    }
+
+    /// A retired engine's folder may be deleted: a plan made from a fresh look says nothing is left on it, and no process runs
+    /// a file from inside it (Wine's own `wine-preloader` and `wineserver` included, which the Windows programs don't show).
+    /// Anything else is tried again at the next look.
+    public static func mayRemove(_ id: String, plan: Plan, folder: URL, executables: [ProcessExecutable]) -> Bool {
+        plan.remove.contains(id) && WineProcesses.executables(inside: folder, from: executables).isEmpty
+    }
+
     /// What to do about the spaces on retired engines, given the ids of the engines installed (retired ones too) and the
     /// spaces something runs or is being started in (`busy`).
     ///
