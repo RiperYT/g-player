@@ -22,6 +22,9 @@
   Settings › General turns that on or off. G-Player asks GitHub for the list of versions and sends nothing about your Mac,
   and an update installs only if it is signed with G-Player's own update key.
 
+- Every engine install and update writes what it went through, and how it ended, to `Logs` in the library, so an update
+  that failed in the background can be looked into later.
+
 ## [0.4.3] - 2026-10-23
 
 - **Game videos play on G-Player Wine.** Intros and cutscenes that go through Windows Media Foundation can play now.
