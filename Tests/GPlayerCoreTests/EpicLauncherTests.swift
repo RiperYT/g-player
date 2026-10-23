@@ -268,4 +268,15 @@ import Testing
             #expect(preset.engineForNewSpace(installed: [staging, gplayerWine]).id == gplayerWine.id)
         }
     }
+
+    @Test func anEpicSpaceOnAnotherEngineIsOfferedTheMoveWhetherOrNotTheMenusAreOn() {
+        func needs(_ preset: String?, _ engine: EngineInfo) -> Bool { EngineSwitch.launcherNeedsMove(presetID: preset, engineID: engine.id) }
+        #expect(needs("epic", staging) && needs("epic", EngineCatalog.gptk))
+        #expect(!needs("epic", gplayerWine) && !needs("epic", EngineCatalog.crossoverRevision1))
+        #expect(!needs("steam", staging) && !needs(nil, staging) && !needs(EpicGames.presetID, staging))
+        // The page's own offer for Wine Staging is the move, so the Epic note shows in the same place.
+        #expect(EngineSwitch.pageOffer(engineID: staging.id, choosingEngines: false) == .move)
+        #expect(EngineSwitch.launcherMoveDetail(presetID: "epic") == "Epic Games Launcher opens only on G-Player Wine. Moving asks first.")
+        #expect(EngineSwitch.launcherMoveDetail(presetID: "steam") == nil && EngineSwitch.launcherMoveDetail(presetID: nil) == nil)
+    }
 }

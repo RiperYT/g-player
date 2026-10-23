@@ -19,10 +19,12 @@ struct SpaceView: View {
                 header
                 if model.needsAppleToolkit(space) { ToolkitOffBanner() }
                 // One offer at a time, the bottle's consent first: a bottle of another app on the retired engine asks for its
-                // owner's yes (`EngineMigration.offersMove`); a space on another engine is offered G-Player Wine (`pageOffer`).
+                // owner's yes (`EngineMigration.offersMove`); a space on another engine is offered G-Player Wine (`pageOffer`), a
+                // launcher space that opens only there (Epic's) also while the engine menus are on.
                 if let target = model.engineMoveOffer(for: space) {
                     EngineMoveOffer(space: space, target: target)
-                } else if model.engineOffer(for: space) == .move {
+                } else if model.engineOffer(for: space) == .move
+                            || EngineSwitch.launcherNeedsMove(presetID: space.presetID, engineID: space.engineID) {
                     EngineMoveNote(space: space) { askToSwitch(to: EngineCatalog.crossover.id) }
                 }
                 if let preset = AppPresets.preset(space.presetID), !preset.isInstalled(in: space) {
@@ -265,6 +267,7 @@ private struct EngineMoveNote: View {
     }
 
     private var detail: String {
+        if let reason = EngineSwitch.launcherMoveDetail(presetID: space.presetID) { return reason }
         let newer = "New spaces use G-Player Wine, which plays game videos and can use Apple's D3DMetal. Moving asks first."
         return info?.kind == .gptk ? "It keeps running while the toolkit is installed and turned on in Settings. " + newer : newer
     }
