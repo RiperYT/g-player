@@ -141,14 +141,19 @@ private struct EpicGameRow: View {
 
     var body: some View {
         let entry = model.epicGame(for: game)
+        let note = entry.flatMap { model.epicNote(for: $0) }
         HStack(spacing: 14) {
             EpicCover(url: game.coverURL)
             VStack(alignment: .leading, spacing: 2) {
                 Text(game.title).font(.callout.weight(.medium)).lineLimit(1)
-                Text(subtitle(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(note?.title ?? subtitle(entry)).font(.caption).foregroundStyle(note == nil ? Color.secondary : .orange).lineLimit(1)
             }
             Spacer(minLength: 12)
-            if let entry { installedButtons(entry) } else { installButton }
+            if let entry {
+                if note == nil { installedButtons(entry) } else { EpicProblemButtons(game: entry) }
+            } else {
+                installButton
+            }
         }
         .padding(10)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

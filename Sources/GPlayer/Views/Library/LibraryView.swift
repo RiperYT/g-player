@@ -170,6 +170,9 @@ struct GameTile: View {
             if model.didNotStart(game) && !model.isRunning(game) && !model.isPreparing(game) {
                 Label("Didn't start · see what to try", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.orange).lineLimit(1)
+            } else if let note = model.epicNote(for: game) {
+                Label("\(note.title) · see Epic Games", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.orange).lineLimit(1)
             } else {
                 Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }

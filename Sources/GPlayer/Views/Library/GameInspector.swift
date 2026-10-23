@@ -37,6 +37,8 @@ struct GameInspector: View {
 
                 facts(space)
 
+                if case .legendary = game.source { EpicFilesNote(game: game) }
+
                 if let space, case .executable = game.source { executableSettings(space) }
                 if let space {
                     if game.kind == .game {
@@ -67,6 +69,7 @@ struct GameInspector: View {
         }
         .onAppear(perform: sync)
         .onChange(of: game.id) { sync() }
+        .task(id: game.id) { if case .legendary = game.source { model.lookAtEpicIfNeeded() } }
         .task(id: [game.id.uuidString, game.executablePath ?? ""]) {
             details = nil
             let exe = model.space(game.spaceID).flatMap { game.executableURL(in: $0) }

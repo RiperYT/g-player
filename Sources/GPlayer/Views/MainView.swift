@@ -98,6 +98,13 @@ struct MainView: View {
         } message: { game in
             Text("“\(game.title)” leaves the library. Its files stay in the space, and you can add it again.")
         }
+        .confirmationDialog("Remove from Epic Games?", isPresented: Binding(get: { model.gamePendingForget != nil },
+                                                                           set: { if !$0 { model.gamePendingForget = nil } }),
+                            titleVisibility: .visible, presenting: model.gamePendingForget) { game in
+            Button("Remove “\(game.title)”", role: .destructive) { model.forgetEpicGame(game) }
+        } message: { game in
+            Text(model.epicNote(for: game)?.removal ?? "")
+        }
         .confirmationDialog("Uninstall from Epic Games?", isPresented: Binding(get: { model.gamePendingUninstall != nil },
                                                                               set: { if !$0 { model.gamePendingUninstall = nil } }),
                             titleVisibility: .visible, presenting: model.gamePendingUninstall) { game in

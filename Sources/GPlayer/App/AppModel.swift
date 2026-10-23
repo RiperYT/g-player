@@ -100,8 +100,9 @@ final class AppModel {
     var showNewSpace = false
     /// The game waiting for the "Remove from Library" confirmation.
     var gamePendingRemoval: Game?
-    /// The Epic game waiting for the "Uninstall" confirmation.
+    /// The Epic game waiting for the "Uninstall" confirmation, and the one waiting for the "Remove" confirmation.
     var gamePendingUninstall: Game?
+    var gamePendingForget: Game?
     /// Epic Games through Legendary: who is signed in, the games, and what it is busy with (`AppModel+Epic`).
     var epic = EpicState()
     /// The last look at what Legendary has on this Mac; the next one waits for it.
@@ -1360,7 +1361,8 @@ final class AppModel {
     func play(_ game: Game, skipping skipped: Set<PlayCheck> = []) {
         // A launcher that is open may be started again: that brings its window back.
         guard paths != nil, space(game.spaceID) != nil, !preparing.contains(game.id),
-              !isRunning(game) || game.kind == .app, epicPlayBlock(for: game) == nil else { return }
+              !isRunning(game) || game.kind == .app else { return }
+        if let reason = epicPlayBlock(for: game) { errorMessage = "Can't start “\(game.title)”. \(reason)"; return }
         preparing.insert(game.id)
         Task {
             await launch(game, skipping: skipped)

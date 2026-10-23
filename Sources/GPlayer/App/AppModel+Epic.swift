@@ -22,6 +22,8 @@ struct EpicState: Equatable {
     var refreshing = false
     /// Epic has been asked for the list in this run (what is shown before is the one kept on disk).
     var fetched = false
+    /// Legendary's list of installed games has been read in this run (`installed` is what it said).
+    var installedKnown = false
     /// Why the last fetch of the list failed, for the page.
     var refreshFailure: String?
     var showSignIn = false
@@ -48,7 +50,12 @@ extension AppModel {
         Legendary(paths: paths).endLeftovers()          // one a G-Player that crashed left running would hold Legendary's lock
         epic.games = EpicGames.loadList(in: paths)
         fetchMissingCovers()
+        // Only a library with an Epic game in it has anything that can be out of date (Legendary's record of where it is).
+        if state.games.contains(where: { $0.legendaryAppName != nil }) { lookAtEpicIfNeeded() }
     }
+
+    /// Looks once per run at what Legendary has, when nothing has yet.
+    func lookAtEpicIfNeeded() { if !epic.looked { lookAtEpic() } }
 
     /// Asks Legendary who is signed in and which games it has installed (from what is on this Mac: no Epic account is asked,
     /// no network used) once the look before it is over, and brings the library's Epic games in line.
@@ -70,6 +77,7 @@ extension AppModel {
             let installed = try await legendary.installedGames()
             epic.account = status.account
             epic.installed = Dictionary(installed.map { ($0.appName, $0) }, uniquingKeysWith: { first, _ in first })
+            epic.installedKnown = true
             mergeEpicGames(installed)
         } catch {
             // A look that fails says nothing; what the user asks for next says why it can't be done.
@@ -103,7 +111,7 @@ extension AppModel {
     /// Refresh looks again), and ask Epic for the list once per run. Not tied to the page: leaving it doesn't stop Legendary
     /// halfway through the list.
     func openEpicPage() {
-        if !epic.looked { lookAtEpic() }
+        lookAtEpicIfNeeded()
         Task {
             await epicLooking?.value
             if epic.isSignedIn, !epic.fetched { await refreshEpicList() }
@@ -276,7 +284,7 @@ extension AppModel {
             guard await prepareLegendary(legendary) else { return }
             let activity = begin("Uninstalling “\(game.title)”", "Removing its files")
             defer { end(activity) }
-            do { try await legendary.uninstall(appName) }
+            do { try await legendary.uninstall(appName); dropEpicEntry(game) }
             catch { errorMessage = "Couldn't uninstall “\(game.title)”. \(error.localizedDescription)" }
             lookAtEpic()
             await epicLooking?.value
@@ -294,8 +302,8 @@ extension AppModel {
     func epicPlan(_ replan: @escaping EpicReplan, appName: String, engine: Engine, paths: LibraryPaths) async throws -> LaunchPlan {
         let legendary = Legendary(paths: paths)
         try await legendary.ensureInstalled()
-        let launch = try await legendary.launchParameters(for: appName, wine: engine.wine)
-        return try await Task.detached(priority: .userInitiated) { try replan(launch) }.value
+        let answer = try await legendary.launchParameters(for: appName, wine: engine.wine)
+        return try await Task.detached(priority: .userInitiated) { try replan(answer.launch) }.value
     }
 }
 
@@ -313,9 +321,62 @@ extension AppModel {
         EpicGames.uninstallBlock(gameIsRunning: isRunning(game), gameIsStarting: isPreparing(game), busy: epic.activity)
     }
 
-    /// Why an Epic game can't be started now, or nil.
+    /// Why an Epic game can't be started now, or nil: it is being uninstalled, or its files aren't where Legendary says.
     func epicPlayBlock(for game: Game) -> String? {
         guard case .legendary(let appName) = game.source else { return nil }
-        return EpicGames.playBlock(appName: appName, uninstalling: epic.uninstalling)
+        if let reason = EpicGames.playBlock(appName: appName, uninstalling: epic.uninstalling) { return reason }
+        return epicNote(for: game)?.detail
+    }
+
+    /// How an Epic game stands with Legendary's record, once its list has been read this run.
+    func epicHealth(of game: Game) -> EpicGames.Health {
+        guard case .legendary(let appName) = game.source, let space = space(game.spaceID) else { return .ok }
+        return EpicGames.health(record: epic.installed[appName], recordsKnown: epic.installedKnown, space: space)
+    }
+
+    /// What to say about an Epic game whose files aren't where Legendary says, or nil.
+    func epicNote(for game: Game) -> EpicGames.Note? { EpicGames.note(for: epicHealth(of: game), title: game.title) }
+
+    /// Takes an Epic game out of the library: once Legendary has uninstalled it or forgotten it.
+    func dropEpicEntry(_ game: Game) {
+        mutate { $0.games = EpicGames.removing(appName: game.legendaryAppName ?? "", of: game.spaceID, from: $0.games) }
+        if selectedGameID == game.id { selectedGameID = nil }
+    }
+
+    /// Repair: points Legendary's record at the files, which are in this library's Epic Games space.
+    func repairEpicGame(_ game: Game) {
+        guard let appName = game.legendaryAppName, let paths, !epic.isOccupied,
+              case .filesNotFound(let base?) = epicHealth(of: game) else { return }
+        epic.busy = "Repairing “\(game.title)”"
+        Task {
+            defer { epic.busy = nil }
+            let legendary = Legendary(paths: paths)
+            do {
+                try await legendary.ensureInstalled()
+                try await legendary.relink(appName, to: base)
+            } catch {
+                errorMessage = "Couldn't repair “\(game.title)”. \(error.localizedDescription)"
+            }
+            lookAtEpic()
+            await epicLooking?.value
+        }
+    }
+
+    /// Remove…, for a game that can't be started: Legendary forgets it (no file is touched) and it leaves the library.
+    func forgetEpicGame(_ game: Game) {
+        guard let appName = game.legendaryAppName, let paths, !epic.isOccupied, epicHealth(of: game) != .ok else { return }
+        epic.busy = "Removing “\(game.title)”"
+        Task {
+            defer { epic.busy = nil }
+            let legendary = Legendary(paths: paths)
+            do {
+                try await legendary.ensureInstalled()
+                try await legendary.uninstall(appName, keepFiles: true)
+                dropEpicEntry(game)
+            } catch {
+                errorMessage = "Couldn't remove “\(game.title)”. \(error.localizedDescription)"
+            }
+            lookAtEpic()
+        }
     }
 }
