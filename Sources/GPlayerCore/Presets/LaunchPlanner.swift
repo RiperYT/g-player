@@ -108,8 +108,8 @@ public enum LaunchPlanner {
         let dotNet = hasDotNet(space)
 
         var environment = preset?.environment ?? [:]
-        for (k, v) in compat?.environment ?? [:] { environment[k] = v }
-        for (k, v) in legendary?.environment ?? [:] { environment[k] = v }           // already without CX_BOTTLE
+        for (k, v) in legendary?.environment ?? [:] { environment[k] = v }           // Legendary's: only what a game may get
+        for (k, v) in compat?.environment ?? [:] { environment[k] = v }              // the layers' win over it
         for (k, v) in game.environment { environment[k] = v }                        // the user's own settings win
         var overrides = preset?.dllOverrides ?? []
         overrides += (compat?.dllOverrides ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }

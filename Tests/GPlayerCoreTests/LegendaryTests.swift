@@ -228,18 +228,42 @@ private let sampleInstalled = """
         #expect(LegendaryOutput.installed(json) == [])
     }
 
-    @Test func launchParametersKeepWhatTheGameNeedsAndDropWhereWineWouldGo() throws {
+    @Test func launchParametersKeepWhatTheGameNeedsAndNoEnvironment() throws {
         let launch = try #require(LegendaryOutput.launch(sampleLaunch))
-        #expect(launch.environment == ["SAMPLE_FLAG": "1"])                                   // no CX_BOTTLE
+        #expect(launch.environment.isEmpty)                                                    // CX_BOTTLE and SAMPLE_FLAG stay out
         #expect(launch.gameParameters == ["-nosplash"] && launch.userParameters == [])
         #expect(launch.eglParameters.contains("-AUTH_PASSWORD=0123456789abcdef0123456789abcdef"))
         #expect(launch.executableURL?.path == "/Users/me/Games/G-Player/Spaces/Epic Games/drive_c/Games/Epic/SampleGame/Bin/Sample.exe")
         #expect(launch.workingDirectoryURL?.path == "/Users/me/Games/G-Player/Spaces/Epic Games/drive_c/Games/Epic/SampleGame/Bin")
     }
 
-    @Test func aPrefixInTheEnvironmentIsDroppedToo() throws {
-        let json = #"{"game_directory": "/g", "game_executable": "x.exe", "environment": {"WINEPREFIX": "/elsewhere", "CX_BOTTLE": "b", "A": "1"}}"#
-        #expect(try #require(LegendaryOutput.launch(json)).environment == ["A": "1"])
+    @Test func nothingOfLegendarysEnvironmentReachesAGameUnlessItsNameIsAllowed() throws {
+        let json = """
+        {"game_directory": "/g", "game_executable": "x.exe", "environment": {"CX_BOTTLE": "b", "WINEPREFIX": "/elsewhere",
+         "WINEDLLOVERRIDES": "x=n", "PATH": "/evil", "GST_PLUGIN_PATH": "/x", "DXVK_HUD": "full", "DYLD_INSERT_LIBRARIES": "/x.dylib",
+         "HOME": "/elsewhere", "SAMPLE_FLAG": "1", "OTHER_FLAG": "2"}}
+        """
+        #expect(LegendaryOutput.gameVariables.isEmpty)
+        #expect(try #require(LegendaryOutput.launch(json)).environment.isEmpty)
+        // A name that is allowed passes, with its value; the others still don't.
+        #expect(try #require(LegendaryOutput.launch(json, allowing: ["SAMPLE_FLAG"])).environment == ["SAMPLE_FLAG": "1"])
+    }
+
+    @Test func aNameThatIsG_PlayersNeverPassesEvenWhenItIsAllowed() throws {
+        let names = ["WINEPREFIX", "WINEDLLOVERRIDES", "winedebug", "PATH", "GST_PLUGIN_SYSTEM_PATH_1_0", "DXVK_ASYNC", "MVK_CONFIG_X",
+                     "D3DM_SUPPORT_DXR", "CX_BOTTLE", "CX_ACTIVE_GRAPHICS_BACKEND", "DYLD_FALLBACK_LIBRARY_PATH", "LD_PRELOAD", "HOME",
+                     "TMPDIR", "LANG", "LC_ALL", "ROSETTA_ADVERTISE_AVX"]
+        let environment = "{" + names.map { "\"\($0)\": \"x\"" }.joined(separator: ", ") + ", \"SAMPLE_FLAG\": \"1\"}"
+        let json = #"{"game_directory": "/g", "game_executable": "x.exe", "environment": \#(environment)}"#
+        let launch = try #require(LegendaryOutput.launch(json, allowing: Set(names + ["SAMPLE_FLAG"])))
+        #expect(launch.environment == ["SAMPLE_FLAG": "1"])
+        for name in names { #expect(LegendaryOutput.isProtected(name), "\(name)") }
+        #expect(!LegendaryOutput.isProtected("SAMPLE_FLAG") && !LegendaryOutput.isProtected("EOS_FLAG"))
+    }
+
+    @Test func aValueThatIsNotTextIsLeftOut() throws {
+        let json = #"{"game_directory": "/g", "game_executable": "x.exe", "environment": {"A": 1, "B": null, "C": "ok"}}"#
+        #expect(try #require(LegendaryOutput.launch(json, allowing: ["A", "B", "C"])).environment == ["C": "ok"])
     }
 
     @Test func theWorkingFolderDefaultsToTheProgramsOwn() throws {
@@ -667,7 +691,7 @@ private let sampleInstalled = """
     @Test func launchParametersComeOnlineWhenEpicAnswers() async throws {
         let legendary = try stand(in: "echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: ""))'")
         let launch = try await legendary.launchParameters(for: "SampleApp", wine: URL(fileURLWithPath: "/engine/bin/wine"))
-        #expect(launch.environment == ["SAMPLE_FLAG": "1"])
+        #expect(launch.environment.isEmpty)
         #expect(calls() == [["-y", "launch", "SampleApp", "--json", "--wine", "/engine/bin/wine", "--skip-version-check"]])
     }
 

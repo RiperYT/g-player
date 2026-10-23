@@ -220,19 +220,25 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(plan.workingDirectory?.path == folder + "/Bin")
     }
 
-    @Test func theEnvironmentHasLegendarysWithoutCXBottleAndTheUsersOwnWins() throws {
+    @Test func theEnvironmentFromLegendaryIsOnlyWhatIsAllowedAndSitsBelowTheLayersAndTheUsersOwn() throws {
         let s = epic
-        let launch = try #require(LegendaryOutput.launch(launchJSON(folder: folder,
-                                                                    environment: #"{"CX_BOTTLE": "Legendary", "SAMPLE_FLAG": "1", "USER_SET": "legendary"}"#)))
+        let json = launchJSON(folder: folder, environment: """
+            {"CX_BOTTLE": "Legendary", "WINEPREFIX": "/elsewhere", "WINEDLLOVERRIDES": "d3d11=b", "DXVK_HUD": "full",
+             "SAMPLE_FLAG": "legendary", "FIX_SET": "legendary", "USER_SET": "legendary"}
+            """)
+        let launch = try #require(LegendaryOutput.launch(json, allowing: ["SAMPLE_FLAG", "FIX_SET", "USER_SET", "WINEPREFIX", "DXVK_HUD"]))
         var g = game(s)
         g.environment = ["USER_SET": "mine"]
-        let plan = try LaunchPlanner.plan(for: g, in: s, legendary: launch)
-        #expect(plan.tweaks.environment["SAMPLE_FLAG"] == "1")
-        #expect(plan.tweaks.environment["CX_BOTTLE"] == nil)
-        #expect(plan.tweaks.environment["USER_SET"] == "mine")
-        // And what Wine gets is G-Player's space, whatever Legendary says.
+        let fix = GameFix(id: "t", exeNames: ["sample.exe"], environment: ["FIX_SET": "fix"], source: "test")
+        let plan = try LaunchPlanner.plan(for: g, in: s, fixes: [fix], legendary: launch)
+        #expect(plan.tweaks.environment["SAMPLE_FLAG"] == "legendary")
+        #expect(plan.tweaks.environment["FIX_SET"] == "fix")                      // the layers' value wins over Legendary's
+        #expect(plan.tweaks.environment["USER_SET"] == "mine")                    // and the user's own over both
+        for name in ["CX_BOTTLE", "WINEPREFIX", "WINEDLLOVERRIDES", "DXVK_HUD"] { #expect(plan.tweaks.environment[name] == nil, "\(name)") }
+        // What Wine gets is G-Player's own, whatever Legendary says.
         let env = WineEnvironment.make(engine: fakeEngine(), space: s, backend: plan.backend, tweaks: plan.tweaks, base: [:])
-        #expect(env["WINEPREFIX"] == s.path && env["CX_BOTTLE"] == nil && env["SAMPLE_FLAG"] == "1")
+        #expect(env["WINEPREFIX"] == s.path && env["CX_BOTTLE"] == nil && env["DXVK_HUD"] == nil && env["SAMPLE_FLAG"] == "legendary")
+        #expect(env["WINEDLLOVERRIDES"]?.contains("d3d11=b") != true)
     }
 
     @Test func aFixThatRewritesTheProgramNeverTouchesTheCode() throws {

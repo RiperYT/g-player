@@ -49,8 +49,8 @@ public struct LegendaryLaunch: Equatable, Sendable, CustomStringConvertible, Cus
     public let userParameters: [String]
     /// Epic's sign-in arguments, among them `-AUTH_PASSWORD=<exchange code>`.
     public let eglParameters: [String]
-    /// What Legendary adds to the game's environment, without the variables that would send Wine elsewhere
-    /// (`LegendaryOutput.droppedVariables`).
+    /// What Legendary adds to the game's environment: only the names in `LegendaryOutput.gameVariables`, and never one of
+    /// G-Player's (`LegendaryOutput.isProtected`).
     public let environment: [String: String]
 
     public var executableURL: URL? { LegendaryOutput.executableURL(folder: gameDirectory, executable: gameExecutable) }
@@ -72,9 +72,28 @@ public struct LegendaryLaunch: Equatable, Sendable, CustomStringConvertible, Cus
 /// Reads what Legendary prints with `--json`. Lenient: a field that isn't there or has another shape means "not known", and
 /// only a whole answer that isn't JSON (or isn't the kind of JSON expected) is nil.
 public enum LegendaryOutput {
-    /// Variables Legendary puts into a launch that must not reach the game: `CX_BOTTLE` (it points at CrossOver, which G-Player
-    /// doesn't use) and `WINEPREFIX` (the space is G-Player's choice).
-    public static let droppedVariables: Set<String> = ["CX_BOTTLE", "WINEPREFIX"]
+    /// The variables of Legendary's launch environment that may reach a game, by name. Legendary sets none for a game by itself
+    /// but `CX_BOTTLE` (it points at CrossOver, which G-Player doesn't use) and `WINEPREFIX` (the space is G-Player's choice);
+    /// anything else comes from `[<game>.env]` sections of its config.ini, which G-Player doesn't write. So nothing passes: a
+    /// name goes in here only when a game is found to need it.
+    public static let gameVariables: Set<String> = []
+
+    /// Names that are G-Player's to set (Wine, the graphics layers, the search path, the user's home), which no answer of
+    /// Legendary may set, even when the name is in `gameVariables`.
+    static func isProtected(_ name: String) -> Bool {
+        let upper = name.uppercased()
+        return ["WINE", "GST_", "DXVK_", "MVK_", "D3DM_", "CX_", "DYLD_", "LD_", "ROSETTA_"].contains(where: upper.hasPrefix)
+            || ["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "SHELL", "LANG"].contains(upper) || upper.hasPrefix("LC_")
+    }
+
+    /// The part of Legendary's environment that may reach the game: the names in `allowed` that aren't protected.
+    static func environment(from object: Any?, allowing allowed: Set<String>) -> [String: String] {
+        var environment: [String: String] = [:]
+        for (key, value) in (object as? [String: Any]) ?? [:] where allowed.contains(key) && !isProtected(key) {
+            if let text = value as? String { environment[key] = text }
+        }
+        return environment
+    }
 
     /// The JSON in Legendary's output: all of it, or from the first line that starts it when log lines came before.
     static func json(_ output: String) -> Any? {
@@ -170,18 +189,15 @@ public enum LegendaryOutput {
     // MARK: Launch
 
     /// `launch --json`. Nil when it names no game folder or program.
-    public static func launch(_ output: String) -> LegendaryLaunch? {
+    public static func launch(_ output: String, allowing allowed: Set<String> = gameVariables) -> LegendaryLaunch? {
         guard let object = json(output) as? [String: Any],
               let directory = string(object["game_directory"]), directory.hasPrefix("/"),
               let executable = string(object["game_executable"]) else { return nil }
         func list(_ key: String) -> [String] { (object[key] as? [Any])?.compactMap { $0 as? String } ?? [] }
-        var environment: [String: String] = [:]
-        for (key, value) in (object["environment"] as? [String: Any]) ?? [:] where !droppedVariables.contains(key) {
-            if let text = value as? String { environment[key] = text }
-        }
         return LegendaryLaunch(gameDirectory: directory, gameExecutable: executable,
                                workingDirectory: string(object["working_directory"]) ?? "",
                                gameParameters: list("game_parameters"), userParameters: list("user_parameters"),
-                               eglParameters: list("egl_parameters"), environment: environment)
+                               eglParameters: list("egl_parameters"),
+                               environment: environment(from: object["environment"], allowing: allowed))
     }
 }
