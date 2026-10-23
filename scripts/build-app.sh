@@ -26,6 +26,8 @@ install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS
 rpaths="$(otool -l "$APP/Contents/MacOS/GPlayer")"                      # read whole: grep -q would cut the pipe under pipefail
 [[ "$rpaths" == *"path @executable_path/../Frameworks "* ]] || { echo "the executable doesn't look in Contents/Frameworks" >&2; exit 1; }
 ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"          # ditto keeps the framework's symlinks
+# Sparkle's XPC services are for sandboxed apps only (its documentation says to remove them otherwise): G-Player isn't.
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/XPCServices"
 # Everything in GPlayerCore/Resources (wrapper, fix database, detection rules, licenses) goes into the bundle.
 cp -R Sources/GPlayerCore/Resources/. "$APP/Contents/Resources/"
 [ -f build/AppIcon.icns ] || swift scripts/make-icon.swift build/AppIcon.icns
@@ -34,12 +36,10 @@ cp LICENSE NOTICE "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" scripts/Info.plist > "$APP/Contents/Info.plist"
 [ -z "$SPARKLE_KEY" ] || plutil -insert SUPublicEDKey -string "$SPARKLE_KEY" "$APP/Contents/Info.plist"
 
-# Sparkle's own code, inside out, as Sparkle's documentation says for an app Xcode doesn't build. No --deep: the downloader
-# service may carry entitlements the rest doesn't. Takes the codesign command to sign with.
+# Sparkle's own code, inside out, as Sparkle's documentation says for an app Xcode doesn't build. Takes the codesign
+# command to sign with.
 sign_sparkle() {
   local framework="$APP/Contents/Frameworks/Sparkle.framework" b="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
-  "$@" "$b/XPCServices/Installer.xpc"
-  "$@" --preserve-metadata=entitlements "$b/XPCServices/Downloader.xpc"
   "$@" "$b/Autoupdate"
   "$@" "$b/Updater.app"
   "$@" "$framework"

@@ -59,7 +59,7 @@ struct UpdateSettings: View {
         Section {
             Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
         } footer: {
-            Text("G-Player asks GitHub whether a newer version is out. Nothing else is sent.").font(.caption).foregroundStyle(.secondary)
+            Text("G-Player asks GitHub whether a newer version is out. The request says which G-Player you have; nothing else is sent.").font(.caption).foregroundStyle(.secondary)
         }
     }
 }
