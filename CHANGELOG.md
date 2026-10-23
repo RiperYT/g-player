@@ -9,7 +9,10 @@
   and feels sluggish. A space that already has the wrapper in Epic's helper gets Epic's helper back
   before the next start, and nothing is deleted.
   An Epic Games Launcher space on Wine Staging is offered **Move to G-Player Wine…** on its page, and new ones are made on
-  G-Player Wine. Games the launcher starts inherit its graphics (DXMT). Get Apps has one **Epic Games** card with both ways to
+  G-Player Wine. A game from Epic's launcher that you play in G-Player goes through the launcher (G-Player starts
+  `EpicGamesLauncher.exe` with the game's link), so while the launcher is open the game inherits its DXMT: a DirectX 12 game,
+  which needs D3DMetal, may not run then. Quit the launcher first and G-Player starts it with the game's own graphics, which
+  makes the launcher itself run on them (D3DMetal renders its web view in software). Get Apps has one **Epic Games** card with both ways to
   Epic's games: Epic Games Launcher (recommended), and Without the launcher, which is faster and goes through Legendary.
 - **Epic's launcher installs Epic Online Services.** Games can be installed from Epic's launcher now: its first start no
   longer ends with "Epic Online Services is not installed" (error II-E1007). Epic's installer for it has .NET steps, and
