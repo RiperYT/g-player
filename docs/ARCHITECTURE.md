@@ -44,7 +44,7 @@ Chosen on first launch, `~/Games/G-Player` by default:
 G-Player/
   library.json      spaces, games (a game can be hidden)
   Spaces/<name>/    Wine prefixes G-Player created
-  Engines/<id>/     G-Player Wine, Wine Staging, DXVK
+  Engines/<id>/     G-Player Wine, DXVK (and Wine Staging, if the user installed it)
   Covers/           cover art and program icons
   Logs/             one log per launch (the command, the DLL overrides, Wine's output)
   Downloads/        installers while they run
@@ -66,13 +66,26 @@ the new place (`LibraryState.movingLibrary`).
 
 G-Player Wine is published in revisions (`wine-cx-26.3.0-1`, `-2`). A revision that a newer one replaces stays in
 `EngineCatalog` as a retired engine (`EngineInfo.replacedBy`, `EngineCatalog.retired`): `EngineCatalog.all` is what is
-offered (pickers, Settings, the first run, new spaces), `EngineCatalog.known` is everything G-Player can run, and
+offered (G-Player Wine and Wine Staging: the engine menus while they are on, Settings), `EngineCatalog.known` is
+everything G-Player can run (also Apple's toolkit, for the spaces that already use it), and
 everything that runs or looks after an installed engine (launching, `EngineFixes`, D3DMetal, Stop All, leftovers) goes
 by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space moves once the
 replacement is installed and nothing runs or starts in it, or at once when the retired engine isn't installed; the
 replacement downloads in the background once per run when spaces still need it; and the retired engine's folder goes
 when no space is on it. `AppModel` looks at start, after an engine install, and at every look at the running programs.
 What G-Player learned about a game's graphics (`AutoGraphics`, which names its engine) moves with the space.
+An installed retired revision counts as G-Player Wine for new spaces and found bottles
+(`EngineCatalog.installedGPlayerWine`), so they start offline on it and move with the rest.
+
+## One engine
+
+People don't choose an engine. `EngineCatalog.firstRunInstalls` is G-Player Wine alone; its runtime libraries come out of
+Gcenx's Wine Staging archive, which `EngineManager.install` downloads for them when Wine Staging isn't installed and
+deletes with its unpacked copy. New spaces get `EngineCatalog.engineForNewSpace` (a pick in New Space counts only while
+`AppModel.choosesEngines`, "Choose the Wine engine for each space" in Settings › Advanced, is on). A space's page shows
+what `EngineSwitch.pageOffer` says: nothing, the engine menu (G-Player Wine and Wine Staging only), or plain words about
+Wine Staging or Apple's toolkit with "Move to G-Player Wine…", which asks the `EngineSwitch.message` question. Wine
+Staging is installed or removed under Settings › Engines › Advanced and never by itself.
 
 An engine archive that lists GStreamer files (`gstreamer-files.txt`, `GStreamerRuntime`) gets them copied, at install,
 out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder.

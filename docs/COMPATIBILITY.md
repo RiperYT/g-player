@@ -135,9 +135,9 @@ title you chose) is left out of the reading, so a game folder called "BattlEye" 
 
 | Engine | Wine | Backends (default first) | Steam |
 |---|---|---|---|
-| Wine Staging 11.18 (Gcenx) | upstream Wine Staging | DXVK, WineD3D | yes |
+| Wine Staging 11.18 (Gcenx) | upstream Wine Staging; advanced, not installed by default | DXVK, WineD3D | yes |
 | G-Player Wine | Wine 11 from CodeWeavers' CrossOver 26.3 source (`scripts/build-engine-cx.sh`) | DXVK, D3DMetal once it is copied in (taken for 64-bit DirectX 10–12), DXMT, WineD3D | yes |
-| Apple's Game Porting Toolkit | Apple's wine 7.7 | D3DMetal, WineD3D | no |
+| Apple's Game Porting Toolkit | Apple's wine 7.7; runs the spaces that already use it, never offered | D3DMetal, WineD3D | no |
 
 - **D3DMetal** (Apple) turns DirectX 11 and 12 straight into Metal, for 64-bit programs only. G-Player Wine runs it next to
   Steam, so DirectX 12 games run with Steam signed in. G-Player copies it from the user's own Game Porting Toolkit, checking
@@ -155,7 +155,8 @@ On G-Player Wine the Recommended profile takes D3DMetal for 64-bit DirectX 10–
 the Mac user's (`tools/wine-patches/cx-real-user-name.patch`, so a space keeps its saves and Steam login on either engine),
 and Microsoft's Visual C++ runtime in a space wins over Wine's builtin (some games check its version before they start).
 Its archive holds no third-party runtime libraries: G-Player copies FreeType, GnuTLS and SDL2 from Gcenx's Wine Staging
-download on the user's Mac. Game videos that go through Media Foundation play through GStreamer 1.28.8 and Wine's
+download on the user's Mac (an installed Wine Staging's, or the archive downloaded for them and deleted after). Game
+videos that go through Media Foundation play through GStreamer 1.28.8 and Wine's
 `winegstreamer`: G-Player downloads the GStreamer project's official macOS package once, copies the plugins and libraries
 the engine lists into G-Player Wine, and points Wine at them (`GST_PLUGIN_SYSTEM_PATH_1_0`, a registry file of its own,
 no plugin scanner), never at a GStreamer.framework the user installed. H.264 and HEVC go to Apple's VideoToolbox. There is
