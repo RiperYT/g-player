@@ -294,9 +294,9 @@ and a failure to create the process for `curl.exe`.
 ## Spaces from other apps
 
 A CrossOver or Whisky bottle, or a prefix you made by hand, is used in place. G-Player changes nothing in it until you
-allow it, once per space: the first launch that would change it asks. Allowing it lets G-Player install components,
-write registry values (per-program DLL and Windows-version settings, Retina mode, and removing values it set before),
-copy DXVK's DLLs over Wine's own (keeping Wine's copies as `*.gplayer-wine`) and put Steam's helper wrapper in place.
+allow it, once per space: the first launch that would change it asks. Allowing it lets G-Player install components, add
+Wine Mono (.NET) for a launcher that needs it (Epic's), write registry values (per-program DLL and Windows-version
+settings, Retina mode, and removing values it set before), copy DXVK's DLLs over Wine's own (keeping Wine's copies as `*.gplayer-wine`) and put Steam's helper wrapper in place.
 Refusing starts games and launchers with the space as it is; their inspector says so, with a button to allow changes
 later.
 Spaces G-Player made itself are always set up as needed.

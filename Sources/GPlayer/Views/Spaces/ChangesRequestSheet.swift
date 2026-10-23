@@ -23,6 +23,7 @@ struct ChangesRequestSheet: View {
                 Text("""
                 G-Player can:
                 • install Windows components such as Visual C++ into it
+                • add .NET (Wine Mono, a download of \(WineMono.sizeLabel(EngineCatalog.wineMono10_4_1))) for programs that need it, such as Epic's launcher
                 • change Wine settings in its registry: per-game DLL and Windows-version settings, Retina mode, and removing ones it set before
                 • put DXVK's graphics files and Steam's window fix in place of Wine's own (it keeps Wine's copies)
                 • install a store app such as Steam into it, when you ask

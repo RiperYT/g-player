@@ -579,6 +579,11 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         #expect(!WineMono.showsNote(for: .tooLong(300), alreadyShown: true))
     }
 
+    @Test func aSpaceKeptAsItIsSaysWhatItCostsALauncherThatNeedsDotNet() {
+        #expect(WineMono.refusedLine(program: "Epic Games Launcher", purpose: "Epic Online Services")
+                == "Without .NET (Wine Mono), Epic Games Launcher can't set up Epic Online Services.")
+    }
+
     @Test func theCardSaysWhatTheFirstStartAdds() {
         #expect(WineMono.sizeLabel(mono) == "40 MB" && WineMono.installedSizeLabel(mono) == "245 MB")
         #expect(AppPresets.epic.dotNetReason == "Epic Online Services" && AppPresets.epic.needsDotNet)

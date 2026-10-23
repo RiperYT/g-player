@@ -50,8 +50,12 @@ struct RefusedChangesNote: View {
             Image(systemName: "lock.fill").foregroundStyle(.secondary).font(.caption)
             VStack(alignment: .leading, spacing: 4) {
                 Text("“\(space.name)” is kept as it is").font(.callout.weight(.medium))
-                Text("You chose not to let G-Player change this space, so its Windows components, settings, graphics files and Steam's window fix aren't applied.")
+                Text("You chose not to let G-Player change this space, so its Windows components, .NET (Wine Mono) for programs that need it, settings, graphics files and Steam's window fix aren't applied.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let preset = AppPresets.preset(space.presetID), let purpose = preset.dotNetReason {
+                    Text(WineMono.refusedLine(program: preset.name, purpose: purpose))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 Button("Allow Changes") { model.setAllowsChanges(true, for: space) }.controlSize(.small)
             }
         }

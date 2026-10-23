@@ -114,6 +114,11 @@ extension WineMono {
         }
     }
 
+    /// What a space that G-Player may not change loses for a program that needs .NET, for the notes that say the space is kept as it is.
+    public static func refusedLine(program: String, purpose: String) -> String {
+        "Without .NET (Wine Mono), \(program) can't set up \(purpose)."
+    }
+
     /// Whether the note is shown now, or has been before in this run: what is said in answer to something the user just did (a
     /// launcher that is open, a failure) is always shown; what is only repeated by a start that skips the attempt (a wait that isn't
     /// over, a path too long) is said once.
