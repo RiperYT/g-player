@@ -22,26 +22,33 @@ final class InstallerRun {
 
 /// Add Game's steps that touch the engines and the space's queue, so the sheet only shows them.
 extension AppModel {
-    /// The engine of `space`, downloaded first when it isn't installed (the sidebar shows that). Nil when it couldn't be:
-    /// the reason is shown.
+    /// The engine of `space` as it is now (the space may have moved to another engine since the caller read it), downloaded
+    /// first when it isn't installed (the sidebar shows that). Nil when it couldn't be: the reason is shown.
     func engineReady(for space: Space) async -> Engine? {
+        let space = self.space(space.id) ?? space
         if let engine = engine(for: space) { return engine }
         return await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging)
     }
 
+    /// Add Game starts and ends its work in a space. Meanwhile the space counts as in use, so its engine isn't switched and
+    /// deleted between the steps (`EngineMigration.isInUse`).
+    func beginAddGame(in space: UUID) { addGameSpaces[space, default: 0] += 1 }
+    func endAddGame(in space: UUID) { Self.decrement(&addGameSpaces, space) }
+
     /// Runs `installer` in `space` from the space's queue: after the Windows components being installed there and before
     /// anything else, so two installers never run at once (a second one fails with error 1618). Returns the programs it
-    /// added, best guess first, once it and what it started have quit or the user said it is done.
+    /// added, best guess first, once it and what it started have quit or the user said it is done. The engine is looked up
+    /// when the installer's turn comes, not before: unpacking the installer and waiting for the queue take time.
     ///
     /// Stopping (`run.cancel()`, or cancelling the calling task) ends the installer and what it started, then throws
     /// `CancellationError`. Whatever the installer was started from is deleted only after that, by the caller.
-    func runInstaller(_ installer: URL, in space: Space, engine: Engine, title: String, run: InstallerRun) async throws -> [ExecutableCandidate] {
+    func runInstaller(_ installer: URL, in space: Space, title: String, run: InstallerRun) async throws -> [ExecutableCandidate] {
         guard let paths else { throw CancellationError() }
         let activity = begin("Installing “\(title)”", "Starting", waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
         defer { cancellers[activity] = nil; end(activity) }
         setStop(activity, help: "Stop the installer. What it already installed stays.") { run.cancel() }
         let queued = enqueue(in: space.id, holds: "the installer of “\(title)”") { () -> Result<[ExecutableCandidate], Error> in
-            await self.runInstallerNow(installer, in: space, engine: engine, title: title, run: run, activity: activity, paths: paths)
+            await self.runInstallerNow(installer, in: space, title: title, run: run, activity: activity, paths: paths)
         }
         // The queue's task isn't a child of this one, so cancelling this call has to reach it by the run.
         let result = await withTaskCancellationHandler {
@@ -56,11 +63,19 @@ extension AppModel {
     }
 
     /// The installer itself; only ever runs from the space's queue.
-    private func runInstallerNow(_ installer: URL, in space: Space, engine: Engine, title: String, run: InstallerRun,
+    private func runInstallerNow(_ installer: URL, in space: Space, title: String, run: InstallerRun,
                                  activity: UUID, paths: LibraryPaths) async -> Result<[ExecutableCandidate], Error> {
         if run.cancelled { return .failure(CancellationError()) }
         run.start()
         startedWaiting(activity)
+        // The engine as it is now, in the installer's turn: unpacking the installer and waiting for the queue took time, and the
+        // engine looked up when Add Game began may be another by now. (After `run.start()`: the caller waits for that.)
+        guard let engine = await engineReady(for: space) else {
+            let reason = errorMessage ?? "\(EngineCatalog.info(space.engineID)?.name ?? "The engine") isn't available."
+            errorMessage = nil                                      // told by the sheet instead, which goes back to its first step
+            return .failure(ShellError.failed(reason))
+        }
+        if run.cancelled { return .failure(CancellationError()) }
         progress(activity, nil, "Running \(installer.lastPathComponent)")
         // Programs open in the space before the installer started aren't the installer's to stop.
         let wasBusy = await Self.isBusy(space)

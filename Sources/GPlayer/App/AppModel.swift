@@ -135,6 +135,9 @@ final class AppModel {
     /// Launches that have begun and whose program hasn't started yet, per space. The space's engine mustn't change under one
     /// (`migrateEngines`).
     @ObservationIgnored var launchesStarting: [UUID: Int] = [:]
+    /// Spaces an Add Game is working in, and how many: from the choice of the space until the installer has quit or the game was
+    /// copied in. The space's engine mustn't change, or be deleted, under the steps in between (`migrateEngines`).
+    @ObservationIgnored var addGameSpaces: [UUID: Int] = [:]
     /// Stops for activities that can be stopped, by activity id.
     var cancellers: [UUID: () -> Void] = [:]
     /// Work queued per space (installs, store setup), so two installers never run in one space at once.

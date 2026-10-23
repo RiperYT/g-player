@@ -76,7 +76,8 @@ extension AppModel {
         return EngineMigration.isInUse(space, processes: processes, activity: .init(
             movingEngine: movingSpaces.contains(space.id), installing: installingSpaces.contains(space.id),
             queued: queueHolder(in: space.id) != nil, launchesStarting: launchesStarting[space.id] ?? 0,
-            gameStarting: games.contains { preparing.contains($0.id) }, gameRunning: games.contains { isRunning($0) }))
+            gameStarting: games.contains { preparing.contains($0.id) }, gameRunning: games.contains { isRunning($0) },
+            addingGame: (addGameSpaces[space.id] ?? 0) > 0))
     }
 
     /// What the app remembers about launches of the moved spaces' games belongs to the engine they ran on (the "Try Other
