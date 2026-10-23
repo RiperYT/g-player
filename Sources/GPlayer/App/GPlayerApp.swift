@@ -41,7 +41,6 @@ struct GPlayerApp: App {
         let model = AppModel()
         _model = State(initialValue: model)
         AppDelegate.model = model                                    // for the question on quitting
-        model.updater.start()                                        // does nothing in a build without the update key
     }
 
     var body: some Scene {
@@ -150,7 +149,12 @@ struct RootView: View {
                 OnboardingView()
             }
         }
-        .onAppear { AppDelegate.reopenMainWindow = { openWindow(id: "main") } }
+        .onAppear {
+            AppDelegate.reopenMainWindow = { openWindow(id: "main") }
+            // Sparkle only once the main window is up: its first question shown before it was the only window, and closing
+            // that window quit G-Player (it quits when its last window closes). Does nothing in a build without the update key.
+            model.updater.start()
+        }
         // Over the window, not instead of it, so onboarding keeps its place while the library question is open.
         .disabled(model.libraryProblem != nil)
         .overlay {
