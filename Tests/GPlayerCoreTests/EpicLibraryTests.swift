@@ -289,3 +289,24 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(!GraphicsRetry.mayTry(Game(title: "L", spaceID: s.id, source: .epic(appName: "a", launchURI: "u")), spaceMayChange: true))
     }
 }
+
+@Suite struct EpicRaceTests {
+    @Test func aGameThatRunsOrStartsCantBeUninstalledAndSaysWhy() {
+        #expect(EpicGames.uninstallBlock(gameIsRunning: true, gameIsStarting: false, busy: nil) == "Quit the game first.")
+        #expect(EpicGames.uninstallBlock(gameIsRunning: false, gameIsStarting: true, busy: nil) == "The game is starting. Wait for it, then quit it.")
+        // A running game is named before anything else Legendary does.
+        #expect(EpicGames.uninstallBlock(gameIsRunning: true, gameIsStarting: true, busy: "installing") == "Quit the game first.")
+    }
+
+    @Test func legendaryDoingSomethingElseBlocksAnUninstall() {
+        #expect(EpicGames.uninstallBlock(gameIsRunning: false, gameIsStarting: false, busy: "Installing “Sample Game”")
+                == "Epic Games is busy (Installing “Sample Game”). Wait for it to finish.")
+        #expect(EpicGames.uninstallBlock(gameIsRunning: false, gameIsStarting: false, busy: nil) == nil)
+    }
+
+    @Test func aGameBeingUninstalledCantBeStartedButAnotherCan() {
+        #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: "SampleApp") == "It is being uninstalled.")
+        #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: "OtherApp") == nil)
+        #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: nil) == nil)
+    }
+}

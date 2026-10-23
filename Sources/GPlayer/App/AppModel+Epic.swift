@@ -16,6 +16,8 @@ struct EpicState: Equatable {
     var busy: String?
     /// The name of the game being installed, while one is.
     var installing: String?
+    /// The name of the game being uninstalled, while one is.
+    var uninstalling: String?
     /// The list of games is being fetched from Epic.
     var refreshing = false
     /// Epic has been asked for the list in this run (what is shown before is the one kept on disk).
@@ -27,6 +29,8 @@ struct EpicState: Equatable {
     var isSignedIn: Bool { account != nil }
     /// A new install, sign-in or fetch has to wait.
     var isOccupied: Bool { busy != nil || refreshing }
+    /// What Legendary is doing, in words, when it is doing anything.
+    var activity: String? { busy ?? (refreshing ? "getting your games" : nil) }
 }
 
 /// Plans a launch again with Legendary's parameters (`LaunchPlanner.plan(legendary:)`), right before it starts.
@@ -41,6 +45,7 @@ extension AppModel {
     /// what is installed are looked at when the Epic Games page opens (`openEpicPage`) or something changes them.
     func loadEpic() {
         guard let paths else { return }
+        Legendary(paths: paths).endLeftovers()          // one a G-Player that crashed left running would hold Legendary's lock
         epic.games = EpicGames.loadList(in: paths)
         fetchMissingCovers()
     }
@@ -260,12 +265,13 @@ extension AppModel {
 
     /// Removes an Epic game and its files, after the user said so. It leaves the library's list once Legendary no longer lists it.
     func uninstallEpicGame(_ game: Game) {
-        guard case .legendary(let appName) = game.source, let paths, !epic.isOccupied else { return }
-        guard !isRunning(game) else { errorMessage = "Quit “\(game.title)” first, then uninstall it."; return }
+        guard case .legendary(let appName) = game.source, let paths else { return }
+        if let reason = epicUninstallBlock(for: game) { errorMessage = "Can't uninstall “\(game.title)” now. \(reason)"; return }
         epic.busy = "Uninstalling “\(game.title)”"
+        epic.uninstalling = appName
         let folder = epic.installed[appName]?.folder
         Task {
-            defer { epic.busy = nil }
+            defer { epic.busy = nil; epic.uninstalling = nil }
             let legendary = Legendary(paths: paths)
             guard await prepareLegendary(legendary) else { return }
             let activity = begin("Uninstalling “\(game.title)”", "Removing its files")
@@ -298,5 +304,18 @@ extension AppModel {
     func epicGame(for game: EpicGame) -> Game? {
         let source = Game.Source.legendary(appName: game.appName)
         return state.games.first { $0.source == source }
+    }
+}
+
+extension AppModel {
+    /// Why an Epic game can't be uninstalled now (the buttons' help), or nil.
+    func epicUninstallBlock(for game: Game) -> String? {
+        EpicGames.uninstallBlock(gameIsRunning: isRunning(game), gameIsStarting: isPreparing(game), busy: epic.activity)
+    }
+
+    /// Why an Epic game can't be started now, or nil.
+    func epicPlayBlock(for game: Game) -> String? {
+        guard case .legendary(let appName) = game.source else { return nil }
+        return EpicGames.playBlock(appName: appName, uninstalling: epic.uninstalling)
     }
 }

@@ -222,7 +222,7 @@ struct GameMenu: View {
         }
         if case .legendary = game.source {
             Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
-                .disabled(model.epic.isOccupied || model.isRunning(game))
+                .disabled(model.epicUninstallBlock(for: game) != nil)
         }
     }
 }

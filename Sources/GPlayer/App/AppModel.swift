@@ -1360,7 +1360,7 @@ final class AppModel {
     func play(_ game: Game, skipping skipped: Set<PlayCheck> = []) {
         // A launcher that is open may be started again: that brings its window back.
         guard paths != nil, space(game.spaceID) != nil, !preparing.contains(game.id),
-              !isRunning(game) || game.kind == .app else { return }
+              !isRunning(game) || game.kind == .app, epicPlayBlock(for: game) == nil else { return }
         preparing.insert(game.id)
         Task {
             await launch(game, skipping: skipped)

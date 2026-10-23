@@ -42,6 +42,22 @@ public enum EpicGames {
     /// Signing out takes the account's list with it.
     public static func forgetList(in paths: LibraryPaths) { try? FileManager.default.removeItem(at: listFile(in: paths)) }
 
+    // MARK: What may happen at the same time
+
+    /// Why a game can't be uninstalled right now (for the button's help), or nil. A running game has its files open and a starting
+    /// one is about to; and Legendary does one thing at a time (`busy` says what it does).
+    public static func uninstallBlock(gameIsRunning: Bool, gameIsStarting: Bool, busy: String?) -> String? {
+        if gameIsRunning { return "Quit the game first." }
+        if gameIsStarting { return "The game is starting. Wait for it, then quit it." }
+        if let busy { return "Epic Games is busy (\(busy)). Wait for it to finish." }
+        return nil
+    }
+
+    /// Why a game can't be started right now: it is being uninstalled.
+    public static func playBlock(appName: String, uninstalling: String?) -> String? {
+        uninstalling == appName ? "It is being uninstalled." : nil
+    }
+
     // MARK: In the library
 
     /// True when `merged` has an Epic game `existing` doesn't. The library written then can't be read by a G-Player from before

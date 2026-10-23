@@ -174,11 +174,14 @@ private struct EpicGameRow: View {
     }
 
     @ViewBuilder private func installedButtons(_ entry: Game) -> some View {
+        let playBlock = model.epicPlayBlock(for: entry), uninstallBlock = model.epicUninstallBlock(for: entry)
         Button(model.isRunning(entry) ? "Stop" : "Play") { model.isRunning(entry) ? model.stop(entry) : model.play(entry) }
             .buttonStyle(.borderedProminent)
-            .disabled(model.isPreparing(entry))
+            .disabled(model.isPreparing(entry) || playBlock != nil)
+            .help(playBlock ?? "")
         Button("Uninstall…") { model.gamePendingUninstall = entry }
-            .disabled(model.epic.isOccupied || model.isRunning(entry))
+            .disabled(uninstallBlock != nil)
+            .help(uninstallBlock ?? "")
     }
 }
 

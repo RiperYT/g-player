@@ -154,8 +154,11 @@ public struct Legendary: Sendable {
         process.standardError = err
         let collector = Collector(log: log, onLine: onLine, stopWhen: stopWhen) { Supervised.terminate(process) }
         defer { collector.finish() }
+        let exited = DispatchSemaphore(value: 0)
+        var started = false
 
-        let status = try await Supervised.run(timeout: timeout, stop: { Supervised.terminate(process) }) { finish in
+        let status: Int32
+        do { status = try await Supervised.run(timeout: timeout, stop: { Supervised.terminate(process) }) { finish in
             for (pipe, isError) in [(out, false), (err, true)] {
                 pipe.fileHandleForReading.readabilityHandler = { handle in
                     let data = handle.availableData
@@ -167,24 +170,45 @@ public struct Legendary: Sendable {
                     }
                 }
             }
+            let pidFile = self.pidFile
             process.terminationHandler = { finished in
+                Running.shared.remove(finished)
+                PidFile.forget(finished.processIdentifier, in: pidFile)
+                exited.signal()
                 // What is still in the pipes is read first. A program Legendary left running can hold a pipe open, so this
                 // waits two seconds at most.
                 collector.waitForPipes(seconds: 2)
                 out.fileHandleForReading.readabilityHandler = nil
                 err.fileHandleForReading.readabilityHandler = nil
-                Running.shared.remove(finished)
                 finish(finished.terminationStatus)
             }
-            Running.shared.add(process)
             do { try process.run() } catch {
-                Running.shared.remove(process)
                 out.fileHandleForReading.readabilityHandler = nil
                 err.fileHandleForReading.readabilityHandler = nil
                 throw error
             }
+            started = true
+            Running.shared.add(process, pidFile: pidFile)
+            PidFile.record(process.processIdentifier, in: pidFile)
+        }
+        } catch {
+            // Stopped (by the user, or because it took too long): what Legendary installs is locked by it until it is gone, so
+            // the caller hears of the stop only then, and the next install doesn't meet a lock.
+            if started { await Self.waitForExit(exited, seconds: 10) }
+            throw error
         }
         return collector.result(status: status)
+    }
+
+    /// Waits for a process's exit, which `exited` announces, at most `seconds`. Not a sleep of the task: a task that was
+    /// cancelled doesn't sleep.
+    private static func waitForExit(_ exited: DispatchSemaphore, seconds: Double) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                _ = exited.wait(timeout: .now() + seconds)
+                continuation.resume()
+            }
+        }
     }
 
     /// Stops every Legendary G-Player started that is still running (a download goes on from its resume file next time). For
@@ -288,16 +312,22 @@ public struct Legendary: Sendable {
 // MARK: - Running processes
 
 /// The Legendary processes that are running, so quitting G-Player can stop them.
-private final class Running: @unchecked Sendable {
+final class Running: @unchecked Sendable {
     static let shared = Running()
     private let lock = NSLock()
-    private var processes: [ObjectIdentifier: Process] = [:]
+    private var processes: [ObjectIdentifier: (process: Process, pidFile: URL)] = [:]
 
-    func add(_ process: Process) { lock.lock(); processes[ObjectIdentifier(process)] = process; lock.unlock() }
+    /// The process ids of the ones running now whose ids are kept in `pidFile`.
+    func pids(in pidFile: URL) -> Set<Int32> {
+        lock.lock(); defer { lock.unlock() }
+        return Set(processes.values.filter { $0.pidFile == pidFile }.map(\.process.processIdentifier))
+    }
+
+    func add(_ process: Process, pidFile: URL) { lock.lock(); processes[ObjectIdentifier(process)] = (process, pidFile); lock.unlock() }
     func remove(_ process: Process) { lock.lock(); processes[ObjectIdentifier(process)] = nil; lock.unlock() }
 
     func terminateAll() {
-        lock.lock(); let running = Array(processes.values); lock.unlock()
+        lock.lock(); let running = processes.values.map(\.process); lock.unlock()
         for process in running { Supervised.terminate(process) }
     }
 }

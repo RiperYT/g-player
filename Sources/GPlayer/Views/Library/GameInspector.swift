@@ -93,9 +93,10 @@ struct GameInspector: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         if case .legendary = game.source {
+            let block = model.epicUninstallBlock(for: game)
             Button("Uninstall…", role: .destructive) { model.gamePendingUninstall = game }
                 .buttonStyle(.link).foregroundStyle(.red)
-                .disabled(model.epic.isOccupied || model.isRunning(game))
+                .disabled(block != nil).help(block ?? "")
             Text("Deletes the game's files from its space. Install it again from Epic Games in the sidebar.")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -215,8 +216,8 @@ private struct PlayStopButton: View {
         let running = model.isRunning(game)
         Button(action: act) { label(retry: retry, running: running) }
             .buttonStyle(.borderedProminent).controlSize(.large)
-            .disabled(model.isPreparing(game) && (retry == .none || retry == .stopping))
-            .help(help(retry: retry, running: running))
+            .disabled(model.isPreparing(game) && (retry == .none || retry == .stopping) || model.epicPlayBlock(for: game) != nil)
+            .help(model.epicPlayBlock(for: game) ?? help(retry: retry, running: running))
             .keyboardShortcut(.return, modifiers: [])
     }
 
