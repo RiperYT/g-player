@@ -9,8 +9,38 @@ import Testing
     @Test func newSpacesGetGPlayerWineAndThePickersListItFirst() {
         #expect(EngineCatalog.defaultForNewSpaces.id == gplayerWine.id)
         #expect(EngineCatalog.all.first?.id == gplayerWine.id)
-        #expect(EngineCatalog.all.map(\.id) == [gplayerWine.id, staging.id, EngineCatalog.gptk.id])
+        #expect(EngineCatalog.all.map(\.id) == [gplayerWine.id, staging.id])
         #expect(EngineCatalog.all.filter(\.isRecommended).map(\.id) == [gplayerWine.id])
+    }
+
+    @Test func appleToolkitIsNeverOfferedAsAnEngineButStaysRunnable() {
+        let toolkit = EngineCatalog.gptk
+        // Not in what the pickers and Settings list, and no new space, found bottle or first run gets it.
+        #expect(!EngineCatalog.all.contains { $0.id == toolkit.id })
+        #expect(EngineCatalog.engineForNewSpace(installed: [toolkit]).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [toolkit, staging]).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [], picked: toolkit.id, choosing: true).id == gplayerWine.id)
+        #expect(EngineCatalog.firstRunEngine(installed: [toolkit]) == nil)
+        // Spaces that already use it still find it: to run, to look after, and to move off.
+        #expect(EngineCatalog.known.contains { $0.id == toolkit.id } && EngineCatalog.info(toolkit.id)?.kind == .gptk)
+        #expect(!toolkit.isRetired && EngineCatalog.replacement(of: toolkit) == nil)
+    }
+
+    @Test func aNewSpaceSheetOnlyHonoursAPickWhileEnginesAreChosen() {
+        let revision1 = EngineCatalog.crossoverRevision1
+        // Menus off: whatever was picked (a stale pick, say), the space gets what a space gets without a choice.
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine, staging], picked: staging.id, choosing: false).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: gplayerWine.id, choosing: false).id == staging.id)   // offline
+        #expect(EngineCatalog.engineForNewSpace(installed: [], picked: nil, choosing: false).id == gplayerWine.id)
+        // Menus on: the pick, if it is one of the engines offered.
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine], picked: staging.id, choosing: true).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: gplayerWine.id, choosing: true).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine], picked: nil, choosing: true).id == gplayerWine.id)
+        // Never an engine that isn't offered, a retired one included; and picking G-Player Wine gives the revision that is installed.
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1], picked: revision1.id, choosing: true).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: revision1.id, choosing: true).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1, staging], picked: gplayerWine.id, choosing: true).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine, revision1], picked: gplayerWine.id, choosing: true).id == gplayerWine.id)
     }
 
     @Test func existingEngineIDsStillResolve() {
@@ -26,12 +56,11 @@ import Testing
         let revision1 = EngineCatalog.crossoverRevision1
         #expect(revision1.id == "wine-cx-26.3.0-1" && gplayerWine.id == "wine-cx-26.3.0-2")
         #expect(EngineCatalog.retired.map(\.id) == [revision1.id])
-        #expect(EngineCatalog.known.map(\.id) == EngineCatalog.all.map(\.id) + [revision1.id])
-        // Not in the pickers, the first run or Settings (`all`), not for a new space, not recommended.
+        #expect(EngineCatalog.known.map(\.id) == EngineCatalog.all.map(\.id) + [EngineCatalog.gptk.id, revision1.id])
+        // Not in the pickers, the first run or Settings (`all`), not recommended, and a new space only gets it while it is the
+        // G-Player Wine that is installed (`anInstalledRetiredRevisionCountsAsGPlayerWine…`).
         #expect(!EngineCatalog.all.contains { $0.id == revision1.id })
         #expect(!EngineCatalog.firstRunInstalls.contains { $0.id == revision1.id })
-        #expect(EngineCatalog.engineForNewSpace(installed: [revision1]).id == gplayerWine.id)
-        #expect(EngineCatalog.firstRunEngine(installed: [revision1]) == nil)
         #expect(!revision1.isRecommended && revision1.isRetired && !gplayerWine.isRetired && !staging.isRetired)
         // Limiting its backends (what a launch plans with) keeps it retired.
         #expect(revision1.limited(to: [.wined3d]).replacedBy == gplayerWine.id)
@@ -73,9 +102,10 @@ import Testing
         #expect(download.approximateBytes > 0)
     }
 
-    @Test func firstRunInstallsStagingBeforeGPlayerWine() {
-        #expect(EngineCatalog.firstRunInstalls.map(\.id) == [staging.id, gplayerWine.id])
-        // G-Player Wine's runtime libraries come from Staging's download, so it must be there first.
+    @Test func firstRunInstallsOnlyGPlayerWine() {
+        #expect(EngineCatalog.firstRunInstalls.map(\.id) == [gplayerWine.id])
+        // Wine Staging isn't installed as an engine: G-Player Wine's runtime libraries come from Gcenx's archive of it, which
+        // is downloaded for them (and deleted after).
         #expect(gplayerWine.downloads.contains { $0.role == .runtimeLibraries && $0.sha256 == staging.downloads[0].sha256 })
     }
 
@@ -86,6 +116,24 @@ import Testing
         #expect(EngineCatalog.engineForNewSpace(installed: [staging, EngineCatalog.gptk]).id == staging.id)
         #expect(EngineCatalog.engineForNewSpace(installed: []).id == gplayerWine.id)            // nothing yet: the recommended one
         #expect(EngineCatalog.engineForNewSpace(installed: [EngineCatalog.gptk]).id == gplayerWine.id)
+    }
+
+    @Test func anInstalledRetiredRevisionCountsAsGPlayerWineForNewSpaces() {
+        let revision1 = EngineCatalog.crossoverRevision1
+        // A library that updated G-Player and has only revision 1 (Wine Staging next to it or not) makes new spaces on
+        // G-Player Wine: on revision 1, which is there, so it works offline; `EngineMigration` moves them once revision 2 is in.
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1, staging]).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1]).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine, revision1]).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1, gplayerWine, staging]).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: []).id == gplayerWine.id)            // nothing installed: it downloads
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging]).id == staging.id)         // no G-Player Wine of any revision
+        #expect(EngineCatalog.installedGPlayerWine(in: [staging, revision1])?.id == revision1.id)
+        #expect(EngineCatalog.installedGPlayerWine(in: [revision1, gplayerWine])?.id == gplayerWine.id)
+        #expect(EngineCatalog.installedGPlayerWine(in: [staging, EngineCatalog.gptk]) == nil)
+        // The first run's spaces too: an engine that is there is used, and none that isn't.
+        #expect(EngineCatalog.firstRunEngine(installed: [revision1])?.id == revision1.id)
+        #expect(EngineCatalog.firstRunEngine(installed: [revision1, staging])?.id == revision1.id)
     }
 
     @Test func firstRunSpacesFallBackToStagingOnlyWhenGPlayerWineIsMissing() {
@@ -124,15 +172,14 @@ import Testing
     }
 
     @Test func firstRunDownloadSizeSkipsLibrariesStagingAlreadyBrings() {
-        let stagingBytes = staging.downloadBytes(wineStagingInstalled: false)
         let withoutLibraries = gplayerWine.downloadBytes(wineStagingInstalled: true)
         let withLibraries = gplayerWine.downloadBytes(wineStagingInstalled: false)
         #expect(withLibraries - withoutLibraries == staging.downloads[0].approximateBytes)
-        // Nothing installed: Staging, then G-Player Wine reusing Staging's libraries, so the archive is downloaded once.
-        #expect(EngineCatalog.firstRunBytes(installed: []) == stagingBytes + withoutLibraries)
+        // Nothing installed: G-Player Wine with Gcenx's archive for its libraries, which is downloaded once.
+        #expect(EngineCatalog.firstRunBytes(installed: []) == withLibraries)
         #expect(EngineCatalog.firstRunBytes(installed: [staging]) == withoutLibraries)
-        #expect(EngineCatalog.firstRunBytes(installed: [gplayerWine]) == stagingBytes)
+        #expect(EngineCatalog.firstRunBytes(installed: [gplayerWine]) == 0)
         #expect(EngineCatalog.firstRunBytes(installed: [staging, gplayerWine]) == 0)
-        #expect(EngineCatalog.firstRunBytes(installed: [EngineCatalog.gptk]) == stagingBytes + withoutLibraries)
+        #expect(EngineCatalog.firstRunBytes(installed: [EngineCatalog.gptk]) == withLibraries)
     }
 }

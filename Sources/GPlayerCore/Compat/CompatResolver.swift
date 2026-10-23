@@ -123,13 +123,13 @@ public enum CompatResolver {
 
     /// Why a 32-bit DirectX 10/11 game fails when the engine's MoltenVK is older than 1.4.1 (G-Player updates it in
     /// the Wine Staging it downloads, see `EngineFixes.moltenVK`).
-    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. Windows components won't help. Switch this space to G-Player Wine, which has a newer one."
+    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. Windows components won't help. Move this space to G-Player Wine, which has a newer one."
 
     /// The blocker for a game that only Apple's D3DMetal can run here, which the app offers to fix.
     public static let needsDirectX12 = "Needs DirectX 12"
     /// Why an Unreal game built for DirectX 12 alone doesn't start on an engine without D3DMetal.
     public static let onlyDirect3D12 = "The game is built for DirectX 12 alone, and it stops at start when asked for DirectX 11. Only Apple's D3DMetal gives DirectX 12 on a Mac."
-    static let useCrossOver = "Switch this space to G-Player Wine and turn on Apple's D3DMetal in Settings › Engines: Steam keeps running there too."
+    static let useCrossOver = "Move this space to G-Player Wine and turn on Apple's D3DMetal in Settings › Engines: Steam keeps running there too."
     static let turnOnD3DMetal = "Turn on Apple's D3DMetal in Settings › Engines; G-Player copies it from your own Game Porting Toolkit."
     static let chooseD3DMetal = "This space has D3DMetal: choose the Recommended profile, or D3DMetal under Advanced."
 

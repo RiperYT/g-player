@@ -84,7 +84,7 @@ struct OnboardingView: View {
 
     @ViewBuilder private var locationStep: some View {
             title("Where should games live?")
-            Text("Spaces, engines and covers go in this folder. Games can take a lot of room, so pick a disk with space to spare.")
+            Text("Spaces, G-Player Wine and covers go in this folder. Games can take a lot of room, so pick a disk with space to spare.")
                 .foregroundStyle(.secondary)
             HStack {
                 PathRow(url: root)
@@ -94,11 +94,11 @@ struct OnboardingView: View {
                         root = u.lastPathComponent == "G-Player" ? u : u.appendingPathComponent("G-Player")
                     }
                 }
-                // The engines download into the folder chosen here; another folder would need them again.
+                // G-Player Wine downloads into the folder chosen here; another folder would need it again.
                 .disabled(model.isInstallingFirstRun)
             }
             if model.isInstallingFirstRun {
-                Text("The engines are downloading into this folder. Change it once they are done.")
+                Text("G-Player Wine is downloading into this folder. Change it once it is done.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             if let problem = model.libraryRootProblem(root) { PathWarning(text: problem) }
@@ -112,14 +112,14 @@ struct OnboardingView: View {
     }
 
     @ViewBuilder private var engineStep: some View {
-            title("Get the engines")
+            title("Get G-Player Wine")
             VStack(alignment: .leading, spacing: 8) {
-                Text("G-Player downloads two versions of Wine. New spaces use G-Player Wine; Wine Staging is a spare. You don't need to choose.")
+                Text("G-Player runs your games on G-Player Wine, its own build of Wine for the Mac. It downloads once, and you don't need to choose anything.")
                 if let sizes = FirstRunSetup.engineSizes(installed: model.installedEngines) { Text(sizes) }
             }
             .foregroundStyle(.secondary)
             rosettaRow
-            ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { engineRow($0) }
+            ForEach(EngineCatalog.firstRunInstalls) { engineRow($0) }
             checkRow(ok: false, icon: "info.circle", title: "Apple's Game Porting Toolkit",
                      detail: "Not needed to start. A few newer DirectX 12 games need it, and G-Player tells you when one does. You get it yourself from Apple; G-Player never downloads it.",
                      actionTitle: nil, action: {})
@@ -231,7 +231,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// An engine G-Player downloads: its own progress while it downloads, then Installed.
+    /// The engine the first run downloads: its own progress while it downloads, then Installed.
     private func engineRow(_ info: EngineInfo) -> some View {
         let installed = model.isInstalled(info)
         let download = model.download(of: info)
@@ -243,13 +243,10 @@ struct OnboardingView: View {
     private func engineDetail(_ info: EngineInfo, installed: Bool, download: Activity?) -> String {
         if installed { return "Installed" }
         if let download { return download.message }
-        if model.isInstallingFirstRun {
-            return info.isRecommended && !model.isInstalled(EngineCatalog.wineStaging) ? "Downloads after Wine Staging, reusing its libraries" : "Starting…"
-        }
-        // The size is what the first run downloads: G-Player Wine reuses the libraries of the Wine Staging that comes first.
-        let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: true))
-        return info.isRecommended ? "New spaces use it. Runs Steam and DirectX 9–11 games. \(mb) MB."
-                                  : "A spare for spaces that need it. Runs Steam and most DirectX 9–11 games. \(mb) MB."
+        if model.isInstallingFirstRun { return "Starting…" }
+        // The size is what the first run downloads: less when a Wine Staging that is installed already has the libraries.
+        let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
+        return "Runs Steam and DirectX 9–11 games. \(mb) MB."
     }
 
     private var hasSteamAlready: Bool {
@@ -278,7 +275,8 @@ struct OnboardingView: View {
             if !EngineCatalog.firstRunInstalls.allSatisfy({ model.isInstalled($0) }) { downloadEngines() }
         case .engine:
             let known = model.spaces.map(\.url) + [root]
-            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false)
+            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false,
+                                           installed: model.installedEngines)
             chosenFound = Set(found.filter { $0.pathProblem == nil }.map(\.id))
             go(1)
         case .found:

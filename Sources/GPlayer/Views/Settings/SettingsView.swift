@@ -57,8 +57,9 @@ struct EngineSettings: View {
     var body: some View {
         ScrollViewReader { proxy in
             Form {
-                ForEach(EngineCatalog.all.filter { !$0.downloads.isEmpty }) { EngineSection(info: $0) }
+                EngineSection(info: EngineCatalog.crossover)
                 AppleToolkitSection()
+                AdvancedEngineSection()
             }
             .formStyle(.grouped)
             .task(id: focus) {
@@ -71,16 +72,57 @@ struct EngineSettings: View {
     }
 }
 
-/// An engine G-Player downloads: what it is, and install or remove. The catalogue lists the recommended one first.
+/// G-Player Wine: what it is, and install or remove.
 struct EngineSection: View {
+    let info: EngineInfo
+    var body: some View {
+        Section {
+            EngineRows(info: info)
+        } header: {
+            Text(info.name)
+        }
+    }
+}
+
+/// Wine Staging, hidden under Advanced: a newer Wine for the rare game that needs it. Not installed with G-Player Wine and
+/// never removed by itself; spaces that run on it keep running.
+struct AdvancedEngineSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var expanded: Bool
+    private let info = EngineCatalog.wineStaging
+
+    /// - Parameter expanded: open at first, for `SnapshotRenderer`.
+    init(expanded: Bool = false) { _expanded = State(initialValue: expanded) }
+
+    var body: some View {
+        Section {
+            DisclosureGroup("Advanced", isExpanded: $expanded) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(info.displayName) is a newer Wine than G-Player Wine's \(EngineCatalog.crossover.version), for the rare game that needs it. To run a space on it, turn on “Choose the Wine engine for each space” in the Advanced tab.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if model.isInstalled(info), !model.isInUse(info) {
+                        Text("No space uses it now. Remove it to free about \(info.installedBytes.formattedBytes).")
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    EngineRows(info: info, showsSummary: false)
+                }
+                .padding(.top, 6)
+            }
+        }
+    }
+}
+
+/// An engine G-Player downloads: its version and graphics, and install or remove.
+struct EngineRows: View {
     @Environment(AppModel.self) private var model
     let info: EngineInfo
+    var showsSummary = true
     @State private var confirmRemove = false
     /// The names of the spaces that keep the engine busy, while the refusal is shown.
     @State private var busySpaces: [String] = []
     var body: some View {
-        Section {
-            Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        Group {
+            if showsSummary { Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
             LabeledContent("Version", value: info.basedOn ?? info.version)
             LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
             if model.isInstalled(info) {
@@ -102,14 +144,6 @@ struct EngineSection: View {
                 let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
                     .disabled(model.isEngineBusy || model.libraryProblem != nil)
-            }
-        } header: {
-            HStack(spacing: 8) {
-                Text(info.name)
-                Text(info.isRecommended ? "Recommended" : "Alternative").font(.caption2.weight(.semibold))
-                    .foregroundStyle(info.isRecommended ? Color.accentColor : .secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background((info.isRecommended ? Color.accentColor : .secondary).opacity(0.12), in: Capsule())
             }
         }
     }
@@ -163,7 +197,7 @@ struct AppleToolkitSection: View {
 
     var body: some View {
         @Bindable var model = model
-        let info = EngineCatalog.gptk
+        let info = EngineCatalog.gptk       // the toolkit as found on this Mac: no engine G-Player offers, only where D3DMetal comes from
         Section {
             Text("Optional. A few newer DirectX 12 games need Apple's D3DMetal. G-Player never includes or downloads Apple's files, so you get the toolkit yourself.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).id(Self.anchor)
@@ -232,6 +266,11 @@ struct AdvancedSettings: View {
     var body: some View {
         @Bindable var model = model
         Form {
+            Section("Spaces") {
+                Toggle("Choose the Wine engine for each space", isOn: $model.choosesEngines)
+                Text("Adds an engine menu to a space's page and to New Space. G-Player Wine suits almost every game; Wine Staging, from Settings › Engines › Advanced, is for the rare one that needs a newer Wine.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Troubleshooting") {
                 Toggle("Detailed Wine logs", isOn: $model.verboseLogs)
                 Text("Slower, but the logs say why a game fails. Each launch writes one log file.")

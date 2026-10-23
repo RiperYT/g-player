@@ -121,8 +121,8 @@ extension AppModel {
     /// CrossOver and Whisky bottles and Wine prefixes that aren't spaces yet, found off the main thread.
     func findExistingEnvironments() async -> [FoundEnvironment] {
         let known = spaces.map(\.url) + (libraryRoot.map { [$0] } ?? [])
-        let toolkit = engineManager?.isInstalled(EngineCatalog.gptk) ?? false
-        return await Task.detached { EnvironmentFinder.find(excluding: known, gptkInstalled: toolkit) }.value
+        let toolkit = engineManager?.isInstalled(EngineCatalog.gptk) ?? false, installed = installedEngines
+        return await Task.detached { EnvironmentFinder.find(excluding: known, gptkInstalled: toolkit, installed: installed) }.value
     }
 
     // MARK: Logs

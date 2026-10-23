@@ -428,6 +428,59 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
     }
 }
 
+/// G-Player Wine installed on a Mac without Wine Staging, as the first run does it: Gcenx's archive is downloaded for the runtime
+/// libraries, unpacked, its libraries copied, and the archive deleted. Stand-in archives with checksums made here wait where the
+/// download would put them (a file with the pinned checksum is not downloaded again), so nothing goes over the network.
+@Suite struct RuntimeLibrariesInstallTests {
+    let id = "wine-cx-test"
+
+    private func pinned(_ name: String, role: PinnedDownload.Role, files: [String: String], executable: [String] = [],
+                        _ tmp: TempFolder) async throws -> PinnedDownload {
+        let source = tmp.dir("source/\(name)")
+        for (path, text) in files { tmp.file("source/\(name)/\(path)", contents: Data(text.utf8)) }
+        for path in executable {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: source.appendingPathComponent(path).path)
+        }
+        let archive = tmp.file("Downloads/\(id)/\(name).tar", bytes: 0)
+        let made = try await Shell.runStoppable(Shell.tool("tar"), ["-cf", archive.path, "-C", source.path, "."])
+        #expect(made.succeeded)
+        return PinnedDownload(url: URL(string: "https://example.invalid/\(name).tar")!, fileName: "\(name).tar",
+                              sha256: try Files.sha256(of: archive), approximateBytes: Files.size(of: archive), role: role)
+    }
+
+    @Test func gPlayerWineTakesItsLibrariesFromGcenxsArchiveAndDeletesIt() async throws {
+        let tmp = TempFolder()
+        let manager = EngineManager(paths: LibraryPaths(root: tmp.url))
+        let lib = "Wine Staging.app/Contents/Resources/wine/lib"
+        let engine = try await pinned("engine", role: .engine, files: ["wine/bin/wine": "#!/bin/sh\n", "wine/lib/libMoltenVK.dylib": "ours"],
+                                      executable: ["wine/bin/wine"], tmp)
+        let runtime = try await pinned("gcenx", role: .runtimeLibraries,
+                                       files: ["\(lib)/libfreetype.6.dylib": "freetype", "\(lib)/libgnutls.30.dylib": "gnutls",
+                                               "\(lib)/libSDL2-2.0.0.dylib": "sdl", "\(lib)/libvulkan.1.dylib": "loader",
+                                               "\(lib)/libMoltenVK.dylib": "theirs"], tmp)
+        let dxvk = try await pinned("dxvk", role: .dxvk, files: ["dxvk-test/x64/d3d11.dll": "x64", "dxvk-test/x32/d3d11.dll": "x32"], tmp)
+        let info = EngineInfo(id: id, name: "G-Player Wine", version: "11.0", kind: .crossover, summary: "",
+                              backends: [.dxvk, .wined3d], downloads: [engine, runtime, dxvk])
+        #expect(!manager.isInstalled(EngineCatalog.wineStaging))
+
+        let installed = try await manager.install(info) { _, _ in }
+
+        #expect(manager.isInstalled(info) && installed.dxvk != nil)
+        let wineLib = installed.wineRoot.appendingPathComponent("lib")
+        for name in EngineManager.runtimeLibraries {
+            #expect(FileManager.default.fileExists(atPath: wineLib.appendingPathComponent(name).path), "\(name)")
+        }
+        // The Vulkan loader isn't used and MoltenVK is G-Player's own: neither is taken from Gcenx's archive.
+        #expect(!FileManager.default.fileExists(atPath: wineLib.appendingPathComponent("libvulkan.1.dylib").path))
+        #expect(try String(contentsOf: wineLib.appendingPathComponent("libMoltenVK.dylib"), encoding: .utf8) == "ours")
+        // Wine Staging wasn't installed for it, and Gcenx's archive and its unpacked copy are gone.
+        #expect(!manager.isInstalled(EngineCatalog.wineStaging))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: manager.paths.engines.path) == [id])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: manager.folder(for: info).path)) == ["wine", "dxvk"])
+        #expect(!FileManager.default.fileExists(atPath: manager.downloadFolder(for: info).path))
+    }
+}
+
 /// A value shared with a callback that runs on another thread.
 final class LockedValue<T>: @unchecked Sendable {
     private let lock = NSLock()

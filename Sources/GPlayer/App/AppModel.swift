@@ -53,6 +53,11 @@ final class AppModel {
     var verboseLogs: Bool {
         didSet { defaults.set(verboseLogs, forKey: "verboseLogs") }
     }
+    /// Show the engine menus (a space's page, New Space) so each space can choose between G-Player Wine and Wine Staging.
+    /// Off by default: nobody has to know what a Wine engine is, and new spaces get G-Player Wine.
+    var choosesEngines: Bool {
+        didSet { defaults.set(choosesEngines, forKey: "choosesEngines") }
+    }
     /// Use Apple's Game Porting Toolkit when the user installed it. Off by default (Apple's license).
     var useAppleToolkit: Bool {
         didSet {
@@ -180,6 +185,7 @@ final class AppModel {
         libraryRoot = d.string(forKey: "libraryRoot").map { URL(fileURLWithPath: $0, isDirectory: true) }
         onboardingDone = d.bool(forKey: "onboardingDone")
         verboseLogs = d.bool(forKey: "verboseLogs")
+        choosesEngines = d.bool(forKey: "choosesEngines")
         useAppleToolkit = d.bool(forKey: "useAppleToolkit")
         firstRunSpaces = d.stringArray(forKey: "firstRunSpaces") ?? []
         engineNoteSeen = d.bool(forKey: "engineNoteSeen")
@@ -364,23 +370,31 @@ final class AppModel {
         engine.readyBackends.filter { $0 != .d3dmetal || useAppleToolkit }
     }
 
-    /// Engines to offer when choosing one: Apple's toolkit only when it is turned on.
-    var availableEngines: [EngineInfo] { EngineCatalog.all.filter { $0.kind != .gptk || useAppleToolkit } }
-
     /// A space on Apple's toolkit while the toolkit is turned off.
     func needsAppleToolkit(_ space: Space) -> Bool { space.engineID == EngineCatalog.gptk.id && !useAppleToolkit }
 
     /// The engine for a new space made without a choice (`EngineCatalog.engineForNewSpace`).
     var newSpaceEngine: EngineInfo { EngineCatalog.engineForNewSpace(installed: installedEngines) }
 
+    /// The engine for a new space made without a choice (`EngineCatalog.engineForNewSpace`), or the one picked in the New
+    /// Space sheet while the engine menus are on.
+    func engineForNewSpace(picking picked: String?) -> EngineInfo {
+        EngineCatalog.engineForNewSpace(installed: installedEngines, picked: picked, choosing: choosesEngines)
+    }
+
+    /// What a space's page offers about its engine (`EngineSwitch.pageOffer`).
+    func engineOffer(for space: Space) -> EngineSwitch.PageOffer {
+        EngineSwitch.pageOffer(engineID: space.engineID, choosingEngines: choosesEngines)
+    }
+
+    /// Some space runs on this engine.
+    func isInUse(_ info: EngineInfo) -> Bool { state.spaces.contains { $0.engineID == info.id } }
+
     /// What an engine picker adds after an engine's name: recommended, and whether it needs a download (with its
-    /// size) or isn't there. `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
+    /// size). `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
     func engineNote(_ info: EngineInfo, listsInstalled: Bool = false) -> String {
-        if info.isRetired { return "  · being replaced" }
         var notes = info.isRecommended ? ["recommended"] : []
-        if info.kind == .gptk && !useAppleToolkit { notes.append("turned off") }
-        else if isInstalled(info) { if listsInstalled { notes.append("installed") } }
-        else if info.downloads.isEmpty { notes.append("not installed") }
+        if isInstalled(info) { if listsInstalled { notes.append("installed") } }
         else {
             let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)))
             notes.append("\(mb) MB to download")
@@ -395,13 +409,6 @@ final class AppModel {
         Task.detached(priority: .utility) {
             for info in EngineCatalog.known { if let engine = manager.engine(info) { EngineFixes.apply(to: engine) } }
         }
-    }
-
-    /// The engines a space can switch to: the available ones, plus the one it uses now.
-    func engineChoices(for space: Space) -> [EngineInfo] {
-        var list = availableEngines
-        if !list.contains(where: { $0.id == space.engineID }), let current = EngineCatalog.info(space.engineID) { list.append(current) }
-        return list
     }
 
     /// Spaces from before 0.3 that already run on the toolkit keep working: turn it on once for them. The answer is
@@ -547,41 +554,39 @@ final class AppModel {
         }
     }
 
-    /// The first run's engines: Wine Staging, then G-Player Wine, which reuses Staging's libraries (no second download).
-    /// Starts once at a time. All failures show in one message, and the message says what the first spaces use then.
-    /// When Staging failed because the connection is down, G-Player Wine isn't tried: its libraries come from the
-    /// same download.
+    /// The first run's engine: G-Player Wine, with its runtime libraries from Gcenx's Wine Staging archive (downloaded for
+    /// them and deleted; Wine Staging isn't installed). Starts once at a time. A failure shows in one message, and the message
+    /// says what the first spaces use then.
     func installFirstRunEngines() {
         guard firstRunInstall == nil, let manager = engineManager else { return }
-        // Both engines take about 3.3 GB: said before anything is downloaded, not when the disk fills up.
+        // G-Player Wine takes about 2.6 GB: said before anything is downloaded, not when the disk fills up.
         let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
         if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
         firstRunPaused = false
         firstRunInstall = Task {
             var failures: [String] = []
             for info in EngineCatalog.firstRunInstalls where await ensureEngine(info) == nil {
-                if stoppedEngines.contains(info.id) {                                   // Stop means stop: not the next one either,
-                    firstRunPaused = true                                               // and the first spaces wait for the engine
+                if stoppedEngines.contains(info.id) {                                   // Stop means stop: the first spaces wait
+                    firstRunPaused = true                                               // for the engine
                     pausedNoteClosed = false
                     break
                 }
                 failures.append(errorMessage ?? "\(info.name) wasn't installed.")
                 errorMessage = nil                                  // shown together below, not one over the other
-                if let error = engineFailures[info.id], EngineManager.isConnectionFailure(error) { break }
             }
             if !failures.isEmpty {
-                let gplayerWine = isInstalled(EngineCatalog.defaultForNewSpaces), staging = isInstalled(EngineCatalog.wineStaging)
+                let gplayerWine = EngineCatalog.installedGPlayerWine(in: installedEngines) != nil, staging = isInstalled(EngineCatalog.wineStaging)
                 failures.append(gplayerWine ? "" : staging
                     ? "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines."
-                    : "Download the engines again in Settings › Engines. The first spaces are made once an engine is installed.")
+                    : "Download G-Player Wine again in Settings › Engines. The first spaces are made once it is installed.")
                 errorMessage = failures.filter { !$0.isEmpty }.joined(separator: "\n\n")
             }
             firstRunInstall = nil
         }
     }
 
-    /// The engine for the spaces the first run creates, once its installs are over: G-Player Wine, or Wine Staging
-    /// when that is all there is. Nil with neither installed.
+    /// The engine for the spaces the first run creates, once its installs are over: G-Player Wine, or a Wine Staging that
+    /// is installed already when G-Player Wine couldn't be. Nil with neither installed.
     func firstRunEngine() async -> EngineInfo? {
         await firstRunInstall?.value
         return EngineCatalog.firstRunEngine(installed: installedEngines)
@@ -743,7 +748,7 @@ final class AppModel {
         if chosen == nil, wanted.id == EngineCatalog.defaultForNewSpaces.id,
            let staging = engineManager?.engine(EngineCatalog.wineStaging) {
             errorMessage = (errorMessage ?? "\(wanted.name) wasn't installed.")
-                + "\n\n“\(name)” uses \(staging.info.name) instead. You can switch its engine in the space's settings once \(wanted.name) is installed."
+                + "\n\n“\(name)” uses \(staging.info.name) instead. You can move it to \(wanted.name) from its page once that is installed."
             chosen = staging
         }
         guard let engine = chosen else { return nil }

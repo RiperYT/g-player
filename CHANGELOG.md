@@ -15,8 +15,23 @@
   moves to the new version once nothing runs in it, with its files, Steam login and what G-Player learned about each
   game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose old version is gone installs
   the new one when you start something in it, instead of switching to Wine Staging.
-- The first run now says it needs about 3.3 GB free and downloads about 640 MB, since GStreamer is part of G-Player
+- The first run now says it needs about 2.6 GB free and downloads about 640 MB, since GStreamer is part of G-Player
   Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
+- **One Wine for everyone.** G-Player Wine is the only engine you meet. The first run installs it alone: Wine Staging is
+  no longer installed, which saves about 750 MB of disk (G-Player Wine still takes its libraries from Gcenx's Wine
+  Staging download, which is deleted once they are copied). New spaces and the bottles G-Player finds on your Mac get
+  G-Player Wine, and the engine menus on a space's page and in New Space are gone, unless you turn on **Settings ›
+  Advanced › Choose the Wine engine for each space**: then they offer G-Player Wine and Wine Staging.
+- **Spaces you have keep working as they are.** A space on Wine Staging or on Apple's Game Porting Toolkit says what it
+  runs on and offers **Move to G-Player Wine…**, which asks first: it names both Wines and the download, and warns that
+  G-Player Wine's Wine 11.0 is older than Wine Staging 11.18, so a space the newer one has updated may not open on it.
+  Nothing moves by itself.
+- **Settings › Engines is simpler.** G-Player Wine and the D3DMetal switch stay. Wine Staging is under Advanced, to
+  install or remove for the rare game that needs a newer Wine, and says when no space uses it. Apple's Game Porting
+  Toolkit is no longer an engine in any list: copying D3DMetal from your own toolkit into G-Player Wine works as
+  before, and spaces that already run on the toolkit keep running while it is installed and turned on.
+- A Mac that has only the earlier G-Player Wine revision (and not the new one yet) now makes new spaces and adds bottles
+  on it, offline too, instead of on Wine Staging or waiting for a download. They move to the new revision with the rest.
 - **Share What Worked.** When a game has run well, its panel and its menu offer Share What Worked…: it opens a GitHub
   issue in your browser, already filled in with what made the game run (the engine, the graphics, the profile and settings
   you changed, extra Windows components, what G-Player found out about the game), so that others, and G-Player's own

@@ -26,7 +26,7 @@ The app is signed with a Developer ID and notarized by Apple, so it opens like a
 goes over the old one the same way: your library, spaces and games stay where they are.
 
 **Needs:** a Mac with Apple Silicon (M1 or later), macOS 15 Sequoia or later, Rosetta 2 (G-Player offers to
-install it), about 3.3 GB for the two engines (a download of about 640 MB) plus room for games.
+install it), about 2.6 GB for G-Player Wine (a download of about 640 MB) plus room for games.
 
 ## What runs
 
@@ -44,20 +44,25 @@ settings that worked, for you to read and submit; G-Player itself sends nothing.
 
 ### Engines
 
-- **G-Player Wine** (the default for new spaces): Wine 11 that G-Player builds from CodeWeavers' CrossOver 26.3 source
+- **G-Player Wine** (what new spaces run on): Wine 11 that G-Player builds from CodeWeavers' CrossOver 26.3 source
   ([scripts/build-engine-cx.sh](scripts/build-engine-cx.sh)), with DXMT (DirectX 10/11 straight to Metal), DXVK and
   GStreamer for game videos.
   CrossOver's Wine has what Apple's D3DMetal needs, so with D3DMetal (below) 64-bit DirectX 10–12 games run through
   it in the same space as Steam, with Steam signed in. G-Player Wine isn't CrossOver and isn't made by CodeWeavers.
-- **Wine Staging 11.18** (Gcenx's build) with DXVK: open source, runs Steam and most DirectX 9–11 games. The first
-  launch installs it next to G-Player Wine, which reuses its libraries instead of downloading them again.
-- **Apple's Game Porting Toolkit**: Apple's own wine 7.7, if you installed it. Steam doesn't run on it.
+- **Wine Staging 11.18** (Gcenx's build) with DXVK: open source, runs Steam and most DirectX 9–11 games. An advanced
+  option for the rare game that needs a newer Wine: the first launch doesn't install it (G-Player Wine takes its
+  libraries from Gcenx's download and deletes the archive), and **Settings › Engines › Advanced** installs or removes it.
+- **Apple's Game Porting Toolkit**: Apple's own wine 7.7, if you installed it. Not an engine you can pick any more;
+  spaces that already run on it keep running while it is installed and turned on. Steam doesn't run on it.
 
-Each space picks its engine. A new space gets G-Player Wine, or Wine Staging while that is the only engine installed;
-spaces made before keep theirs. Moving between Wine Staging and G-Player Wine keeps the space's files, saves and
-Steam login; G-Player asks first, since the other Wine updates the space for itself. A space on an earlier revision of
-G-Player Wine moves to the current one by itself once nothing runs in it: G-Player downloads the new revision in the
-background first, and your games keep working on the old one meanwhile, offline too.
+Nobody has to choose an engine: a new space gets G-Player Wine (or Wine Staging while that is the only engine
+installed and G-Player Wine can't be downloaded). Turn on **Settings › Advanced › Choose the Wine engine for each
+space** to pick between G-Player Wine and Wine Staging for each space. Spaces made before keep theirs: one on Wine
+Staging or on the toolkit offers **Move to G-Player Wine…** on its page. Moving keeps the space's files, saves and
+Steam login; G-Player asks first, since the other Wine updates the space for itself, and G-Player Wine's Wine 11.0 is
+older than Wine Staging's 11.18, which a space that the newer one has updated may not open on. A space on an earlier
+revision of G-Player Wine moves to the current one by itself once nothing runs in it: G-Player downloads the new
+revision in the background first, and your games keep working on the old one meanwhile, offline too.
 
 ### Apple's D3DMetal (optional, off by default)
 

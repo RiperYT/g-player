@@ -61,7 +61,7 @@ struct LibraryNoteBanner: View {
 
     private var text: String {
         switch note {
-        case .gplayerWine: "Spaces you have keep their engine. You can switch a space in its settings."
+        case .gplayerWine: "Spaces you have keep what they run on. Open one to move it to G-Player Wine."
         case .storeReady(let name): "Open it from All Games, sign in, and your \(name) games appear here."
         case .setupOnHold(let pending): FirstRunSetup.pausedNote(pendingSpaces: pending).text
         }

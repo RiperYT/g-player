@@ -31,7 +31,7 @@ import Testing
         // Without a scratch size an archive counts as itself, as before.
         #expect(EngineCatalog.diskBytes(installing: [EngineCatalog.wineStaging]) == 750_000_000 + 193_105_336)
         #expect(EngineCatalog.diskBytes(installing: []) == 0)
-        #expect(EngineCatalog.firstRunDiskBytes(installed: []) == 750_000_000 + 1_690_000_000 + 156_581_817 + 705_000_000)
+        #expect(EngineCatalog.firstRunDiskBytes(installed: []) == 1_690_000_000 + 156_581_817 + 705_000_000)       // the first run installs only it
     }
 
     // MARK: The list
