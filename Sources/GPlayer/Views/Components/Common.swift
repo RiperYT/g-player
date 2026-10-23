@@ -52,7 +52,9 @@ struct ActivityPanel: View {
                         else { ProgressView().progressViewStyle(.linear).controlSize(.small) }
                         Text(model.message(of: a)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         if let note = a.note {
-                            Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            // A line limit, never fixedSize: the window's minimum size is measured at zero width, where
+                            // a fixed-height text is endless and pushes the whole window's content out of view.
+                            Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(4)
                         }
                     }
                 }
@@ -75,7 +77,7 @@ private struct EngineUpdateNotice: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            Text(line).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(line).foregroundStyle(.secondary).lineLimit(4)   // not fixedSize (see ActivityPanel)
             Spacer(minLength: 0)
             Button { model.closeUpdateNotice(id) } label: { Image(systemName: "xmark.circle.fill") }
                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Hide").accessibilityLabel("Hide")

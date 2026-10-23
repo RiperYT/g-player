@@ -529,7 +529,7 @@ final class AppModel {
         await leftoversCleaning?.value
         // An update nobody asked for isn't "setup" to quit over: what came is kept, and it goes on at the next start.
         let activity = begin(Self.downloadTitle(info), "Starting", setup: !updating,
-                             note: updating ? EngineMigration.updateNote(for: info) : nil)
+                             note: updating ? EngineMigration.shortUpdateNote(for: info) : nil)
         defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil; updatingEngines.remove(info.id) }
         engineFailures[info.id] = nil
         engineUpdateFailures[info.id] = nil

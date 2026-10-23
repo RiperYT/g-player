@@ -163,6 +163,11 @@ public enum EngineMigration {
             + "Spaces switch over by themselves once nothing runs in them, and the old version is then removed."
     }
 
+    /// `updateNote` short enough for the sidebar's activity panel.
+    public static func shortUpdateNote(for info: EngineInfo) -> String {
+        "Adds video playback in games. Your games keep working meanwhile."
+    }
+
     /// The one line for a background update that failed, in Settings › Engines and in the sidebar: what failed, why in a few
     /// words, and that it is tried again.
     public static func updateFailure(for info: EngineInfo, reason: String) -> String {

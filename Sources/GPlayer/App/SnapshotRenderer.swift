@@ -92,6 +92,12 @@ enum SnapshotRenderer {
                 _ = box.model.begin("Creating “Main”", "Setting up Windows. This takes about a minute the first time.")
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
+            Shot(name: "main-library-updating-engine", size: mainSize) { box in
+                box.libraryWithGames()
+                _ = box.model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 120 of 446 MB", progress: 0.27,
+                                    note: EngineMigration.shortUpdateNote(for: EngineCatalog.crossover))
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
+            },
             Shot(name: "main-library-notes", size: mainSize) { box in
                 box.libraryWithGames()
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
