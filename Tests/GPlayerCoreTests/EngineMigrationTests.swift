@@ -51,8 +51,8 @@ import Testing
         #expect(p.install == [new.id])                              // once, not per space
         // Busy or not makes no difference without the replacement: games keep running on the old revision meanwhile.
         #expect(plan([a, b], installed: [old, staging], busy: [a]).install == [new.id])
-        // Only spaces on a retired engine ask for it.
-        #expect(plan([space("S", on: staging.id)], installed: [old]).install.isEmpty)
+        // A space on another engine asks for nothing; it is the old engine installed that does (anOldEngineGoesOnlyOnceItsReplacementIsInstalled).
+        #expect(plan([space("S", on: staging.id)], installed: [staging]).install.isEmpty)
     }
 
     @Test func aSpaceWhoseOldEngineIsGoneMovesAtOnceAndLaunchingInstallsTheNewOne() {
@@ -67,7 +67,7 @@ import Testing
     }
 
     @Test func anOldEngineNobodyUsesIsRemovedOnlyWhileItIsInstalled() {
-        #expect(plan([], installed: [old, staging]).remove == [old.id])
+        #expect(plan([], installed: [old, new, staging]).remove == [old.id])
         #expect(plan([space("Main", on: new.id)], installed: [old, new]).remove == [old.id])
         #expect(plan([space("Main", on: new.id)], installed: [new]).remove.isEmpty)
         // Not while a space is still on it, whatever the reason.
@@ -77,11 +77,76 @@ import Testing
         #expect(plan([], installed: [new, staging, EngineCatalog.gptk]).isEmpty)
     }
 
+    @Test func anOldEngineGoesOnlyOnceItsReplacementIsInstalled() {
+        // Nothing is on it (all spaces on Wine Staging, an empty library, or the only one was switched away): it stays, and the
+        // replacement is installed first so that the Mac isn't left without G-Player Wine.
+        for spaces in [[], [space("Staging", on: staging.id)]] {
+            let p = plan(spaces, installed: [old, staging])
+            #expect(p.remove.isEmpty && p.switches.isEmpty)
+            #expect(p.install == [new.id])
+        }
+        // Offline, say: the same at every look, until the replacement is there. Then the old one goes.
+        #expect(plan([], installed: [old]).install == [new.id])
+        #expect(plan([], installed: [old, new]).remove == [old.id])
+        #expect(plan([], installed: [old, new]).install.isEmpty)
+        // An old engine that isn't installed asks for nothing: there is nothing to replace.
+        #expect(plan([], installed: [staging]).isEmpty)
+        #expect(plan([space("Staging", on: staging.id)], installed: [staging]).isEmpty)
+        // The replacement is asked for once, however many spaces and reasons there are.
+        let p = plan([space("A", on: old.id), space("B", on: old.id)], installed: [old])
+        #expect(p.install == [new.id])
+    }
+
+    // MARK: Spaces of other apps
+
+    func bottle(_ name: String, on engine: String, allows: Bool? = nil) -> Space {
+        var s = space(name, on: engine, origin: .external)
+        s.originNote = "CrossOver"; s.allowsChanges = allows
+        return s
+    }
+
+    @Test func aSpaceOfAnotherAppIsNeverMovedWithoutItsOwnersYes() {
+        // The first start on the new Wine updates the bottle's files: not before the user allowed changes there.
+        for allows in [nil, false] as [Bool?] {
+            let b = bottle("Bottle", on: old.id, allows: allows)
+            let p = plan([b], installed: [old, new])                 // idle, and the replacement is there
+            #expect(p.switches.isEmpty)
+            #expect(p.remove.isEmpty)                                // it is still on the old engine, which stays for it
+            #expect(p.install.isEmpty)
+            // The replacement still comes: that is what the offer on the space's page waits for.
+            #expect(plan([b], installed: [old]).install == [new.id])
+        }
+        // Allowed: it moves like a space G-Player made, and the old engine goes.
+        let allowed = bottle("Allowed", on: old.id, allows: true)
+        let p = plan([allowed], installed: [old, new])
+        #expect(p.switches == [.init(space: allowed.id, from: old.id, to: new.id)] && p.remove == [old.id])
+    }
+
+    @Test func aSpaceOfAnotherAppHoldsTheOldEngineWhileOthersMove() {
+        let mine = space("Mine", on: old.id), bottle = bottle("Bottle", on: old.id)
+        let p = plan([mine, bottle], installed: [old, new])
+        #expect(p.switches == [.init(space: mine.id, from: old.id, to: new.id)])
+        #expect(p.remove.isEmpty)
+        // Once it is allowed, the next look moves it and removes the old engine.
+        var allowed = bottle; allowed.allowsChanges = true
+        let next = plan([allowed], installed: [old, new])
+        #expect(next.switches.map(\.space) == [allowed.id] && next.remove == [old.id])
+    }
+
+    @Test func aSpaceOfAnotherAppWhoseOldEngineIsGoneWaitsForItsOwnersYesToo() {
+        // Its engine isn't there, but moving it is what the first start on the new Wine would do to it.
+        let b = bottle("Bottle", on: old.id)
+        #expect(plan([b], installed: [new]).isEmpty)
+        #expect(plan([b], installed: []).install == [new.id])
+        var allowed = b; allowed.allowsChanges = true
+        #expect(plan([allowed], installed: [new]).switches.count == 1)
+    }
+
     // MARK: Carrying it out
 
     @Test func theSpaceKeepsEverythingButItsEngineAndTheGamesKeepWhatWasLearned() {
         var steam = space("Steam", on: old.id, origin: .external)
-        steam.originNote = "CrossOver"; steam.allowsChanges = false; steam.presetID = "steam"
+        steam.originNote = "CrossOver"; steam.allowsChanges = true; steam.presetID = "steam"
         let other = space("Other", on: old.id)
         var learned = Game(title: "Learned", spaceID: steam.id)
         learned.autoGraphics = AutoGraphics(engineID: old.id, worked: .dxmt, failed: [.dxvk])
@@ -105,6 +170,19 @@ import Testing
         #expect(state.games[3].autoGraphics == nil)
         // What was learned counts on the new engine, so the next launch starts from it.
         #expect(state.games[0].autoGraphics?.current(on: new.id).worked == .dxmt)
+    }
+
+    @Test func aSpaceThatMayNotBeChangedIsLeftAloneEvenIfAPlanNamesIt() {
+        // The plan was made before the user said no (or a plan from elsewhere): applying it never writes to such a space.
+        for allows in [nil, false] as [Bool?] {
+            let b = bottle("Bottle", on: old.id, allows: allows)
+            var game = Game(title: "G", spaceID: b.id)
+            game.autoGraphics = AutoGraphics(engineID: old.id, worked: .dxvk)
+            var state = LibraryState()
+            state.spaces = [b]; state.games = [game]
+            EngineMigration.apply(.init(switches: [.init(space: b.id, from: old.id, to: new.id)]), to: &state)
+            #expect(state.spaces == [b] && state.games[0].autoGraphics?.engineID == old.id)
+        }
     }
 
     @Test func aSpaceThatChangedEngineSincePlanningIsLeftAlone() {
