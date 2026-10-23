@@ -468,3 +468,120 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         #expect(!manager.isInstalled(engine.info))
     }
 }
+
+/// What is remembered of a failed attempt, how an attempt ended, and the words for each ending.
+@Suite struct WineMonoOutcomeTests {
+    let mono = EngineCatalog.wineMono10_4_1
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let hour: TimeInterval = 3600
+
+    private func failure(_ ago: TimeInterval = 0, offline: Bool = false, version: String = "10.4.1",
+                         reason: String = "The server answered 500 for wine-mono-10.4.1-x86.tar.xz.") -> WineMono.Failure {
+        .init(version: version, date: now.addingTimeInterval(-ago), offline: offline, reason: reason)
+    }
+
+    @Test func aFailureIsWaitedOutLikeAFailedComponentAndAnOfflineOneForMinutes() {
+        #expect(!WineMono.isWaiting(nil, for: mono, now: now))
+        #expect(WineMono.retryAfter == 3 * 24 * hour)                                   // what a failed component waits
+        #expect(WineMono.isWaiting(failure(hour), for: mono, now: now))
+        #expect(WineMono.isWaiting(failure(71 * hour), for: mono, now: now))
+        #expect(!WineMono.isWaiting(failure(73 * hour), for: mono, now: now))
+        // Offline: the Mac is likely to be back soon.
+        #expect(WineMono.isWaiting(failure(5 * 60, offline: true), for: mono, now: now))
+        #expect(!WineMono.isWaiting(failure(11 * 60, offline: true), for: mono, now: now))
+        // Another Wine Mono (a newer engine revision) is tried at once, and a date in the future isn't waited for.
+        #expect(!WineMono.isWaiting(failure(hour, version: "10.3.0"), for: mono, now: now))
+        #expect(!WineMono.isWaiting(failure(-hour), for: mono, now: now))
+    }
+
+    @Test func aFailureIsKeptInTheSpaceAndForgottenOnSuccess() throws {
+        let tmp = TempFolder()
+        let s = space(at: tmp.prefix("Epic"), preset: "epic")
+        #expect(WineMono.failure(in: s) == nil)
+        let kept = failure(hour, reason: "Couldn't unpack it.")
+        WineMono.record(kept, in: s)
+        let read = try #require(WineMono.failure(in: s))
+        #expect(read.version == kept.version && read.reason == kept.reason && read.offline == kept.offline)
+        #expect(abs(read.date.timeIntervalSince(kept.date)) < 1)
+        WineMono.forgetFailure(in: s)
+        #expect(WineMono.failure(in: s) == nil)
+        tmp.file("Epic/\(WineMono.failureFileName)", contents: Data("not json".utf8))
+        #expect(WineMono.failure(in: s) == nil)                                          // an unreadable file is no failure
+    }
+
+    @Test func anEndIsNamedByWhatCausedIt() {
+        struct Boom: LocalizedError { var errorDescription: String? { "The disk is full" } }
+        #expect(WineMono.outcome(after: CancellationError(), stoppedEverything: false, package: mono, now: now) == .stopped(everything: false))
+        // Stop All kills the setup's own program, which then looks like a failure: it isn't one.
+        #expect(WineMono.outcome(after: Boom(), stoppedEverything: true, package: mono, now: now) == .stopped(everything: true))
+        #expect(WineMono.outcome(after: ShellError.failed("Wine Mono's setup finished (code 1), but it isn't listed."),
+                                 stoppedEverything: true, package: mono, now: now) == .stopped(everything: true))
+        #expect(WineMono.outcome(after: Boom(), stoppedEverything: false, package: mono, now: now)
+                == .failed(.init(version: "10.4.1", date: now, offline: false, reason: "The disk is full")))
+        for code in [URLError.Code.notConnectedToInternet, .timedOut, .cannotFindHost] {
+            let outcome = WineMono.outcome(after: URLError(code), stoppedEverything: false, package: mono, now: now)
+            guard case .failed(let f) = outcome else { Issue.record("\(code)"); continue }
+            #expect(f.offline, "\(code)")
+        }
+    }
+
+    @Test func aBusySpaceIsToldToQuitAndOpenAgainInOneLine() throws {
+        let note = try #require(WineMono.note(for: .spaceBusy, program: "Epic Games Launcher", purpose: "Epic Online Services"))
+        #expect(note.text == "Quit Epic Games Launcher and open it again to add .NET (needed for Epic Online Services).")
+        #expect(!note.title.isEmpty)
+    }
+
+    @Test func anOfflineMacGetsANoteAndNoAlert() throws {
+        let offline = WineMono.Outcome.failed(failure(offline: true, reason: "The Internet connection appears to be offline."))
+        let note = try #require(WineMono.note(for: offline, program: "Epic Games Launcher", purpose: "Epic Online Services"))
+        #expect(note.text.contains("isn't online") && note.text.contains("starts without it"))
+        #expect(WineMono.alert(for: offline, space: "Epic Games Launcher", consequence: "x") == nil)
+        // The same words when a start skips the attempt because the wait isn't over.
+        let skipped = WineMono.note(for: .waiting(failure(offline: true)), program: "Epic Games Launcher", purpose: "Epic Online Services")
+        #expect(skipped == note)
+    }
+
+    @Test func aFailureIsSaidInAnAlertAndInTheNoteWithTheConsequence() throws {
+        let failed = WineMono.Outcome.failed(failure(reason: "Couldn't unpack wine-mono-10.4.1-x86.tar.xz"))
+        let note = try #require(WineMono.note(for: failed, program: "Epic Games Launcher", purpose: "Epic Online Services"))
+        #expect(note.text.contains("Couldn't unpack wine-mono-10.4.1-x86.tar.xz. Epic Games Launcher starts without it"))
+        let alert = try #require(WineMono.alert(for: failed, space: "Epic Games Launcher",
+                                                consequence: "Epic Games Launcher starts without .NET."))
+        #expect(alert == "Couldn't set up Wine Mono in “Epic Games Launcher”: Couldn't unpack wine-mono-10.4.1-x86.tar.xz. Epic Games Launcher starts without .NET.")
+        // A reason that ends with a mark keeps it.
+        #expect(WineMono.sentence("Try again?") == "Try again?" && WineMono.sentence(" Done. ") == "Done.")
+        // The installer's words differ from a program's: there is no program yet.
+        let installer = WineMono.alert(for: failed, space: "Epic Games Launcher",
+                                       consequence: "The installer runs without .NET, and the first start tries again.")
+        #expect(installer?.hasSuffix("The installer runs without .NET, and the first start tries again.") == true)
+        #expect(installer?.contains("starts without") == false)
+    }
+
+    @Test func aPathThatIsTooLongIsExplainedWithItsLength() throws {
+        let note = try #require(WineMono.note(for: .tooLong(281), program: "Epic Games Launcher", purpose: "Epic Online Services"))
+        #expect(note.text.contains("281") && note.text.contains("260") && note.text.contains("home folder"))
+    }
+
+    @Test func nothingIsSaidWhenItWorkedWasStoppedOrIsNotAllowed() {
+        for outcome in [WineMono.Outcome.ready, .notAllowed, .stopped(everything: true), .stopped(everything: false)] {
+            #expect(WineMono.note(for: outcome, program: "P", purpose: "Q") == nil)
+            #expect(WineMono.alert(for: outcome, space: "S", consequence: "C") == nil)
+            #expect(!WineMono.showsNote(for: outcome, alreadyShown: false))
+        }
+    }
+
+    @Test func whatTheUserJustCausedIsAlwaysSaidAndWhatASkippedStartRepeatsOnce() {
+        #expect(WineMono.showsNote(for: .spaceBusy, alreadyShown: true))
+        #expect(WineMono.showsNote(for: .failed(failure()), alreadyShown: true))
+        #expect(WineMono.showsNote(for: .waiting(failure()), alreadyShown: false))
+        #expect(!WineMono.showsNote(for: .waiting(failure()), alreadyShown: true))
+        #expect(WineMono.showsNote(for: .tooLong(300), alreadyShown: false))
+        #expect(!WineMono.showsNote(for: .tooLong(300), alreadyShown: true))
+    }
+
+    @Test func theCardSaysWhatTheFirstStartAdds() {
+        #expect(WineMono.sizeLabel(mono) == "40 MB" && WineMono.installedSizeLabel(mono) == "245 MB")
+        #expect(AppPresets.epic.dotNetReason == "Epic Online Services" && AppPresets.epic.needsDotNet)
+        #expect(AppPresets.all.filter { $0.dotNetReason != nil }.map(\.id) == ["epic"])
+    }
+}
