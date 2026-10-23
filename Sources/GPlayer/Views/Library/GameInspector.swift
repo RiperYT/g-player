@@ -47,6 +47,8 @@ struct GameInspector: View {
                     }
                 }
 
+                if model.canShareWhatWorked(game) { ShareWhatWorkedRow(game: game) }
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Cover").sectionTitle()
                     HStack {
@@ -175,6 +177,20 @@ struct GameInspector: View {
             }
             .labelsHidden()
             Text(info.graphicsHint(for: game.graphics, profile: game.launchOptions.profile))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Once a game has run well: a way to tell others what made it work. G-Player only opens the browser; the user submits it.
+private struct ShareWhatWorkedRow: View {
+    @Environment(AppModel.self) private var model
+    let game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { model.shareWhatWorked(game) } label: { Label("Share What Worked…", systemImage: "square.and.arrow.up") }
+            Text("Opens a filled-in GitHub issue in your browser, so others can run this game the way you do. You see it first, and nothing is sent until you submit it.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
