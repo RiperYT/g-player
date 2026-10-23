@@ -105,7 +105,7 @@ extension AppModel {
     var installedEngineIDs: Set<String> { Set(installedEngines.map(\.id)) }
 
     /// Deletes a retired engine's folder once nothing uses it, off the main thread, after the other work in engine folders
-    /// (`engineFilesWork`: linking D3DMetal, the engine fixes) has ended. Right before, it looks again: the plan was made from
+    /// (`engineFilesWork`: linking D3DMetal, the engine fixes) and the start's clean-up have ended. Right before, it looks again: the plan was made from
     /// a look taken a moment ago, and a program may have started since, so there is a fresh look at the programs and at which
     /// files the running processes come from (`EngineMigration.mayRemove`). If anything uses the engine it is left, and the next
     /// look at the programs tries again.
@@ -115,6 +115,7 @@ extension AppModel {
         let previous = engineFilesWork
         engineFilesWork = Task {
             await previous?.value
+            await leftoversCleaning?.value                  // the start's clean-up walks the Engines folder too
             defer { removingEngines.remove(info.id) }
             let folder = manager.folder(for: info)
             let (processes, executables) = await Task.detached(priority: .utility) {
