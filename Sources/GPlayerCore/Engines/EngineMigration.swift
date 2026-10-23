@@ -113,6 +113,28 @@ public enum EngineMigration {
         return plan(spaces: [space], installed: installed, busy: []).switches.first { $0.to == engine.id }
     }
 
+    /// The space page's offer for a space G-Player may not change (a bottle of another app that was not asked yet) on a retired
+    /// engine whose replacement is installed: moving it updates Wine's files in it once, so it asks. A space the user said no to
+    /// gets no offer: allowing changes in its settings lets it move like any other.
+    public static func offersMove(_ space: Space, installed: Set<String>) -> Bool {
+        guard !space.mayChange, space.allowsChanges == nil, let old = EngineCatalog.info(space.engineID),
+              let new = EngineCatalog.replacement(of: old) else { return false }
+        return installed.contains(new.id)
+    }
+
+    /// What the offer says, in one plain sentence.
+    public static func moveOffer(to info: EngineInfo) -> String {
+        "A newer \(info.name) is ready. Moving this bottle to it updates Wine's files in it once."
+    }
+
+    /// A start in the space would run the replacement of its retired engine, which isn't installed (`ensureEngine` then installs
+    /// the replacement and runs it), and the space is one G-Player may not change: the first start there would update its files,
+    /// so it asks first.
+    public static func startNeedsConsent(_ space: Space, installed: Set<String>) -> Bool {
+        guard !space.mayChange, let old = EngineCatalog.info(space.engineID), EngineCatalog.replacement(of: old) != nil else { return false }
+        return !installed.contains(old.id)
+    }
+
     /// The user switches `space` to `info` on its page. From a retired engine to its replacement it is the move the app makes by
     /// itself (the same Wine, so what was learned about the games' graphics and the launch records go with the space). Nil for any
     /// other switch: another Wine learns afresh.

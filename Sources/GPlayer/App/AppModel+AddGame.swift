@@ -26,6 +26,7 @@ extension AppModel {
     /// first when it isn't installed (the sidebar shows that). Nil when it couldn't be: the reason is shown.
     func engineReady(for space: Space) async -> Engine? {
         let space = self.space(space.id) ?? space
+        if askBeforeNewEngine(for: space, then: {}) { return nil }          // the sheet goes back; pressing it again, once allowed, goes on
         if let engine = engine(for: space) { return engine }
         return await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging)
     }

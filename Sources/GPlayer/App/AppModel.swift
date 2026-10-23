@@ -1317,8 +1317,14 @@ final class AppModel {
         let startingIn = game.spaceID
         launchesStarting[startingIn, default: 0] += 1
         defer { Self.decrement(&launchesStarting, startingIn) }
-        guard let paths, let found = space(game.spaceID),
-              let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
+        guard let paths, let found = space(game.spaceID) else { return false }
+        // A bottle of another app whose old engine is gone would meet the newer one on this start, which updates its files:
+        // asked first. (An automatic retry never asks; it is not made.)
+        let held = retry?.automatic == true
+            ? EngineMigration.startNeedsConsent(found, installed: installedEngineIDs)
+            : askBeforeNewEngine(for: found) { [weak self] in if let g = self?.game(game.id) { self?.play(g, skipping: skipped) } }
+        if held { return false }
+        guard let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
         // The space as it is now: the engine that was just installed may be the replacement of the one it was on, and then the
         // launch, and what it records, belong to the engine it runs on.
         let space = settleSpace(found, on: engine)
@@ -1550,6 +1556,7 @@ final class AppModel {
     /// Runs any Windows program in a space without adding it to the library.
     func run(_ file: URL, in space: Space) {
         guard let paths else { return }
+        if askBeforeNewEngine(for: space, then: { [weak self] in self?.run(file, in: space) }) { return }
         Task {
             var found = engine(for: space)
             if found == nil { found = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }

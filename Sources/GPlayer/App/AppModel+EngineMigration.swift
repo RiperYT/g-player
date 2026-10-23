@@ -27,10 +27,41 @@ extension AppModel {
     /// under its program; one that can't move yet is looked at again at the next look at the programs.
     func migrateEngines(processes: [WineProcess]) {
         guard let manager = engineManager, needsEngineMigration else { return }
-        var plan = enginePlan(processes: processes, manager: manager)
+        var plan = enginePlan(processes: processes)
         if !plan.switches.isEmpty, !moveSpaces(plan.switches) { plan.remove = [] }       // moved, or not at all
         for id in plan.install { if let info = EngineCatalog.info(id) { updateEngineInBackground(info) } }
         for id in plan.remove { if let info = EngineCatalog.info(id) { removeRetiredEngine(info, manager: manager) } }
+    }
+
+    // MARK: Spaces of other apps
+
+    /// The newer engine to offer a bottle of another app that is on a retired one, once it is installed and the user wasn't
+    /// asked (`EngineMigration.offersMove`). The space's page shows the offer.
+    func engineMoveOffer(for space: Space) -> EngineInfo? {
+        guard let current = self.space(space.id), EngineMigration.offersMove(current, installed: installedEngineIDs),
+              let old = EngineCatalog.info(current.engineID) else { return nil }
+        return EngineCatalog.replacement(of: old)
+    }
+
+    /// Yes to the offer: changes are allowed in the space, as the other consent flows save it, and it moves like any space G-Player
+    /// may change: now when nothing runs in it, otherwise once it goes quiet.
+    func acceptEngineMove(of space: Space) {
+        guard let current = self.space(space.id), engineMoveOffer(for: current) != nil else { return }
+        setAllowsChanges(true, for: current)
+        migrateEngines()
+    }
+
+    /// A start in the space would run a newer engine in a bottle of another app and update its files
+    /// (`EngineMigration.startNeedsConsent`): asks first, as every change to such a space does, and goes on with `retry` on a
+    /// yes. A no is final. Returns true when the start must not go on.
+    func askBeforeNewEngine(for space: Space, then retry: @escaping @MainActor () -> Void) -> Bool {
+        guard EngineMigration.startNeedsConsent(space, installed: installedEngineIDs) else { return false }
+        if space.allowsChanges == nil {
+            askToChange(space) { allowed in if allowed { retry() } }
+        } else {
+            errorMessage = "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first."
+        }
+        return true
     }
 
     /// Puts the spaces on their new engines, with what was learned about their games' graphics (`EngineMigration.apply`) and what
@@ -59,19 +90,19 @@ extension AppModel {
     /// installs and returns the replacement, and the space would move to it a moment later in the background: it moves now
     /// (`EngineMigration.moveForStart`), so the start, and what it records about the game's graphics, go by the engine it runs on.
     func settleSpace(_ space: Space, on engine: Engine) -> Space {
-        guard let manager = engineManager else { return space }
-        let installed = Set(EngineCatalog.known.filter { manager.isInstalled($0) }.map(\.id))
         let current = self.space(space.id) ?? space
-        if let move = EngineMigration.moveForStart(current, on: engine.info, installed: installed) { moveSpaces([move]) }
+        if let move = EngineMigration.moveForStart(current, on: engine.info, installed: installedEngineIDs) { moveSpaces([move]) }
         return self.space(space.id) ?? current
     }
 
     /// `EngineMigration.plan` for what is installed and in use now.
-    private func enginePlan(processes: [WineProcess], manager: EngineManager) -> EngineMigration.Plan {
-        let installed = Set(EngineCatalog.known.filter { manager.isInstalled($0) }.map(\.id))
+    private func enginePlan(processes: [WineProcess]) -> EngineMigration.Plan {
         let busy = Set(state.spaces.filter { isEngineInUse(by: $0, processes: processes) }.map(\.id))
-        return EngineMigration.plan(spaces: state.spaces, installed: installed, busy: busy)
+        return EngineMigration.plan(spaces: state.spaces, installed: installedEngineIDs, busy: busy)
     }
+
+    /// The ids of the engines installed on this Mac, retired ones too.
+    var installedEngineIDs: Set<String> { Set(installedEngines.map(\.id)) }
 
     /// Deletes a retired engine's folder once nothing uses it, off the main thread, after the other work in engine folders
     /// (`engineFilesWork`: linking D3DMetal, the engine fixes) has ended. Right before, it looks again: the plan was made from
@@ -89,7 +120,7 @@ extension AppModel {
             let (processes, executables) = await Task.detached(priority: .utility) {
                 (WineProcesses.snapshot(), WineProcesses.executables())
             }.value
-            let plan = enginePlan(processes: processes, manager: manager)
+            let plan = enginePlan(processes: processes)
             guard EngineMigration.mayRemove(info.id, plan: plan, folder: folder, executables: executables) else { return }
             retiredRemovalsTried.insert(info.id)
             await Task.detached(priority: .utility) { _ = try? manager.remove(info) }.value

@@ -18,6 +18,7 @@ struct SpaceView: View {
             VStack(alignment: .leading, spacing: 28) {
                 header
                 if model.needsAppleToolkit(space) { ToolkitOffBanner() }
+                if let target = model.engineMoveOffer(for: space) { EngineMoveOffer(space: space, target: target) }
                 if let preset = AppPresets.preset(space.presetID), !preset.isInstalled(in: space) {
                     presetMissing(preset)
                 }
@@ -229,6 +230,25 @@ private struct ToolkitOffBanner: View {
         }
         .padding(12)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// A bottle of another app that is on a retired engine, once the newer one is ready: one sentence and the yes. Nothing is
+/// written into the bottle before it.
+private struct EngineMoveOffer: View {
+    @Environment(AppModel.self) private var model
+    let space: Space
+    let target: EngineInfo
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(Color.accentColor).font(.title3)
+            Text(EngineMigration.moveOffer(to: target)).font(.callout).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Move Bottle") { model.acceptEngineMove(of: space) }
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

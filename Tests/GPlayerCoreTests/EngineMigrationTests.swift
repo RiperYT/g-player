@@ -188,6 +188,37 @@ import Testing
         #expect(state.games[0].autoGraphics?.current(on: new.id) == AutoGraphics(engineID: new.id, worked: .dxmt, failed: [.dxvk]))
     }
 
+    @Test func theOfferIsForABottleOfAnotherAppNotAskedYetOnceTheNewEngineIsThere() {
+        func offers(_ s: Space, _ installed: [EngineInfo]) -> Bool { EngineMigration.offersMove(s, installed: Set(installed.map(\.id))) }
+        let b = bottle("Bottle", on: old.id)
+        #expect(offers(b, [old, new]))
+        #expect(offers(b, [new]))                                    // its own engine gone: still the way forward
+        #expect(!offers(b, [old]))                                   // "ready" means installed
+        // Said no: no offer; allowing changes in its settings is the way, and then it moves like any other space.
+        #expect(!offers(bottle("No", on: old.id, allows: false), [old, new]))
+        // Allowed (it moves by itself), made by G-Player, or not on a retired engine: nothing to offer.
+        #expect(!offers(bottle("Yes", on: old.id, allows: true), [old, new]))
+        #expect(!offers(space("Mine", on: old.id), [old, new]))
+        #expect(!offers(bottle("Now", on: new.id), [old, new]))
+        #expect(!offers(bottle("Staging", on: staging.id), [old, new, staging]))
+    }
+
+    @Test func theOfferIsOnePlainSentenceAboutOneUpdateOfWinesFiles() {
+        #expect(EngineMigration.moveOffer(to: new)
+                == "A newer G-Player Wine is ready. Moving this bottle to it updates Wine's files in it once.")
+    }
+
+    @Test func aStartAsksFirstOnlyForABottleWhoseRetiredEngineIsGone() {
+        func asks(_ s: Space, _ installed: [EngineInfo]) -> Bool { EngineMigration.startNeedsConsent(s, installed: Set(installed.map(\.id))) }
+        let b = bottle("Bottle", on: old.id)
+        #expect(asks(b, [new]) && asks(b, []))                       // the start would run the new engine in it
+        #expect(!asks(b, [old, new]) && !asks(b, [old]))             // it runs on the old one, which is there
+        #expect(asks(bottle("No", on: old.id, allows: false), [new]))
+        #expect(!asks(bottle("Yes", on: old.id, allows: true), [new]))
+        #expect(!asks(space("Mine", on: old.id), [new]))
+        #expect(!asks(bottle("Now", on: new.id), [new]) && !asks(bottle("Staging", on: staging.id), [staging]))
+    }
+
     // MARK: In use
 
     func program(_ command: String, in space: Space, folder: String = "drive_c/windows/system32") -> WineProcess {
