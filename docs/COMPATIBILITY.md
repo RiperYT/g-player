@@ -155,7 +155,12 @@ On G-Player Wine the Recommended profile takes D3DMetal for 64-bit DirectX 10–
 the Mac user's (`tools/wine-patches/cx-real-user-name.patch`, so a space keeps its saves and Steam login on either engine),
 and Microsoft's Visual C++ runtime in a space wins over Wine's builtin (some games check its version before they start).
 Its archive holds no third-party runtime libraries: G-Player copies FreeType, GnuTLS and SDL2 from Gcenx's Wine Staging
-download on the user's Mac. Game videos that go through Media Foundation need GStreamer, which this build doesn't use yet.
+download on the user's Mac. Game videos that go through Media Foundation play through GStreamer 1.28.8 and Wine's
+`winegstreamer`: G-Player downloads the GStreamer project's official macOS package once, copies the plugins and libraries
+the engine lists into G-Player Wine, and points Wine at them (`GST_PLUGIN_SYSTEM_PATH_1_0`, a registry file of its own,
+no plugin scanner), never at a GStreamer.framework the user installed. H.264 and HEVC go to Apple's VideoToolbox. There is
+no FFmpeg, so WMV and other codecs outside that set may not play. Wine Staging doesn't have this: it uses a
+GStreamer.framework only if the user installed one.
 
 ## Automatic graphics
 
@@ -226,8 +231,8 @@ G-Player Wine's ntdll (CrossOver 26.3.0's, with Alexander Theißen's change, `to
 turned no-execute off for a whole 32-bit process as soon as one DLL in it lacked the `NX_COMPAT` flag, which old Microsoft
 DLLs (xinput1_3, d3dx9, XACT, OpenAL32: what the common Windows components add) do, and Metal on macOS 26 then failed
 every frame, so a 32-bit Unity game showed a black window. The fixed ntdll decides from the main program alone, as Windows
-does; details are in `tools/wine-patches/README.md`. `EngineFixes` puts it into G-Player Wine 26.3.0-1 only over the exact
-files that release ships. If a game needs the old behaviour, `WINE_DISABLE_NX_COMPAT=0` in the game's own environment
+does; details are in `tools/wine-patches/README.md`. G-Player Wine 26.3.0-2 is built with it; `EngineFixes` puts the fixed
+files into 26.3.0-1 (the retired revision) only over the exact files that release ships. If a game needs the old behaviour, `WINE_DISABLE_NX_COMPAT=0` in the game's own environment
 variables (the `environment` of its library entry; the app has no field for it yet) gives it back for that game.
 
 32-bit DirectX 10/11 needs DXVK: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1, so the Compatible

@@ -44,9 +44,10 @@ the common Windows components put them into a space), and on macOS 26 Metal then
 program only; the patch does the same, and under Rosetta keeps no-execute permanently on (a writable and executable
 page costs Rosetta a round trip on first touch). `WINE_DISABLE_NX_COMPAT=0` gives back the Windows behaviour.
 
-- Applied with the other `cx-*.patch` files by `scripts/build-engine-cx.sh`; G-Player Wine 26.3.0-1 was built
-  before it, so `EngineFixes.ntdllNoExec` puts the three rebuilt files into that engine (`ntdll.so` and the
-  x86_64 and i386 `ntdll.dll`), only over the exact files its release ships.
+- Applied with the other `cx-*.patch` files by `scripts/build-engine-cx.sh`. G-Player Wine 26.3.0-2 is built with it;
+  26.3.0-1 was built before it, so `EngineFixes.ntdllNoExec` puts the three rebuilt files into that engine (`ntdll.so`
+  and the x86_64 and i386 `ntdll.dll`), only over the exact files its release ships. Revision 1 is retired: its spaces
+  move to revision 2 (`EngineMigration`) and it is then removed.
 - The bundled files are `Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll*`. Built in the engine's own build tree
   (the same tree and toolchain give byte-identical unpatched files), so the source is the engine's published source
   tarball plus this patch.
@@ -62,7 +63,7 @@ callback, as Wine's ALSA driver does (`adjust_buffer_volume` in `dlls/winealsa.d
 and 32/64-bit float. The Mac's volume is never touched. The same code is in Wine 11.18, so Wine Staging has the same
 issue (not fixed there yet).
 
-- `EngineFixes.coreAudioVolume` puts the rebuilt `x86_64-unix/winecoreaudio.so` into G-Player Wine 26.3.0-1, only over
-  the exact file its release ships. Built with `make dlls/winecoreaudio.drv/winecoreaudio.so` in the engine's build tree;
+- G-Player Wine 26.3.0-2 is built with it. `EngineFixes.coreAudioVolume` puts the rebuilt `x86_64-unix/winecoreaudio.so`
+  into 26.3.0-1 (retired), only over the exact file its release ships. Built with `make dlls/winecoreaudio.drv/winecoreaudio.so` in the engine's build tree;
   a rebuild differs from the bundled file only in debug-info time stamps.
 
