@@ -223,7 +223,8 @@ public struct Legendary: Sendable {
     /// Installs a game into `basePath` (Legendary makes the game's own folder in it) and waits. `status` hears how far it is.
     /// `hasRoom` is asked once, with the game's size on disk, when Legendary reports it, which is before it starts downloading;
     /// a reason it returns stops the install with that reason as the error (Legendary checks the room itself too, in words of
-    /// its own). Cancelling the task stops Legendary; what was downloaded stays, and installing again goes on from there. What
+    /// its own). It isn't asked when Legendary goes on with an install that was stopped: the files that came are already on the
+    /// disk, so the whole size isn't what is still needed, and Legendary's own check knows. Cancelling the task stops Legendary; what was downloaded stays, and installing again goes on from there. What
     /// counts as done is the game showing up as installed: Legendary exits with 0 after some failures.
     public func install(_ appName: String, basePath: URL, log: URL? = nil, hasRoom: @escaping @Sendable (Int64) -> String? = { _ in nil },
                         status: @escaping @Sendable (LegendaryInstallStatus) -> Void) async throws {
@@ -232,7 +233,8 @@ public struct Legendary: Sendable {
         let current = StatusBox()
         let lacking = Reason()
         let result = try await run(LegendaryCommand.install(appName: appName, basePath: basePath), timeout: nil, log: log, stopWhen: { line in
-            guard let size = LegendaryInstallStatus.installSize(in: line), let problem = hasRoom(size) else { return false }
+            if LegendaryInstallStatus.isResuming(line) { lacking.resume() }
+            guard let size = LegendaryInstallStatus.installSize(in: line), !lacking.resumes, let problem = hasRoom(size) else { return false }
             lacking.set(problem)
             return true
         }, onLine: { line in
@@ -292,12 +294,15 @@ private final class StatusBox: @unchecked Sendable {
     }
 }
 
-/// Why an install was stopped, set from the thread that reads Legendary's output.
+/// Why an install was stopped, and whether it goes on from an earlier try; set from the thread that reads Legendary's output.
 private final class Reason: @unchecked Sendable {
     private let lock = NSLock()
     private var text: String?
+    private var resuming = false
     func set(_ reason: String) { lock.lock(); if text == nil { text = reason }; lock.unlock() }
+    func resume() { lock.lock(); resuming = true; lock.unlock() }
     var value: String? { lock.lock(); defer { lock.unlock() }; return text }
+    var resumes: Bool { lock.lock(); defer { lock.unlock() }; return resuming }
 }
 
 /// Collects a process's output: stdout whole, the end of stderr, and stderr as lines (to a log and to a listener).

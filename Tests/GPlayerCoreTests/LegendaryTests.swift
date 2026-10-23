@@ -295,6 +295,11 @@ private let sampleInstalled = """
         #expect(status == LegendaryInstallStatus())
     }
 
+    @Test func anInterruptedDownloadIsRecognisedFromItsLine() {
+        #expect(LegendaryInstallStatus.isResuming("[DLManager] INFO: Found previously interrupted download. Download will be resumed if possible."))
+        #expect(!LegendaryInstallStatus.isResuming("[cli] INFO: Install size: 1.00 MiB"))
+    }
+
     @Test func theGamesSizeIsReadFromItsLine() {
         #expect(LegendaryInstallStatus.installSize(in: "[cli] INFO: Install size: 1024.00 MiB") == 1_073_741_824)
         #expect(LegendaryInstallStatus.installSize(in: "[cli] INFO: Install size: 20480.50 MiB") == Int64(20480.5 * 1_048_576))
@@ -599,6 +604,22 @@ private let sampleInstalled = """
         #expect(asked.all == [20_480 * 1_048_576])
         #expect(Date().timeIntervalSince(started) < 10)
         #expect(calls().count == 1)                                                       // nothing was listed or checked afterwards
+    }
+
+    @Test func anInstallThatGoesOnFromAnEarlierTryIsNotRefusedForItsWholeSize() async throws {
+        // 45 of 50 GB came before it was stopped: only the rest has to fit, which Legendary's own check works out.
+        let legendary = try stand(in: """
+        case "$2" in
+          install)
+            echo '[DLManager] INFO: Found previously interrupted download. Download will be resumed if possible.' >&2
+            echo '[cli] INFO: Install size: 51200.00 MiB' >&2 ;;
+          list-installed) echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))' ;;
+        esac
+        """)
+        let asked = Sizes()
+        try await legendary.install("SampleApp", basePath: tmp.url.appendingPathComponent("base"),
+                                    hasRoom: { asked.add($0); return "No room." }) { _ in }
+        #expect(asked.all.isEmpty)
     }
 
     @Test func anInstallThatFitsGoesOn() async throws {

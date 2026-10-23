@@ -68,6 +68,10 @@ public struct LegendaryInstallStatus: Equatable, Sendable {
         return Int64(mebibytes * 1_048_576)
     }
 
+    /// `Found previously interrupted download. Download will be resumed if possible.`: this install goes on from one that was
+    /// stopped. Legendary writes it while it works out what to download, before it says how big the game is.
+    public static func isResuming(_ line: String) -> Bool { line.contains("Found previously interrupted download") }
+
     /// `01:23:45` or `00:01:23`: hours, minutes, seconds.
     static func seconds(fromClock text: Substring) -> TimeInterval? {
         let clock = text.prefix { $0.isNumber || $0 == ":" }
