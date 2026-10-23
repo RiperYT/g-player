@@ -107,6 +107,11 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
 
     public var isHidden: Bool { hidden == true }
 
+    /// Legendary's name for the game, when it is an Epic game G-Player installed.
+    public var legendaryAppName: String? {
+        if case .legendary(let name) = source { name } else { nil }
+    }
+
     /// Only games the user added can be removed. A store game would come back, a launcher is rebuilt, so those are hidden instead.
     public var canRemove: Bool { source == .executable && kind == .game }
 

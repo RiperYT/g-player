@@ -30,7 +30,16 @@ public enum LegendaryCommand {
         command(["install", appName, "--platform", platform, "--base-path", basePath.path, "--skip-sdl", "--skip-dlcs"])
     }
 
-    public static func uninstall(appName: String) -> [String] { command(["uninstall", appName]) }
+    /// Removes a game. With `keepFiles` only Legendary's record of it goes: the files are not touched.
+    public static func uninstall(appName: String, keepFiles: Bool = false) -> [String] {
+        command(["uninstall", appName] + (keepFiles ? ["--keep-files"] : []))
+    }
+
+    /// Points Legendary's record of a game at `basePath`/<the game's folder name>, without moving anything: for a game whose files
+    /// are where they should be but whose record says another place (the library moved).
+    public static func relink(appName: String, basePath: URL) -> [String] {
+        command(["move", appName, basePath.path, "--skip-move"])
+    }
 
     // TODO: update and repair (`install` again, `install --repair`), verify, sync-saves and eos-overlay, once G-Player offers them.
 

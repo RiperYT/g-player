@@ -69,20 +69,19 @@ public enum EpicGames {
         return !names(merged).subtracting(names(existing)).isEmpty
     }
 
-    /// Brings the library's Epic games of `space` in line with `installed`, which is everything Legendary has installed (not a
-    /// partial list: a game missing from it is taken out). A new game becomes a library entry; one that is already there keeps
-    /// its title, playtime, settings and `hidden`, and learns again what it is if its program moved; one that Legendary no longer
-    /// lists, or whose program is gone from the disk, leaves.
+    /// Brings the library's Epic games of `space` in line with `installed`, what Legendary lists. A new game with its program on the
+    /// disk becomes a library entry; one that is already there keeps its title, playtime, settings and `hidden`, and learns again what
+    /// it is if its program moved. Nothing leaves: a game whose files aren't found (the library moved, a disk is away) or that
+    /// Legendary no longer lists stays, marked by `health`, until the user removes it (`removing`) or fixes what is wrong; a look
+    /// that came at a bad moment must never cost anyone a game's playtime and settings.
     /// - Parameter isPresent: whether a file is on the disk.
     public static func merge(existing: [Game], installed: [LegendaryInstalledGame], space: Space,
                              isPresent: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) })
         -> (games: [Game], changed: Bool) {
         var games = existing
         var changed = false
-        var kept = Set<String>()
         for installedGame in installed {
             guard let program = installedGame.executableURL, isPresent(program) else { continue }
-            kept.insert(installedGame.appName)
             let path = Game.storedPath(for: program, in: space)
             let source = Game.Source.legendary(appName: installedGame.appName)
             if let index = games.firstIndex(where: { $0.spaceID == space.id && $0.source == source }) {
@@ -96,11 +95,69 @@ public enum EpicGames {
                 changed = true
             }
         }
-        let before = games.count
-        games.removeAll { game in
-            guard game.spaceID == space.id, case .legendary(let name) = game.source else { return false }
-            return !kept.contains(name)
+        return (games, changed)
+    }
+
+    /// `games` without the Epic game `appName` of `spaceID`: what happens once Legendary has uninstalled it or forgotten it.
+    public static func removing(appName: String, of spaceID: UUID, from games: [Game]) -> [Game] {
+        games.filter { !($0.spaceID == spaceID && $0.source == .legendary(appName: appName)) }
+    }
+
+    // MARK: Whether the files are where Legendary says
+
+    /// How a library entry stands with what Legendary has recorded.
+    public enum Health: Equatable, Sendable {
+        case ok
+        /// Legendary's record points at a place where the game's program isn't. `repairBase` is set when the program is in the
+        /// Epic space at the same place below `drive_c` (the library moved, so the record still holds the old path): it is the
+        /// folder to give Legendary (`Legendary.relink`).
+        case filesNotFound(repairBase: URL?)
+        /// Legendary has no record of the game: it can't be started from here, and the entry can only go.
+        case notRecorded
+    }
+
+    /// - Parameters:
+    ///   - record: what Legendary's list has for the game, nil when it has nothing.
+    ///   - recordsKnown: Legendary's list has been read in this run; before that nothing is known, and nothing is wrong.
+    ///   - isPresent: whether a file is on the disk.
+    public static func health(record: LegendaryInstalledGame?, recordsKnown: Bool, space: Space,
+                              isPresent: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> Health {
+        guard recordsKnown else { return .ok }
+        guard let record else { return .notRecorded }
+        if let program = record.executableURL, isPresent(program) { return .ok }
+        let base = installBase(in: space)
+        let folder = base.appendingPathComponent(URL(fileURLWithPath: record.installPath).lastPathComponent, isDirectory: true)
+        let here = LegendaryOutput.executableURL(folder: folder.path, executable: record.executable)
+        guard let here, !Legendary.samePath(folder.path, record.installPath), isPresent(here) else { return .filesNotFound(repairBase: nil) }
+        return .filesNotFound(repairBase: base)
+    }
+
+    /// What to tell the user about a game that isn't `ok`, and what removing it means.
+    public struct Note: Equatable, Sendable {
+        /// A few words for a label: "Files not found".
+        public let title: String
+        /// What happened and what can be done.
+        public let detail: String
+        /// The question before the entry is removed, which says that no file is deleted.
+        public let removal: String
+    }
+
+    public static func note(for health: Health, title: String) -> Note? {
+        switch health {
+        case .ok:
+            return nil
+        case .filesNotFound(.some):
+            return Note(title: "Files not found",
+                        detail: "Legendary's record of “\(title)” points at its old place, but its files are in this library's Epic Games space. Repair points the record at them.",
+                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from Epic Games.")
+        case .filesNotFound(nil):
+            return Note(title: "Files not found",
+                        detail: "“\(title)” isn't where Epic Games installed it. If you moved its files, put them back, or remove it and install it again.",
+                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from Epic Games.")
+        case .notRecorded:
+            return Note(title: "Not installed",
+                        detail: "Legendary has no record of “\(title)” any more. Remove it from the library, then install it again from Epic Games.",
+                        removal: "“\(title)” leaves the library. Legendary has no record of it, and no file is deleted.")
         }
-        return (games, changed || games.count != before)
     }
 }

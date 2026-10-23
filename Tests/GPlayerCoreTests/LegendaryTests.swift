@@ -94,6 +94,16 @@ private let sampleInstalled = """
         #expect(LegendaryCommand.launch(appName: "SampleApp", wine: wine, offline: true) == online + ["--offline"])
     }
 
+    @Test func uninstallKeepsTheFilesOnlyWhenAsked() {
+        #expect(LegendaryCommand.uninstall(appName: "SampleApp") == ["-y", "uninstall", "SampleApp"])
+        #expect(LegendaryCommand.uninstall(appName: "SampleApp", keepFiles: true) == ["-y", "uninstall", "SampleApp", "--keep-files"])
+    }
+
+    @Test func aRelinkMovesNothing() {
+        #expect(LegendaryCommand.relink(appName: "SampleApp", basePath: URL(fileURLWithPath: "/lib/Spaces/Epic Games/drive_c/Games/Epic"))
+                == ["-y", "move", "SampleApp", "/lib/Spaces/Epic Games/drive_c/Games/Epic", "--skip-move"])
+    }
+
     @Test func aNameThatCouldBeAnOptionIsNotAnAppName() {
         #expect(LegendaryCommand.isAppName("SampleApp"))
         #expect(LegendaryCommand.isAppName("0123456789abcdef0123456789abcdef"))
@@ -380,6 +390,17 @@ private let sampleInstalled = """
         #expect(LegendaryFailure.kind(stderr: text) == .busy)
     }
 
+    @Test func aRecordForAFolderThatIsGoneIsNotConfusedWithAnythingElse() {
+        let text = #"[cli] CRITICAL: Install directory "/old/Spaces/Epic Games/drive_c/Games/Epic/SampleGame" appears to be deleted, cannot launch SampleApp!"#
+        #expect(LegendaryFailure.kind(stderr: text) == .installMissing)
+        let reason = LegendaryFailure.reason(stdout: "", stderr: text, status: 1)
+        #expect(reason == LegendaryFailure.installMissingMessage && !reason.contains("/old/"))
+    }
+
+    @Test func aTimeoutIsNetworkTrouble() {
+        #expect(LegendaryFailure.kind(stderr: "requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='x'): Read timed out.") == .network)
+    }
+
     @Test func noNetworkIsSaidSo() {
         let text = "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.legendary.gl', port=443): Max retries exceeded"
         #expect(LegendaryFailure.kind(stderr: text) == .network)
@@ -425,7 +446,7 @@ private let sampleInstalled = """
 
     /// A shell script in place of Legendary. It writes the arguments, the environment and what reading stdin gives (1 is the end
     /// of the file, as on /dev/null; 142 would be a stdin nobody closed) to files in `trace`.
-    private func stand(in body: String) throws -> Legendary {
+    private func stand(in body: String, limits: Legendary.Limits = Legendary.Limits()) throws -> Legendary {
         let trace = tmp.dir("trace")
         let script = """
         #!/bin/bash
@@ -437,7 +458,7 @@ private let sampleInstalled = """
         """
         let file = tmp.file("stand/legendary", contents: Data(script.utf8))
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
-        return Legendary(paths: paths, executable: file, checksum: try Files.sha256(of: file))
+        return Legendary(paths: paths, executable: file, checksum: try Files.sha256(of: file), limits: limits)
     }
 
     private func trace(_ name: String) -> String { (try? String(contentsOf: tmp.url.appendingPathComponent("trace/\(name)"), encoding: .utf8)) ?? "" }
@@ -613,11 +634,19 @@ private let sampleInstalled = """
 
     // MARK: Install and uninstall
 
+    /// What `list-installed` prints for one game whose program is on the disk (or, with `program: false`, isn't), as one line for
+    /// a script to print.
+    private func installedLine(program: Bool = true, folder: String = "games/SampleGame") -> String {
+        if program { tmp.file("\(folder)/Bin/Sample.exe") }
+        let path = tmp.url.appendingPathComponent(folder).path
+        return #"[{"app_name": "SampleApp", "install_path": "\#(path)", "title": "Sample Game", "version": "1", "executable": "Bin\\Sample.exe", "install_size": 5, "is_dlc": false, "platform": "Windows"}]"#
+    }
+
     @Test func anInstallIsDoneWhenTheGameIsListedAsInstalled() async throws {
         let legendary = try stand(in: """
         case "$2" in
           install) echo '[DLManager] INFO: = Progress: 50.00% (5/10), Running for 00:00:05, ETA: 00:00:05' >&2 ;;
-          list-installed) echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))' ;;
+          list-installed) echo '\(installedLine())' ;;
         esac
         """)
         let heard = Statuses()
@@ -626,6 +655,22 @@ private let sampleInstalled = """
         #expect(calls()[0] == ["-y", "install", "SampleApp", "--platform", "Windows", "--base-path",
                                tmp.url.appendingPathComponent("base").path, "--skip-sdl", "--skip-dlcs"])
         #expect(FileManager.default.fileExists(atPath: tmp.url.appendingPathComponent("base").path))
+    }
+
+    @Test func anInstallWhoseProgramIsNotOnTheDiskIsNotDone() async throws {
+        let legendary = try stand(in: """
+        case "$2" in
+          install) echo '[cli] INFO: Finished installation process in 5.00 seconds.' >&2 ;;
+          list-installed) echo '\(installedLine(program: false))' ;;
+        esac
+        """)
+        do {
+            try await legendary.install("SampleApp", basePath: tmp.url.appendingPathComponent("base")) { _ in }
+            Issue.record("expected an error")
+        } catch {
+            let text = error.localizedDescription
+            #expect(text.contains("“Sample Game”") && text.contains("its program isn't in") && text.contains("games/SampleGame"), "\(text)")
+        }
     }
 
     @Test func anInstallThatLegendaryEndedWithZeroButDidNotFinishIsAnError() async throws {
@@ -682,7 +727,7 @@ private let sampleInstalled = """
           install)
             echo '[DLManager] INFO: Found previously interrupted download. Download will be resumed if possible.' >&2
             echo '[cli] INFO: Install size: 51200.00 MiB' >&2 ;;
-          list-installed) echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))' ;;
+          list-installed) echo '\(installedLine())' ;;
         esac
         """)
         let asked = Sizes()
@@ -695,7 +740,7 @@ private let sampleInstalled = """
         let legendary = try stand(in: """
         case "$2" in
           install) echo '[cli] INFO: Install size: 10.00 MiB' >&2 ;;
-          list-installed) echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))' ;;
+          list-installed) echo '\(installedLine())' ;;
         esac
         """)
         let asked = Sizes()
@@ -713,7 +758,7 @@ private let sampleInstalled = """
         let legendary = try stand(in: """
         case "$2" in
           uninstall) rm -f '\(tmp.url.path)/listed' ;;
-          list-installed) if [ -e '\(tmp.url.path)/listed' ]; then echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))'; else echo '[]'; fi ;;
+          list-installed) if [ -e '\(tmp.url.path)/listed' ]; then echo '\(installedLine())'; else echo '[]'; fi ;;
         esac
         """)
         tmp.file("listed")
@@ -721,27 +766,91 @@ private let sampleInstalled = """
         #expect(calls().first == ["-y", "uninstall", "SampleApp"])
     }
 
+    @Test func removingOnlyTheRecordKeepsTheFilesAndSaysSo() async throws {
+        let legendary = try stand(in: """
+        case "$2" in
+          uninstall) rm -f '\(tmp.url.path)/listed' ;;
+          list-installed) if [ -e '\(tmp.url.path)/listed' ]; then echo '\(installedLine())'; else echo '[]'; fi ;;
+        esac
+        """)
+        tmp.file("listed")
+        try await legendary.uninstall("SampleApp", keepFiles: true)
+        #expect(calls().first == ["-y", "uninstall", "SampleApp", "--keep-files"])
+    }
+
     @Test func anUninstallThatLeftTheGameListedIsAnError() async throws {
         let legendary = try stand(in: """
         case "$2" in
           uninstall) echo '[core] ERROR: Deleting failed' >&2 ;;
-          list-installed) echo '\(sampleInstalled.replacingOccurrences(of: "\n", with: ""))' ;;
+          list-installed) echo '\(installedLine())' ;;
         esac
         """)
         await #expect(throws: ShellError.self) { try await legendary.uninstall("SampleApp") }
     }
 
+    // MARK: A record that points at the old place
+
+    @Test func aRecordIsPointedAtTheFilesWhereTheyAreNow() async throws {
+        let base = tmp.dir("new/Epic")
+        let here = installedLine(folder: "new/Epic/SampleGame")                          // the files, in the new place
+        let stale = installedLine(program: false, folder: "old/Epic/SampleGame")         // where Legendary still thinks they are
+        let legendary = try stand(in: """
+        case "$2" in
+          move) touch '\(tmp.url.path)/moved' ;;
+          list-installed) if [ -e '\(tmp.url.path)/moved' ]; then echo '\(here)'; else echo '\(stale)'; fi ;;
+        esac
+        """)
+        try await legendary.relink("SampleApp", to: base)
+        #expect(calls().first == ["-y", "move", "SampleApp", base.path, "--skip-move"])
+    }
+
+    @Test func aRelinkThatLegendaryDidNotDoIsAnErrorEvenWithExitZero() async throws {
+        let base = tmp.dir("new/Epic")
+        let stale = installedLine(program: false, folder: "old/Epic/SampleGame")
+        let legendary = try stand(in: """
+        case "$2" in
+          move) echo '[cli] ERROR: No installed game found for "SampleApp"' >&2 ;;
+          list-installed) echo '\(stale)' ;;
+        esac
+        """)
+        do {
+            try await legendary.relink("SampleApp", to: base)
+            Issue.record("expected an error")
+        } catch {
+            #expect(error.localizedDescription.contains("No installed game found"), "\(error)")
+        }
+    }
+
+    @Test func aRelinkToAFolderWithoutTheProgramIsAnError() async throws {
+        let base = tmp.dir("new/Epic")
+        let pointed = installedLine(program: false, folder: "new/Epic/SampleGame")        // the record moved, the files aren't there
+        let legendary = try stand(in: """
+        case "$2" in
+          list-installed) echo '\(pointed)' ;;
+        esac
+        """)
+        await #expect(throws: ShellError.self) { try await legendary.relink("SampleApp", to: base) }
+    }
+
+    @Test func aRelinkForSomethingThatIsNotAnAppNameNeverRuns() async throws {
+        let legendary = try stand(in: "true")
+        await #expect(throws: ShellError.self) { try await legendary.relink("--force", to: tmp.url) }
+        #expect(calls().isEmpty)
+    }
+
     // MARK: Launch
+
+    private let wine = URL(fileURLWithPath: "/engine/bin/wine")
 
     @Test func launchParametersComeOnlineWhenEpicAnswers() async throws {
         let legendary = try stand(in: "echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: ""))'")
-        let launch = try await legendary.launchParameters(for: "SampleApp", wine: URL(fileURLWithPath: "/engine/bin/wine"))
-        #expect(launch.environment.isEmpty)
+        let answer = try await legendary.launchParameters(for: "SampleApp", wine: wine)
+        #expect(answer.launch.environment.isEmpty && answer.offlineBecause == nil)
         #expect(calls() == [["-y", "launch", "SampleApp", "--json", "--wine", "/engine/bin/wine", "--skip-version-check"]])
     }
 
-    @Test func withoutTheNetworkTheGameIsAskedForOffline() async throws {
-        let legendary = try stand(in: """
+    private var networkDown: String {
+        """
         if printf '%s\\n' "$@" | grep -qx -- --offline; then
           echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: "").replacingOccurrences(of: "0123456789abcdef0123456789abcdef", with: ""))'
         else
@@ -749,11 +858,32 @@ private let sampleInstalled = """
           echo '[cli] ERROR: Login failed, cannot continue!' >&2
           exit 1
         fi
-        """)
-        let launch = try await legendary.launchParameters(for: "SampleApp", wine: URL(fileURLWithPath: "/engine/bin/wine"))
-        #expect(launch.eglParameters.contains("-AUTH_PASSWORD="))
+        """
+    }
+
+    @Test func whenEpicCantBeReachedTheGameIsAskedForOfflineAndTheAnswerSaysWhy() async throws {
+        let legendary = try stand(in: networkDown)
+        let answer = try await legendary.launchParameters(for: "SampleApp", wine: wine)
+        #expect(answer.launch.eglParameters.contains("-AUTH_PASSWORD="))
+        #expect(answer.offlineBecause == "Epic Games can't be reached.")
         let all = calls()
         #expect(all.count == 2 && !all[0].contains("--offline") && all[1].contains("--offline"))
+    }
+
+    @Test func noAnswerWithinTheLimitCountsAsEpicNotBeingReached() async throws {
+        var limits = Legendary.Limits()
+        limits.onlineLaunch = 1
+        let legendary = try stand(in: """
+        if printf '%s\\n' "$@" | grep -qx -- --offline; then
+          echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: ""))'
+        else
+          exec sleep 30
+        fi
+        """, limits: limits)
+        let started = Date()
+        let answer = try await legendary.launchParameters(for: "SampleApp", wine: wine)
+        #expect(answer.offlineBecause == "Epic Games didn't answer in time.")
+        #expect(Date().timeIntervalSince(started) < 25)
     }
 
     @Test func aSignedOutAccountIsNotRetriedOffline() async throws {
@@ -762,7 +892,7 @@ private let sampleInstalled = """
         exit 1
         """)
         do {
-            _ = try await legendary.launchParameters(for: "SampleApp", wine: URL(fileURLWithPath: "/engine/bin/wine"))
+            _ = try await legendary.launchParameters(for: "SampleApp", wine: wine)
             Issue.record("expected an error")
         } catch {
             #expect(error.localizedDescription == LegendaryFailure.signedOutMessage)
@@ -770,17 +900,51 @@ private let sampleInstalled = """
         #expect(calls().count == 1)
     }
 
+    @Test func anyOtherFailureIsShownAndNeverBecomesAnOfflineStart() async throws {
+        // Epic answered, but not with what a launch needs: starting without its login would only fail later and less clearly.
+        let legendary = try stand(in: """
+        if printf '%s\\n' "$@" | grep -qx -- --offline; then
+          echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: ""))'
+        else
+          echo '[cli] ERROR: Getting authentication token failed: 403 Forbidden' >&2
+          exit 1
+        fi
+        """)
+        do {
+            _ = try await legendary.launchParameters(for: "SampleApp", wine: wine)
+            Issue.record("expected an error")
+        } catch {
+            #expect(error.localizedDescription.contains("Getting authentication token failed"), "\(error)")
+        }
+        #expect(calls().count == 1)
+    }
+
+    @Test func aRecordThatPointsAtAFolderThatIsGoneSaysWhatToDo() async throws {
+        let legendary = try stand(in: """
+        echo '[cli] CRITICAL: Install directory "/old/Spaces/Epic Games/drive_c/Games/Epic/SampleGame" appears to be deleted, cannot launch SampleApp!' >&2
+        exit 1
+        """)
+        do {
+            _ = try await legendary.launchParameters(for: "SampleApp", wine: wine)
+            Issue.record("expected an error")
+        } catch {
+            #expect(error.localizedDescription == LegendaryFailure.installMissingMessage)
+        }
+        #expect(calls().count == 1)                                                       // not asked again offline: it would say the same
+    }
+
     @Test func theCodeIsNeverInAnErrorOrALog() async throws {
         let legendary = try stand(in: """
         echo '\(sampleLaunch.replacingOccurrences(of: "\n", with: ""))'
-        echo '[cli] ERROR: dry run: x.exe -AUTH_PASSWORD=0123456789abcdef0123456789abcdef' >&2
+        echo '[cli] ERROR: dry run: x.exe -AUTH_PASSWORD=0123456789abcdef0123456789abcdef -epicusername=Sample Player' >&2
         exit 2
         """)
         do {
-            _ = try await legendary.launchParameters(for: "SampleApp", wine: URL(fileURLWithPath: "/engine/bin/wine"))
+            _ = try await legendary.launchParameters(for: "SampleApp", wine: wine)
             Issue.record("expected an error")
         } catch {
             #expect(!error.localizedDescription.contains("0123456789abcdef"), "\(error)")
+            #expect(!error.localizedDescription.contains("Player"), "\(error)")
         }
     }
 

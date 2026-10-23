@@ -30,6 +30,14 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(!Game.Source.steam(appID: "1").startsProgramItself && !Game.Source.epic(appName: "a", launchURI: "u").startsProgramItself)
     }
 
+    @Test func onlyAnEpicGameInstalledWithLegendaryHasALegendaryName() {
+        let space = UUID()
+        #expect(Game(title: "A", spaceID: space, source: .legendary(appName: "SampleApp")).legendaryAppName == "SampleApp")
+        #expect(Game(title: "A", spaceID: space).legendaryAppName == nil)
+        #expect(Game(title: "A", spaceID: space, source: .epic(appName: "x", launchURI: "u")).legendaryAppName == nil)
+        #expect(Game(title: "A", spaceID: space, source: .steam(appID: "1")).legendaryAppName == nil)
+    }
+
     @Test func aStoreGameCanBeHiddenButNotRemoved() {
         let game = Game(title: "Sample Game", spaceID: UUID(), source: .legendary(appName: "SampleApp"))
         #expect(!game.canRemove)
@@ -110,19 +118,37 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(merged.games[0].analysis == nil && merged.games[0].secondsPlayed == 5)
     }
 
-    @Test func aGameLegendaryNoLongerListsLeaves() {
+    @Test func aGameLegendaryNoLongerListsStaysWithItsPlaytimeAndSettings() {
+        // An empty list can be a look at a bad moment (a disk away, the settings folder moved): nothing is lost for it.
         let s = epic
-        let gone = Game(title: "Gone", spaceID: s.id, source: .legendary(appName: "Gone"), executablePath: "x.exe")
+        var gone = Game(title: "Gone", spaceID: s.id, source: .legendary(appName: "Gone"), executablePath: "x.exe", secondsPlayed: 3600, hidden: true)
+        gone.environment = ["A": "1"]
         let merged = EpicGames.merge(existing: [gone], installed: [], space: s)
-        #expect(merged.changed && merged.games.isEmpty)
+        #expect(!merged.changed && merged.games == [gone])
     }
 
-    @Test func aGameWhoseProgramIsGoneFromTheDiskLeaves() {
-        let s = epic                                                                         // the folder was deleted in Finder
+    @Test func aGameWhoseProgramIsNotFoundStaysAndIsNotChanged() {
+        let s = epic                                                                         // the library moved: the record's path is old
         let game = Game(title: "Sample Game", spaceID: s.id, source: .legendary(appName: "SampleApp"),
-                        executablePath: "drive_c/Games/Epic/SampleGame/Bin/Sample.exe")
-        let merged = EpicGames.merge(existing: [game], installed: [installedGame(folder: folder)], space: s)
-        #expect(merged.changed && merged.games.isEmpty)
+                        executablePath: "drive_c/Games/Epic/SampleGame/Bin/Sample.exe", secondsPlayed: 600)
+        let merged = EpicGames.merge(existing: [game], installed: [installedGame(folder: "/old/library/Spaces/Epic Games/drive_c/Games/Epic/SampleGame")], space: s)
+        #expect(!merged.changed && merged.games == [game])
+    }
+
+    @Test func aGameInstalledButNotOnTheDiskIsNotAddedYet() {
+        let s = epic
+        let merged = EpicGames.merge(existing: [], installed: [installedGame(folder: folder)], space: s)     // no file made
+        #expect(!merged.changed && merged.games.isEmpty)
+    }
+
+    @Test func removingTakesOnlyThatGameOfThatSpace() {
+        let s = epic, other = space(at: tmp.prefix("Main"))
+        let a = Game(title: "A", spaceID: s.id, source: .legendary(appName: "SampleApp"))
+        let b = Game(title: "B", spaceID: s.id, source: .legendary(appName: "OtherApp"))
+        let c = Game(title: "C", spaceID: other.id, source: .legendary(appName: "SampleApp"))
+        let d = Game(title: "D", spaceID: s.id)
+        #expect(EpicGames.removing(appName: "SampleApp", of: s.id, from: [a, b, c, d]) == [b, c, d])
+        #expect(EpicGames.removing(appName: "Missing", of: s.id, from: [a, b]) == [a, b])
     }
 
     @Test func otherGamesAndSpacesAreLeftAlone() {
@@ -261,12 +287,23 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(plan.arguments.first == folder + "/Bin64/Sample.exe")
     }
 
-    @Test func aProgramThatIsNotThereIsAClearError() throws {
+    @Test func aProgramThatIsNotThereSaysWhatToDoAndNeverToChooseOneInItsSettings() throws {
         let s = epic
         let g = Game(title: "Sample Game", spaceID: s.id, source: .legendary(appName: "SampleApp"), executablePath: "drive_c/Games/Epic/none.exe")
-        #expect(throws: LaunchPlanner.PlanError.self) { try LaunchPlanner.plan(for: g, in: s) }
+        func message(_ work: () throws -> LaunchPlan) -> String? {
+            do { _ = try work(); return nil } catch { return error.localizedDescription }
+        }
+        let first = message { try LaunchPlanner.plan(for: g, in: s) }
         let launch = try #require(LegendaryOutput.launch(launchJSON(folder: folder, game: "Bin/none.exe")))
-        #expect(throws: LaunchPlanner.PlanError.self) { try LaunchPlanner.plan(for: game(s), in: s, legendary: launch) }
+        let second = message { try LaunchPlanner.plan(for: game(s), in: s, legendary: launch) }
+        for text in [first, second] {
+            let text = try #require(text)
+            #expect(text.contains("Open Epic Games in the sidebar") && !text.contains("settings"), "\(text)")
+        }
+        #expect(first?.contains("Sample Game") == true)
+        // A program the user added still says how to choose another.
+        let mine = Game(title: "Mine", spaceID: s.id, executablePath: "drive_c/Games/none.exe")
+        #expect(message { try LaunchPlanner.plan(for: mine, in: s) }?.contains("Choose one in its settings") == true)
     }
 
     @Test func theGameIsPlannedLikeAProgramOfYourOwn() throws {
@@ -308,5 +345,87 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: "SampleApp") == "It is being uninstalled.")
         #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: "OtherApp") == nil)
         #expect(EpicGames.playBlock(appName: "SampleApp", uninstalling: nil) == nil)
+    }
+}
+
+@Suite struct EpicHealthTests {
+    let tmp = TempFolder()
+    var epic: Space { space(at: tmp.prefix("Epic Games"), preset: EpicGames.presetID) }
+    private let old = "/old/library/Spaces/Epic Games/drive_c/Games/Epic/SampleGame"
+
+    private func record(_ folder: String, executable: String = "Bin\\Sample.exe") -> LegendaryInstalledGame {
+        installedGame(folder: folder, executable: executable)
+    }
+
+    @Test func nothingIsWrongBeforeLegendarysListHasBeenRead() {
+        #expect(EpicGames.health(record: nil, recordsKnown: false, space: epic) == .ok)
+        #expect(EpicGames.health(record: record(old), recordsKnown: false, space: epic) == .ok)
+    }
+
+    @Test func aGameWhoseProgramIsWhereLegendarySaysIsFine() {
+        let s = epic
+        let folder = s.driveC.appendingPathComponent("Games/Epic/SampleGame").path
+        tmp.file("Epic Games/drive_c/Games/Epic/SampleGame/Bin/Sample.exe")
+        #expect(EpicGames.health(record: record(folder), recordsKnown: true, space: s) == .ok)
+    }
+
+    @Test func aGameLegendaryHasNoRecordOfIsNotRecorded() {
+        #expect(EpicGames.health(record: nil, recordsKnown: true, space: epic) == .notRecorded)
+    }
+
+    @Test func aMovedLibraryIsRepairableWhenTheFilesAreInTheSpaceAtTheSameRelativePath() {
+        let s = epic
+        tmp.file("Epic Games/drive_c/Games/Epic/SampleGame/Bin/Sample.exe")                  // the files moved along with the library
+        let health = EpicGames.health(record: record(old), recordsKnown: true, space: s)
+        #expect(health == .filesNotFound(repairBase: EpicGames.installBase(in: s)))
+    }
+
+    @Test func aGameWhoseFilesAreNowhereIsNotRepairable() {
+        #expect(EpicGames.health(record: record(old), recordsKnown: true, space: epic) == .filesNotFound(repairBase: nil))
+    }
+
+    @Test func aRecordAlreadyInThisSpaceWithoutItsProgramHasNothingToRepairWith() {
+        let s = epic
+        let here = s.driveC.appendingPathComponent("Games/Epic/SampleGame").path
+        tmp.dir("Epic Games/drive_c/Games/Epic/SampleGame")                                    // the folder, but not the program
+        #expect(EpicGames.health(record: record(here), recordsKnown: true, space: s) == .filesNotFound(repairBase: nil))
+    }
+
+    @Test func aFolderOfAnotherNameIsNotTakenForTheGame() {
+        let s = epic
+        tmp.file("Epic Games/drive_c/Games/Epic/Renamed/Bin/Sample.exe")
+        #expect(EpicGames.health(record: record(old), recordsKnown: true, space: s) == .filesNotFound(repairBase: nil))
+    }
+
+    @Test func aRecordWhoseProgramLeavesItsFolderIsBroken() {
+        let s = epic
+        let health = EpicGames.health(record: record(old, executable: "..\\..\\x.exe"), recordsKnown: true, space: s)
+        #expect(health == .filesNotFound(repairBase: nil))
+    }
+}
+
+@Suite struct EpicHealthNoteTests {
+    @Test func aHealthyGameHasNothingToSay() {
+        #expect(EpicGames.note(for: .ok, title: "Sample Game") == nil)
+    }
+
+    @Test func aRepairableGameOffersTheRepairAndSaysNothingIsDeletedOnRemoval() throws {
+        let note = try #require(EpicGames.note(for: .filesNotFound(repairBase: URL(fileURLWithPath: "/lib/Epic")), title: "Sample Game"))
+        #expect(note.title == "Files not found")
+        #expect(note.detail.contains("Repair") && note.detail.contains("“Sample Game”"))
+        #expect(note.removal.contains("No file is deleted") && note.removal.contains("install it again"))
+    }
+
+    @Test func aGameWhoseFilesAreGoneSaysToPutThemBackOrRemoveIt() throws {
+        let note = try #require(EpicGames.note(for: .filesNotFound(repairBase: nil), title: "Sample Game"))
+        #expect(note.title == "Files not found" && !note.detail.contains("Repair"))
+        #expect(note.detail.contains("put them back") && note.detail.contains("install it again"))
+        #expect(note.removal.contains("No file is deleted"))
+    }
+
+    @Test func aGameLegendaryForgotCanOnlyLeaveTheLibrary() throws {
+        let note = try #require(EpicGames.note(for: .notRecorded, title: "Sample Game"))
+        #expect(note.title == "Not installed" && note.detail.contains("Remove it from the library"))
+        #expect(note.removal.contains("leaves the library") && note.removal.contains("no file is deleted"))
     }
 }

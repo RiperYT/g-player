@@ -23,11 +23,27 @@ public struct Legendary: Sendable {
     private let override: URL?
     /// The SHA-256 the file has to have for every run (`verified`): the pinned one. A test's stand-in may have another, or none.
     private let checksum: String?
+    private let limits: Limits
 
-    public init(paths: LibraryPaths) { self.paths = paths; self.override = nil; self.checksum = Self.download.sha256 }
+    /// How long a kind of command may take before G-Player stops it, in seconds. Each Legendary command takes about six seconds
+    /// to start, and Epic's answers are bounded by its own ten-second limit on each request, so none of these is generous: a
+    /// launch waits for at most `onlineLaunch` + `offlineLaunch` before the game starts or says why it can't.
+    struct Limits: Sendable {
+        var quick: TimeInterval = 60          // status, list-installed
+        var signIn: TimeInterval = 120
+        var library: TimeInterval = 5 * 60    // a big library the first time
+        var uninstall: TimeInterval = 10 * 60
+        var relink: TimeInterval = 60
+        var onlineLaunch: TimeInterval = 60   // login, a token, and the answer
+        var offlineLaunch: TimeInterval = 30
+    }
 
-    init(paths: LibraryPaths, executable: URL, checksum: String? = nil) {
-        self.paths = paths; self.override = executable; self.checksum = checksum
+    public init(paths: LibraryPaths) {
+        self.paths = paths; self.override = nil; self.checksum = Self.download.sha256; self.limits = Limits()
+    }
+
+    init(paths: LibraryPaths, executable: URL, checksum: String? = nil, limits: Limits = Limits()) {
+        self.paths = paths; self.override = executable; self.checksum = checksum; self.limits = limits
     }
 
     /// `Tools/legendary-0.21.1`: a new version gets a folder of its own, and the old one's goes when nothing needs it.
@@ -223,7 +239,7 @@ public struct Legendary: Sendable {
 
     /// Who is signed in, from what is on this Mac.
     public func status() async throws -> LegendaryStatus {
-        let result = try await run(LegendaryCommand.status)
+        let result = try await run(LegendaryCommand.status, timeout: limits.quick)
         guard result.succeeded, let status = LegendaryOutput.status(result.stdout) else { throw fail(result) }
         return status
     }
@@ -232,7 +248,7 @@ public struct Legendary: Sendable {
     /// so what counts is that its status shows an account afterwards.
     public func signIn(code: String) async throws -> LegendaryStatus {
         guard EpicSignIn.plausible(code) != nil else { throw ShellError.failed("That isn't a code from Epic's sign-in page.") }
-        let result = try await run(LegendaryCommand.signIn(code: code), timeout: 120)
+        let result = try await run(LegendaryCommand.signIn(code: code), timeout: limits.signIn)
         let status = try await status()
         guard status.isSignedIn else {
             if LegendaryFailure.kind(stderr: result.stderr) == .network { throw fail(result) }
@@ -243,21 +259,21 @@ public struct Legendary: Sendable {
 
     /// Forgets the login on this Mac. Installed games stay where they are.
     public func signOut() async throws {
-        let result = try await run(LegendaryCommand.signOut)
+        let result = try await run(LegendaryCommand.signOut, timeout: limits.quick)
         guard try await status().isSignedIn == false else { throw fail(result) }
     }
 
     /// The games the account owns. Asks Epic, so it needs the network; a few seconds, and a minute for a big library the
     /// first time.
     public func library() async throws -> [EpicGame] {
-        let result = try await run(LegendaryCommand.library, timeout: 10 * 60)
+        let result = try await run(LegendaryCommand.library, timeout: limits.library)
         guard result.succeeded, let games = LegendaryOutput.library(result.stdout) else { throw fail(result) }
         return games
     }
 
     /// The games Legendary has installed, from what is on this Mac.
     public func installedGames() async throws -> [LegendaryInstalledGame] {
-        let result = try await run(LegendaryCommand.installed)
+        let result = try await run(LegendaryCommand.installed, timeout: limits.quick)
         guard result.succeeded, let games = LegendaryOutput.installed(result.stdout) else { throw fail(result) }
         return games
     }
@@ -284,28 +300,59 @@ public struct Legendary: Sendable {
             if let update = current.take(line) { status(update) }
         })
         if let problem = lacking.value { throw ShellError.failed(problem) }
-        guard (try? await installedGames())?.contains(where: { $0.appName == appName }) == true else { throw fail(result) }
+        guard let installed = (try? await installedGames())?.first(where: { $0.appName == appName }) else { throw fail(result) }
+        // Legendary's record says it is there; the program has to be, too.
+        guard let program = installed.executableURL, FileManager.default.fileExists(atPath: program.path) else {
+            throw ShellError.failed("Legendary says “\(installed.title)” is installed, but its program isn't in \(installed.installPath). Try installing it again.")
+        }
         // TODO: a game's prerequisites (Visual C++, DirectX): on a Mac Legendary only records them (`prereq_info`).
     }
 
-    /// Removes a game and its files. Legendary exits with 0 when it can't, so the game must be gone from its list.
-    public func uninstall(_ appName: String) async throws {
+    /// Removes a game and its files, or with `keepFiles` only Legendary's record of it. Legendary exits with 0 when it can't, so
+    /// the game must be gone from its list.
+    public func uninstall(_ appName: String, keepFiles: Bool = false) async throws {
         guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
-        let result = try await run(LegendaryCommand.uninstall(appName: appName), timeout: 10 * 60)
+        let result = try await run(LegendaryCommand.uninstall(appName: appName, keepFiles: keepFiles), timeout: limits.uninstall)
         guard try await !installedGames().contains(where: { $0.appName == appName }) else { throw fail(result) }
     }
 
-    /// How to start an installed game. Online first: Legendary asks Epic for a one-time code that logs the game in, so what
-    /// comes back is for right now. When Epic can't be reached it asks again with `--offline`, which most single-player games
-    /// accept. A signed-out account is not retried: no login means no launch either way.
-    public func launchParameters(for appName: String, wine: URL) async throws -> LegendaryLaunch {
+    /// Repairs Legendary's record of a game whose files were moved with the library: it is pointed at `base`/<the game's folder>,
+    /// where the files are. Legendary exits with 0 when it can't, so the record must say the new place, and the program must be
+    /// there, afterwards.
+    public func relink(_ appName: String, to base: URL) async throws {
         guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
-        let online = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: false), timeout: 90)
-        if online.succeeded, let launch = LegendaryOutput.launch(online.stdout) { return launch }
-        if LegendaryFailure.kind(stderr: online.stderr) == .signedOut { throw fail(online) }
-        let offline = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: true), timeout: 60)
+        let result = try await run(LegendaryCommand.relink(appName: appName, basePath: base), timeout: limits.relink)
+        guard let record = try await installedGames().first(where: { $0.appName == appName }),
+              Self.samePath(record.installPath, base.appendingPathComponent(URL(fileURLWithPath: record.installPath).lastPathComponent).path),
+              let program = record.executableURL, FileManager.default.fileExists(atPath: program.path) else { throw fail(result) }
+    }
+
+    /// How a game is to be started, and, when it couldn't be asked of Epic, why it is started offline.
+    public struct LaunchAnswer: Sendable {
+        public let launch: LegendaryLaunch
+        /// "Epic Games can't be reached." when the parameters are for a start without Epic; nil when Epic gave a one-time code.
+        public let offlineBecause: String?
+    }
+
+    /// How to start an installed game. Online first: Legendary asks Epic for a one-time code that logs the game in, so what
+    /// comes back is for right now. Only when Epic can't be reached (no network, or no answer within the limit) it asks again with
+    /// `--offline`, which most single-player games accept, and says why in the answer; every other failure is the caller's to show
+    /// (a signed-out account, a game whose files moved), since a game started without its login for such a reason would only fail
+    /// later and more confusingly.
+    public func launchParameters(for appName: String, wine: URL) async throws -> LaunchAnswer {
+        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
+        let why: String
+        do {
+            let online = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: false), timeout: limits.onlineLaunch)
+            if online.succeeded, let launch = LegendaryOutput.launch(online.stdout) { return LaunchAnswer(launch: launch, offlineBecause: nil) }
+            guard LegendaryFailure.kind(stderr: online.stderr) == .network else { throw fail(online) }
+            why = "Epic Games can't be reached."
+        } catch is Supervised.TimedOut {
+            why = "Epic Games didn't answer in time."
+        }
+        let offline = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: true), timeout: limits.offlineLaunch)
         guard offline.succeeded, let launch = LegendaryOutput.launch(offline.stdout) else { throw fail(offline) }
-        return launch
+        return LaunchAnswer(launch: launch, offlineBecause: why)
     }
 }
 

@@ -71,10 +71,11 @@ extension LaunchPlan {
 
 public enum LaunchPlanner {
     public enum PlanError: LocalizedError {
-        case missingExecutable(String), launcherMissing(String)
+        case missingExecutable(String), launcherMissing(String), epicFilesMissing(String)
         public var errorDescription: String? {
             switch self {
             case .missingExecutable(let t): "\(t) has no program to start. Choose one in its settings."
+            case .epicFilesMissing(let t): "\(t)'s files aren't where Epic Games installed them. Open Epic Games in the sidebar to repair or remove it."
             case .launcherMissing(let n): "\(n) isn't installed in this space yet."
             }
         }
@@ -164,7 +165,7 @@ public enum LaunchPlanner {
             // TODO: some Epic games want Epic's launcher (EpicGamesLauncher.exe) as their parent; a stand-in isn't made yet.
             // The program Legendary names for this launch; before that, the one it installed.
             guard let exe = legendary?.executableURL ?? game.executableURL(in: space),
-                  FileManager.default.fileExists(atPath: exe.path) else { throw PlanError.missingExecutable(game.title) }
+                  FileManager.default.fileExists(atPath: exe.path) else { throw PlanError.epicFilesMissing(game.title) }
             // Legendary's order: the game's arguments, the user's, and last Epic's sign-in arguments, which the fixes' replacements
             // never touch. G-Player's own (the profile, the fixes) go with the game's.
             let own = (legendary?.gameParameters ?? []) + gameArguments() + (legendary?.userParameters ?? [])

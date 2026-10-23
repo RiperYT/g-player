@@ -10,11 +10,15 @@ public enum LegendaryFailure {
         case busy
         /// Epic (or Legendary's own server, which a login asks too) couldn't be reached.
         case network
+        /// Legendary's record of the game points at a folder that isn't there (the library or its disk moved).
+        case installMissing
         /// Anything else.
         case other
     }
 
     public static let signedOutMessage = "You're signed out of Epic Games. Sign in again from Epic Games in the sidebar."
+
+    public static let installMissingMessage = "Legendary can't find the game's files where it recorded them. If your library moved, open the game on Epic Games in the sidebar and choose Repair."
 
     /// What Legendary's log (stderr) says went wrong. Its stdout is not looked at: it can hold a game's description.
     public static func kind(stderr text: String) -> Kind {
@@ -22,7 +26,9 @@ public enum LegendaryFailure {
             return .signedOut
         }
         if text.contains("Failed to acquire installed data lock") { return .busy }
-        if ["ConnectionError", "NameResolutionError", "Max retries exceeded", "Connection refused", "HTTP request for login failed"]
+        if text.contains("appears to be deleted") { return .installMissing }
+        if ["ConnectionError", "NameResolutionError", "Max retries exceeded", "Connection refused", "HTTP request for login failed",
+             "Timeout", "timed out"]
             .contains(where: text.contains) { return .network }
         return .other
     }
@@ -34,6 +40,7 @@ public enum LegendaryFailure {
         case .signedOut: return signedOutMessage
         case .busy: return "Epic Games is busy with another install. Wait for it to finish, then try again."
         case .network: return "Couldn't connect to Epic Games. Check your internet connection, then try again."
+        case .installMissing: return installMissingMessage
         case .other: break
         }
         let lines = (stderr + "\n" + stdout).split(whereSeparator: \.isNewline)
