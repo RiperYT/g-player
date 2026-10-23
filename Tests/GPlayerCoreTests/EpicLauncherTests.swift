@@ -3,8 +3,8 @@ import Testing
 @testable import GPlayerCore
 
 /// Epic's own launcher. On G-Player Wine it runs with the web helper Epic made (its network service crashes in a loop behind
-/// G-Player's wrapper) and on D3DMetal, or DXMT without it (on DXVK its renderer can't make a swap chain, on WineD3D it
-/// crashes); on Wine Staging nothing changes. Both decisions are functions of the preset and the engine's kind.
+/// G-Player's wrapper) and on DXMT, also when D3DMetal is added (on DXVK its renderer can't make a swap chain, on WineD3D it
+/// crashes, on D3DMetal its web view has no GPU process and renders in software); on Wine Staging nothing changes. Both decisions are functions of the preset and the engine's kind.
 @Suite struct EpicLauncherTests {
     let staging = EngineCatalog.wineStaging
     let gplayerWine = EngineCatalog.crossover
@@ -53,15 +53,17 @@ import Testing
         }
     }
 
-    @Test func epicsLauncherIsPinnedToD3DMetalOrDXMTOnGPlayerWineAndNeverToWineD3D() {
-        // D3DMetal when the engine has it ready (it runs DirectX 12 games the launcher starts too), DXMT otherwise.
-        #expect(epic.launcherBackend(on: .crossover, ready: withMetal) == .d3dmetal)
+    @Test func epicsLauncherIsPinnedToDXMTOnGPlayerWineAlsoWithD3DMetalAndNeverToWineD3D() {
+        // DXMT, also when the engine has D3DMetal ready: on D3DMetal the launcher's web view can't start its GPU process, renders
+        // in software and idles at about three times the CPU.
+        #expect(epic.launcherBackend(on: .crossover, ready: withMetal) == .dxmt)
         #expect(epic.launcherBackend(on: .crossover, ready: withoutMetal) == .dxmt)
-        // Whatever is ready, in every combination: never WineD3D or DXVK, which don't open the 2026 launcher. Without either of
-        // the two the last choice stands, and the engine runs what it has.
+        #expect(epic.engineRecipes[.crossover]?.backends == [.dxmt])
+        // Whatever is ready, in every combination: never WineD3D, DXVK or D3DMetal. Without DXMT ready the choice stands, and the
+        // engine runs what it has.
         for mask in 0..<16 {
             let ready = withMetal.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element)
-            #expect(epic.launcherBackend(on: .crossover, ready: ready) == (ready.contains(.d3dmetal) ? .d3dmetal : .dxmt))
+            #expect(epic.launcherBackend(on: .crossover, ready: ready) == .dxmt)
         }
         // G-Player Wine only.
         for kind in [EngineInfo.Kind.wineStaging, .gptk] {
@@ -75,29 +77,32 @@ import Testing
         try LaunchPlanner.plan(for: launcher(in: s, graphics: graphics), in: s, ready: ready)
     }
 
-    @Test func theLauncherOnGPlayerWineStartsOnD3DMetalOrDXMTWhateverIsChosen() throws {
+    @Test func theLauncherOnGPlayerWineStartsOnDXMTWhateverIsChosenAndWhateverIsReady() throws {
         let tmp = TempFolder()
         let s = epicSpace(tmp, on: gplayerWine)
         for chosen in [GraphicsBackend.auto, .dxvk, .wined3d, .d3dmetal, .dxmt] {
-            #expect(try plan(s, graphics: chosen, ready: withMetal).backend == .d3dmetal)
+            #expect(try plan(s, graphics: chosen, ready: withMetal).backend == .dxmt)
             #expect(try plan(s, graphics: chosen, ready: withoutMetal).backend == .dxmt)
-            #expect(try plan(s, graphics: chosen).backend == .d3dmetal)              // nothing known of the engine yet: the first choice
+            #expect(try plan(s, graphics: chosen).backend == .dxmt)                  // nothing known of the engine yet: the same
         }
         let launch = try plan(s)
         #expect(launch.arguments.contains("-SkipBuildPatchPrereq"))
         #expect(launch.chromiumHelpers.isEmpty && launch.unwrapHelpers == epic.chromiumHelpers)
     }
 
-    @Test func withoutD3DMetalTheLauncherGetsDXMTsDLLsAndNotDXVKs() throws {
+    @Test func theLauncherGetsDXMTsDLLsAndNotDXVKsOrD3DMetalsWithOrWithoutD3DMetal() throws {
         let tmp = TempFolder()
         let s = epicSpace(tmp, on: gplayerWine)
-        let launch = try plan(s, ready: withoutMetal)
-        let root = URL(fileURLWithPath: "/tmp/engine/wine")
-        let engine = Engine(info: gplayerWine.limited(to: withoutMetal), wineRoot: root, wine: root.appendingPathComponent("bin/wine"),
-                            dxvk: URL(fileURLWithPath: "/tmp/engine/dxvk"), dxmt: URL(fileURLWithPath: "/tmp/engine/dxmt"))
-        let env = WineEnvironment.make(engine: engine, space: s, backend: launch.backend, tweaks: launch.tweaks, base: [:])
-        #expect(env["WINEDLLOVERRIDES"]?.contains(";dxgi,d3d11,d3d10core=n,b") == true)    // its DLLs go into the space as native ones
-        #expect(env["DXVK_ASYNC"] == nil)
+        for ready in [withoutMetal, withMetal] {
+            let launch = try plan(s, ready: ready)
+            let root = URL(fileURLWithPath: "/tmp/engine/wine")
+            let engine = Engine(info: gplayerWine.limited(to: ready), wineRoot: root, wine: root.appendingPathComponent("bin/wine"),
+                                dxvk: URL(fileURLWithPath: "/tmp/engine/dxvk"), dxmt: URL(fileURLWithPath: "/tmp/engine/dxmt"))
+            let env = WineEnvironment.make(engine: engine, space: s, backend: launch.backend, tweaks: launch.tweaks, base: [:])
+            #expect(env["WINEDLLOVERRIDES"]?.contains(";dxgi,d3d11,d3d10core=n,b") == true)    // its DLLs go into the space as native ones
+            #expect(env["DXVK_ASYNC"] == nil)
+            #expect(env["CX_ACTIVE_GRAPHICS_BACKEND"] == nil)                                  // D3DMetal's switch stays off
+        }
     }
 
     @Test func theLauncherOnWineStagingStaysAsItWas() throws {
@@ -144,11 +149,12 @@ import Testing
         #expect(steamGame.chromiumHelpers == AppPresets.steam.chromiumHelpers && steamGame.unwrapHelpers.isEmpty)
     }
 
-    @Test func aLauncherOnGPlayerWineAsksForConsentOnlyForDXMTsFiles() throws {
+    @Test func aLauncherOnGPlayerWineAsksForConsentForDXMTsFilesAlsoWithD3DMetal() throws {
         let tmp = TempFolder()
         var s = epicSpace(tmp, on: gplayerWine)
-        // D3DMetal and the unwrap write nothing the owner of another app's bottle has to allow; DXMT's DLLs and the wrapper do.
-        #expect(!(try plan(s, ready: withMetal)).writesToSpace(engine: gplayerWine.limited(to: withMetal)))
+        // The unwrap writes nothing the owner of another app's bottle has to allow; DXMT's DLLs and the wrapper do, and the
+        // launcher runs on DXMT with or without D3DMetal.
+        #expect(try plan(s, ready: withMetal).writesToSpace(engine: gplayerWine.limited(to: withMetal)))
         #expect(try plan(s, ready: withoutMetal).writesToSpace(engine: gplayerWine.limited(to: withoutMetal)))
         s.engineID = staging.id
         #expect(try plan(s).writesToSpace(engine: staging))                         // the wrapper, as before

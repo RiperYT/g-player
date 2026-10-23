@@ -106,9 +106,11 @@ public enum AppPresets {
         launchArguments: ["-SkipBuildPatchPrereq"],
         dllOverrides: [], environment: qtWebEngine, discovery: .epic,
         // On G-Player Wine its web helper runs as Epic made it (wrapped, its network service crashes again and again), and its
-        // renderer needs D3DMetal, or DXMT without it: on DXVK it can't make its swap chain and restarts itself, and on WineD3D
-        // (OpenGL 4.1) it falls back to software rendering and crashes. On Wine Staging nothing changes: it doesn't open there.
-        engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.d3dmetal, .dxmt])], needsGPlayerWine: true)
+        // renderer runs on DXMT, also when D3DMetal is added: on DXVK it can't make its swap chain and restarts itself, on WineD3D
+        // (OpenGL 4.1) it falls back to software rendering and crashes, and on D3DMetal its web view's GPU process can't start
+        // (ANGLE's Direct3D 11 path fails: "Passthrough is not supported, GL is disabled"), so it renders in software and idles
+        // at about 34% CPU where DXMT idles at about 11%. On Wine Staging nothing changes: it doesn't open there.
+        engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.dxmt])], needsGPlayerWine: true)
 
     public static let gog = AppPreset(
         id: "gog", name: "GOG Galaxy",

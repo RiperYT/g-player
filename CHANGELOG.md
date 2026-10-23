@@ -4,13 +4,13 @@
 
 - **Epic's own launcher opens on G-Player Wine.** The Epic Games Launcher no longer stops at its loading screen: it reaches
   Epic's sign-in page. G-Player starts it on G-Player Wine with Epic's own web helper (the Chromium helper wrapper made its
-  network service crash again and again there) and on D3DMetal when you have added it, DXMT otherwise, whatever its library
-  entry says (DXVK and WineD3D don't open it); a space that already has the wrapper in Epic's helper gets Epic's helper back
+  network service crash again and again there) and on DXMT, also when you have added D3DMetal, whatever its library entry
+  says: DXVK and WineD3D don't open it, and with D3DMetal its web view can't start its GPU process, so it renders in software
+  and feels sluggish. A space that already has the wrapper in Epic's helper gets Epic's helper back
   before the next start, and nothing is deleted.
   An Epic Games Launcher space on Wine Staging is offered **Move to G-Player Wine…** on its page, and new ones are made on
   G-Player Wine. Get Apps and the Epic Games page show both ways side by side: the launcher (recommended), and Epic Games
-  without it, which is faster and goes through Legendary. Games the launcher starts inherit its graphics, so DirectX 12 games it starts run
-  with D3DMetal.
+  without it, which is faster and goes through Legendary. Games the launcher starts inherit its graphics (DXMT).
 - **Epic games without Epic's launcher.** **Epic Games** in the sidebar signs you in on Epic's own page (with Epic, Google,
   Apple or whatever you use: G-Player never sees your password, and the window keeps nothing) and lists the games your account
   owns. **Install** puts a game into a space of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop

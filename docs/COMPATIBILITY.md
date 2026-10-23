@@ -257,16 +257,17 @@ in `kernelbase` and `advapi32`. The recipe, in `AppPreset.epic` (`engineRecipes`
   crashed, restarting service"); with Epic's own `EpicWebHelper.exe` there is no crash and the sign-in page loads. A space
   that was wrapped gets it back before the next start: `EpicWebHelper_real.exe` is copied over `EpicWebHelper.exe`, only
   where that file is exactly the wrapper G-Player ships, and only in a space G-Player may change. Nothing is deleted.
-- **D3DMetal if you added it, DXMT otherwise, for the launcher itself**, whatever its library entry says: D3DMetal when it
-  is ready on the engine (it also lets DirectX 12 games the launcher starts run), else DXMT (its `d3d11`, `d3d10core` and
-  `dxgi` go into the space as native copies, `dxgi,d3d11,d3d10core=n,b`). With either the launcher gets feature level 11_1,
-  creates its swap chain and doesn't restart, and its sign-in page loads with no network-service or GPU crash. Nothing
-  else works for the 2026 launcher: on **DXVK** its renderer fails `IDXGIFactory1::CreateSwapChain` (0x80004005) and the
-  launcher restarts itself about every 5 seconds with `-AllowSoftwareRendering`; on **WineD3D** (builtin, OpenGL 4.1) it
+- **DXMT for the launcher itself**, also when D3DMetal is added, whatever its library entry says (`dxgi,d3d11,d3d10core=n,b`:
+  DXMT's `d3d11`, `d3d10core` and `dxgi` go into the space as native copies). With DXMT the launcher gets feature level 11_1,
+  creates its swap chain and doesn't restart, its sign-in page loads, and `cef3.log` has no GPU errors; it idles at about 11% CPU.
+  With **D3DMetal** its web view's GPU process can't start (`gpu_init.cc: Passthrough is not supported, GL is disabled`: ANGLE's
+  Direct3D 11 path fails on it), so everything renders without the GPU and the launcher idles at about 34% CPU and feels
+  sluggish. Nothing else works for the 2026 launcher: on **DXVK** its renderer fails `IDXGIFactory1::CreateSwapChain` (0x80004005)
+  and the launcher restarts itself about every 5 seconds with `-AllowSoftwareRendering`; on **WineD3D** (builtin, OpenGL 4.1) it
   falls back to `-AllowSoftwareRendering` and crashes with an access violation reading address 0; `-opengl` crashes it too.
 - **Wine Staging** is set up as before (wrapper, the engine's usual graphics); it isn't known to help there.
 
-Games the launcher starts inherit its environment, so they run on its graphics (D3DMetal or DXMT) too; G-Player can't give
+Games the launcher starts inherit its environment, so they run on its graphics (DXMT) too; G-Player can't give
 a game started from inside the launcher graphics of its own. Epic Games without the launcher (Legendary) starts each game through
 G-Player's own launch, with its own.
 
