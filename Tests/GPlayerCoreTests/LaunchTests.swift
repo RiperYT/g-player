@@ -354,6 +354,23 @@ import Testing
         }
     }
 
+    @Test func bottlesGetTheG_PlayerWineThatIsInstalledSoTheyWorkOffline() {
+        let tmp = TempFolder()
+        _ = tmp.prefix("Library/Application Support/CrossOver/Bottles/Bottle")
+        _ = tmp.prefix("Library/Containers/com.isaacmarovitz.Whisky/Bottles/Old")
+        let revision1 = EngineCatalog.crossoverRevision1, gplayerWine = EngineCatalog.crossover, staging = EngineCatalog.wineStaging
+        func engines(_ installed: [EngineInfo]) -> [String] {
+            EnvironmentFinder.find(home: tmp.url, gptkInstalled: false, installed: installed).map(\.suggestedEngineID)
+        }
+        // Only the earlier revision is there (with Wine Staging or not): the bottles get it, and the migration moves them later.
+        #expect(engines([revision1, staging]) == [revision1.id, revision1.id])
+        #expect(engines([revision1]) == [revision1.id, revision1.id])
+        #expect(engines([gplayerWine, revision1]) == [gplayerWine.id, gplayerWine.id])
+        // No G-Player Wine installed: the current one, which downloads; never Wine Staging.
+        #expect(engines([]) == [gplayerWine.id, gplayerWine.id])
+        #expect(engines([staging]) == [gplayerWine.id, gplayerWine.id])
+    }
+
     @Test func aLauncherScriptsEngineWinsAlsoForSteamPrefixes() {
         let tmp = TempFolder()
         let steam = "drive_c/Program Files (x86)/Steam/steam.exe"

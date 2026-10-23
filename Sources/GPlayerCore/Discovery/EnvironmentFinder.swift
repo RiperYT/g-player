@@ -28,9 +28,10 @@ public enum EnvironmentFinder {
         ]
     }
 
-    /// Finds prefixes, skipping G-Player's own library and those already added.
+    /// Finds prefixes, skipping G-Player's own library and those already added. `installed` is what is installed on this Mac:
+    /// a bottle gets the G-Player Wine that is there, so it works offline (`EngineCatalog.installedGPlayerWine`).
     public static func find(home: URL = FileManager.default.homeDirectoryForCurrentUser,
-                            excluding: [URL] = [], gptkInstalled: Bool) -> [FoundEnvironment] {
+                            excluding: [URL] = [], gptkInstalled: Bool, installed: [EngineInfo] = []) -> [FoundEnvironment] {
         let fm = FileManager.default
         let skip = Set(excluding.map { $0.standardizedFileURL.path })
         var found: [FoundEnvironment] = []
@@ -48,7 +49,9 @@ public enum EnvironmentFinder {
                     // doesn't count for a Steam prefix.
                     if let e = scripts.engineID, !(hasSteam && e == EngineCatalog.gptk.id) { return e }
                     // Bottles were made by CrossOver's or Whisky's Wine; G-Player Wine comes from CrossOver's source.
-                    if note == "CrossOver" || note == "Whisky" { return EngineCatalog.defaultForNewSpaces.id }
+                    if note == "CrossOver" || note == "Whisky" {
+                        return (EngineCatalog.installedGPlayerWine(in: installed) ?? EngineCatalog.defaultForNewSpaces).id
+                    }
                     if hasSteam { return EngineCatalog.wineStaging.id }
                     return gptkInstalled ? EngineCatalog.gptk.id : EngineCatalog.wineStaging.id
                 }()

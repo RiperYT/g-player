@@ -275,7 +275,8 @@ struct OnboardingView: View {
             if !EngineCatalog.firstRunInstalls.allSatisfy({ model.isInstalled($0) }) { downloadEngines() }
         case .engine:
             let known = model.spaces.map(\.url) + [root]
-            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false)
+            found = EnvironmentFinder.find(excluding: known, gptkInstalled: model.engineManager?.isInstalled(EngineCatalog.gptk) ?? false,
+                                           installed: model.installedEngines)
             chosenFound = Set(found.filter { $0.pathProblem == nil }.map(\.id))
             go(1)
         case .found:

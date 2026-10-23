@@ -566,7 +566,7 @@ final class AppModel {
                 errorMessage = nil                                  // shown together below, not one over the other
             }
             if !failures.isEmpty {
-                let gplayerWine = isInstalled(EngineCatalog.defaultForNewSpaces), staging = isInstalled(EngineCatalog.wineStaging)
+                let gplayerWine = EngineCatalog.installedGPlayerWine(in: installedEngines) != nil, staging = isInstalled(EngineCatalog.wineStaging)
                 failures.append(gplayerWine ? "" : staging
                     ? "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines."
                     : "Download G-Player Wine again in Settings › Engines. The first spaces are made once it is installed.")

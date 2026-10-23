@@ -212,12 +212,21 @@ public enum EngineCatalog {
     /// earlier keep the engine they have. What a new space gets right now is `engineForNewSpace`.
     public static let defaultForNewSpaces = crossover
 
+    /// The G-Player Wine that is installed: the current revision, else a retired one that still is. A library that updated
+    /// G-Player and doesn't have the new revision yet has only the old one, and a space (or a found bottle) made on that
+    /// works offline; `EngineMigration` moves it once the current revision is in. Nil when none is installed.
+    public static func installedGPlayerWine(in installed: [EngineInfo]) -> EngineInfo? {
+        let revisions = installed.filter { isRevision($0.id, of: defaultForNewSpaces) }
+        return revisions.first { $0.id == defaultForNewSpaces.id } ?? revisions.first
+    }
+
     /// The engine for a new space made without a choice (Main, store presets, Add Game, the New Space sheet's first
-    /// pick): G-Player Wine when it is installed, else Wine Staging when that is, so the space needs no download
-    /// (offline, say). Only with neither installed is it G-Player Wine, which then downloads.
+    /// pick): the installed G-Player Wine (`installedGPlayerWine`), else Wine Staging when that is installed, so the space
+    /// needs no download (offline, say). Only with neither installed is it G-Player Wine, which then downloads. An engine
+    /// that isn't installed is never the answer while a G-Player Wine is.
     public static func engineForNewSpace(installed: [EngineInfo]) -> EngineInfo {
-        let has = { (info: EngineInfo) in installed.contains { $0.id == info.id } }
-        return has(defaultForNewSpaces) || !has(wineStaging) ? defaultForNewSpaces : wineStaging
+        if let gplayerWine = installedGPlayerWine(in: installed) { return gplayerWine }
+        return installed.contains { $0.id == wineStaging.id } ? wineStaging : defaultForNewSpaces
     }
 
     /// What the first run installs: G-Player Wine alone. Its runtime libraries come out of Gcenx's Wine Staging archive, which
@@ -228,7 +237,8 @@ public enum EngineCatalog {
     /// G-Player put it there) when G-Player Wine couldn't be installed, so there is an engine. Nil with neither installed:
     /// those spaces wait for G-Player Wine. Wine Staging is never installed for this.
     public static func firstRunEngine(installed: [EngineInfo]) -> EngineInfo? {
-        installed.contains { $0.id == crossover.id || $0.id == wineStaging.id } ? engineForNewSpace(installed: installed) : nil
+        let engine = engineForNewSpace(installed: installed)
+        return installed.contains { $0.id == engine.id } ? engine : nil
     }
 
     /// What the first run still has to download, in bytes: the engines of `firstRunInstalls` that aren't installed,

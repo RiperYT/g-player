@@ -92,8 +92,8 @@ public enum FirstRunSetup {
 }
 
 extension FoundEnvironment {
-    /// A CrossOver or Whisky bottle: another app's own folder, which G-Player Wine runs in place.
+    /// A CrossOver or Whisky bottle: another app's own folder, which G-Player Wine (any revision of it) runs in place.
     public var isAnotherAppsBottle: Bool {
-        (originNote == "CrossOver" || originNote == "Whisky") && suggestedEngineID == EngineCatalog.crossover.id
+        (originNote == "CrossOver" || originNote == "Whisky") && EngineCatalog.isRevision(suggestedEngineID, of: EngineCatalog.crossover)
     }
 }

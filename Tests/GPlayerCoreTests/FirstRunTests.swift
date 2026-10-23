@@ -93,6 +93,8 @@ import Testing
         let crossOver = found("A", "CrossOver", engine: gplayerWine), whisky = found("B", "Whisky", engine: gplayerWine)
         let prefix = found("C", "~/Games", engine: staging)
         #expect(crossOver.isAnotherAppsBottle && whisky.isAnotherAppsBottle && !prefix.isAnotherAppsBottle)
+        // A bottle that got the earlier revision (the only one installed) is warned about too: it is G-Player Wine all the same.
+        #expect(found("D", "CrossOver", engine: EngineCatalog.crossoverRevision1).isAnotherAppsBottle)
         #expect(FirstRunSetup.bottleWarning(for: [prefix]) == nil)
         #expect(FirstRunSetup.bottleWarning(for: []) == nil)
         let one = FirstRunSetup.bottleWarning(for: [crossOver, prefix])
