@@ -40,10 +40,11 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
     from the Wine project's own download (https://dl.winehq.org/wine/wine-mono/10.4.1/wine-mono-10.4.1-x86.tar.xz,
     SHA-256 a16606ef0724202e6a6848ece6e0cbba64d11e2f11aefe744af1d93c6d9f99bb), unpacked unchanged into the user's G-Player
     Wine only when something needs it. It contains code from several projects under their own licenses: Wine Mono's own
-    code and its winforms, wpf, monoDX and System.Speech libraries are MIT; Mono's runtime and class libraries are
-    available as LGPL or MIT X11 (one library, ICSharpCode.SharpZipLib, is GPL with an exception); mono-basic is MIT X11
-    (its compiler LGPL v2); FNA is a mix of MSPL and MIT, with FAudio, FNA3D, MojoShader, SDL3 and the SDL bindings under
-    the zlib license. Its source is at https://gitlab.winehq.org/mono/wine-mono (tag wine-mono-10.4.1, with submodules).
+    code and its winforms, winforms-datavisualization, wpf, monoDX and System.Speech libraries are MIT; Mono's runtime and
+    class libraries are available as LGPL or MIT X11 (one library, ICSharpCode.SharpZipLib, is GPL with an exception);
+    mono-basic is MIT X11 (its compiler LGPL v2); FNA (WineMono.FNA, for XNA games) is a mix of MSPL and MIT, with FAudio,
+    FNA3D, MojoShader, SDL3 and the SDL bindings under the zlib license, FNAMF under MIT and FNA.NetStub under MSPL. Its
+    source is at https://gitlab.winehq.org/mono/wine-mono (tag wine-mono-10.4.1, with submodules).
   - DXVK for macOS (zlib), by Gcenx: https://github.com/Gcenx/DXVK-macOS
   - winetricks 20260125 (LGPL-2.1+): https://github.com/Winetricks/winetricks. G-Player runs it as a separate
     program and, on the user's Mac, writes a copy that refuses unverified downloads.
