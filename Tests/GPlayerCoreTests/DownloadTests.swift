@@ -142,7 +142,7 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         // The catalogue's sizes are approximate: never more than the whole.
         #expect(DownloadResume.message(received: 99_500_000, total: 98_000_000) == "Downloading 98 of 98 MB")
         #expect(DownloadResume.message(received: 5_000_000, total: 0) == "Downloading 5 MB")
-        // Rounded as everywhere: G-Player Wine and its extras are 287,881,528 bytes, which is 288 MB and ends as "288 of 288".
+        // Rounded as everywhere: a total of 287,881,528 bytes is 288 MB and ends as "288 of 288".
         #expect(DownloadResume.message(received: 287_881_528, total: 287_881_528) == "Downloading 288 of 288 MB")
         #expect(DownloadResume.message(received: 143_990_000, total: 287_881_528) == "Downloading 144 of 288 MB")
         #expect(DownloadResume.message(received: 600_000, total: 98_000_000) == "Downloading 1 of 98 MB")

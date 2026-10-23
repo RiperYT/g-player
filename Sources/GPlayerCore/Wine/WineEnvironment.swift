@@ -74,6 +74,13 @@ public enum WineEnvironment {
             // Microsoft's own copies win when the space has them; otherwise Wine's builtins load as before.
             overrides.append(Self.visualCppRuntime + "=n,b")
         }
+        if let plugins = engine.gstreamerPlugins {
+            // G-Player Wine's own GStreamer, for game videos, and never one the user installed: its universal scanner would
+            // run arm64 against these x86_64 plugins, and the scanner isn't shipped, so plugins are read in this process.
+            env["GST_PLUGIN_SYSTEM_PATH_1_0"] = plugins.path
+            env["GST_REGISTRY_1_0"] = engine.gstreamerRegistry.path
+            env["GST_REGISTRY_FORK"] = "no"
+        }
         overrides += tweaks.dllOverrides
         env["WINEDLLOVERRIDES"] = overrides.joined(separator: ";")
         for (k, v) in tweaks.environment { env[k] = v }

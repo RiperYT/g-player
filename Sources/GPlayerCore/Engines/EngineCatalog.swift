@@ -3,14 +3,17 @@ import Foundation
 /// A downloadable file, pinned by SHA-256.
 public struct PinnedDownload: Sendable, Hashable {
     /// What the archive is for: the engine itself, DXVK, or (G-Player Wine) the runtime libraries from Gcenx's
-    /// build that Wine loads, which G-Player's own archive leaves out.
-    public enum Role: Sendable, Hashable { case engine, dxvk, runtimeLibraries }
+    /// build that Wine loads and GStreamer's official package for game videos, which G-Player's own archive leaves out.
+    public enum Role: Sendable, Hashable { case engine, dxvk, runtimeLibraries, gstreamer }
 
     public let url: URL
     public let fileName: String
     public let sha256: String
     public let approximateBytes: Int64
     public var role: Role = .engine
+    /// Room installing it takes besides the file itself while it is worked on, free again after: GStreamer's package is
+    /// expanded into a folder of its own before the files an engine needs are copied out of it.
+    public var scratchBytes: Int64 = 0
 }
 
 /// A Wine build G-Player knows how to use.
@@ -93,10 +96,10 @@ public enum EngineCatalog {
         installedBytes: 750_000_000)
 
     /// G-Player Wine: Wine 11 built by G-Player from CodeWeavers' CrossOver 26.3 source (scripts/build-engine-cx.sh,
-    /// tools/wine-patches/cx-*.patch), with DXMT and MoltenVK 1.4.2, plus Gcenx's runtime libraries and DXVK.
-    /// CrossOver's tree has the hooks Apple's D3DMetal needs, so with D3DMetal copied from the user's own Game Porting
-    /// Toolkit (`D3DMetalStore`) DirectX 12 games run in the same space as Steam. Without D3DMetal it still runs
-    /// DXVK, DXMT and WineD3D. "CrossOver" is CodeWeavers' trademark; it only says where the source comes from.
+    /// tools/wine-patches/cx-*.patch), with DXMT, MoltenVK 1.4.2 and GStreamer for game videos, plus Gcenx's runtime
+    /// libraries and DXVK. CrossOver's tree has the hooks Apple's D3DMetal needs, so with D3DMetal copied from the user's
+    /// own Game Porting Toolkit (`D3DMetalStore`) DirectX 12 games run in the same space as Steam. Without D3DMetal it
+    /// still runs DXVK, DXMT and WineD3D. "CrossOver" is CodeWeavers' trademark; it only says where the source comes from.
     /// This is revision 2; revision 1 is `crossoverRevision1`.
     public static let crossover = EngineInfo(
         id: "wine-cx-26.3.0-2",
@@ -123,13 +126,16 @@ public enum EngineCatalog {
                 sha256: "acd1520ad105d8ef124a09c8e11a259a5dc8bdc565ad18e0e52693f9807b2477",
                 approximateBytes: 3_900_000,
                 role: .dxvk),
+            gstreamer,
         ],
         basedOn: "Wine 11 from CrossOver 26.3",
-        installedBytes: 1_650_000_000)
+        // Revision 1's 1.65 GB, and the GStreamer files copied from the package as they are (universal binaries: macOS
+        // has no `lipo` for users to cut them down with).
+        installedBytes: 1_690_000_000)
 
     /// G-Player Wine revision 1, retired. Spaces made while it was the engine keep running on it until `EngineMigration`
-    /// moves them to revision 2, which has the same Wine and the two fixes `EngineFixes` still puts into this one built in.
-    /// Its pins stay so that an installed copy is found, fixed and used, offline too; it is never installed again.
+    /// moves them to revision 2, which has the same Wine, the two fixes `EngineFixes` still puts into this one built in, and
+    /// GStreamer. Its pins stay so that an installed copy is found, fixed and used, offline too; it is never installed again.
     public static let crossoverRevision1 = EngineInfo(
         id: "wine-cx-26.3.0-1",
         name: crossover.name,
@@ -149,6 +155,17 @@ public enum EngineCatalog {
         basedOn: crossover.basedOn,
         installedBytes: 1_650_000_000,
         replacedBy: crossover.id)
+
+    /// GStreamer's official macOS runtime package (LGPL-2.1+), which G-Player Wine's archive doesn't carry: the engine lists
+    /// the files it needs (`gstreamer-files.txt`) and installing copies them out of this package, unchanged
+    /// (`GStreamerRuntime`). Wine Staging never gets it: it uses a GStreamer.framework the user installed, if there is one.
+    public static let gstreamer = PinnedDownload(
+        url: URL(string: "https://gstreamer.freedesktop.org/data/pkg/osx/1.28.8/gstreamer-1.0-1.28.8-universal.pkg")!,
+        fileName: "gstreamer-1.0-1.28.8-universal.pkg",
+        sha256: "d371ab04a7632713626836c2fc234e863cc98484c74c473eba99b0fbd9b3a3fe",
+        approximateBytes: 156_581_817,
+        role: .gstreamer,
+        scratchBytes: 705_000_000)                              // what `pkgutil --expand-full` makes of it
 
     /// Apple's Game Porting Toolkit (wine 7.7 + D3DMetal), only when the user installed it themselves.
     /// G-Player never ships, downloads or installs Apple's files: Apple's license allows the toolkit for
@@ -226,18 +243,19 @@ public enum EngineCatalog {
     }
 
     /// The free disk space installing `infos` one after the other needs: what they take once unpacked, and room for the
-    /// biggest archive, which is there while it unpacks and deleted after.
+    /// biggest archive with what working on it takes (`PinnedDownload.scratchBytes`), which is there while it unpacks and
+    /// deleted after.
     public static func diskBytes(installing infos: [EngineInfo]) -> Int64 {
-        infos.reduce(0) { $0 + $1.installedBytes } + (infos.flatMap(\.downloads).map(\.approximateBytes).max() ?? 0)
+        infos.reduce(0) { $0 + $1.installedBytes }
+            + (infos.flatMap(\.downloads).map { $0.approximateBytes + $0.scratchBytes }.max() ?? 0)
     }
 
-    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 2.7 GB for both).
+    /// The free space the first run's engines need, counting the ones that aren't installed yet (about 3.3 GB for both).
     public static func firstRunDiskBytes(installed: [EngineInfo]) -> Int64 {
         diskBytes(installing: firstRunInstalls.filter { first in !installed.contains { $0.id == first.id } })
     }
 
-    /// A download size in whole megabytes, rounded: both first-run engines are 484,886,864 bytes, which is "485". Cutting
-    /// the fraction off said 484 for both, and 287 for G-Player Wine alone.
+    /// A download size in whole megabytes, rounded: cutting the fraction off said "484" for 484.9 MB, which is "485".
     public static func megabytes(_ bytes: Int64) -> Int { Int((Double(bytes) / 1_000_000).rounded()) }
 
     /// Apple's page about the toolkit and its license.

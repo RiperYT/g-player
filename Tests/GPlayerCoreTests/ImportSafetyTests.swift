@@ -26,9 +26,9 @@ import Testing
         #expect(!DiskSpace.sameVolume(tmp.url, URL(fileURLWithPath: "/dev")))
     }
 
-    @Test func theFirstRunsEnginesNeedAboutTwoPointSevenGigabytes() {
+    @Test func theFirstRunsEnginesNeedAboutThreePointThreeGigabytes() {
         let both = EngineCatalog.firstRunDiskBytes(installed: [])
-        #expect(both > 2_500_000_000 && both < 3_000_000_000)
+        #expect(both > 3_000_000_000 && both < 3_600_000_000)
         // What is installed already isn't counted again; with both there, nothing is needed.
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.wineStaging]) < both - 700_000_000)
         #expect(EngineCatalog.firstRunDiskBytes(installed: [EngineCatalog.wineStaging, EngineCatalog.crossover]) == 0)

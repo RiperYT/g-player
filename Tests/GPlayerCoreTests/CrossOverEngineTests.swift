@@ -99,6 +99,55 @@ import Testing
         #expect(staging["WINEDLLOVERRIDES"]?.contains("msvcp140") == false)          // Wine Staging picks by version itself
     }
 
+    // MARK: GStreamer
+
+    /// The three variables G-Player Wine's launches get once its GStreamer plugins are in.
+    private let gstreamerVariables = ["GST_PLUGIN_SYSTEM_PATH_1_0", "GST_REGISTRY_1_0", "GST_REGISTRY_FORK"]
+
+    @Test func gPlayerWineUsesItsOwnGStreamerOnceItsPluginsAreIn() throws {
+        let tmp = TempFolder()
+        let e = engine(tmp)
+        let s = Space(name: "Main", path: "/tmp/Main", engineID: e.info.id, origin: .managed)
+        #expect(e.gstreamerPlugins == nil)
+        for variable in gstreamerVariables { #expect(WineEnvironment.make(engine: e, space: s, backend: .dxvk, base: [:])[variable] == nil) }
+
+        let plugins = tmp.dir("Engines/\(EngineCatalog.crossover.id)/wine/lib/gstreamer-1.0")
+        let env = WineEnvironment.make(engine: e, space: s, backend: .dxvk, base: [:])
+        #expect(e.gstreamerPlugins == plugins)
+        #expect(env["GST_PLUGIN_SYSTEM_PATH_1_0"] == plugins.path)
+        // The registry is in the engine's own folder, not in `wine/`, so removing the engine removes it.
+        #expect(env["GST_REGISTRY_1_0"] == tmp.url.appendingPathComponent("Engines/\(EngineCatalog.crossover.id)/gstreamer-1.0-registry.x86_64.bin").path)
+        #expect(env["GST_REGISTRY_FORK"] == "no")
+        // Every backend and every kind of launch (Wine's own tools too) gets them.
+        for backend in [GraphicsBackend.d3dmetal, .dxmt, .wined3d, .auto] {
+            #expect(WineEnvironment.make(engine: e, space: s, backend: backend, base: [:])["GST_REGISTRY_FORK"] == "no")
+        }
+        // What a game sets for itself wins, as for any variable.
+        let own = LaunchTweaks(environment: ["GST_REGISTRY_FORK": "yes", "GST_DEBUG": "3"])
+        let tweaked = WineEnvironment.make(engine: e, space: s, backend: .dxvk, tweaks: own, base: [:])
+        #expect(tweaked["GST_REGISTRY_FORK"] == "yes" && tweaked["GST_DEBUG"] == "3" && tweaked["GST_REGISTRY_1_0"] == env["GST_REGISTRY_1_0"])
+        // A GStreamer in the app's own environment is never passed on.
+        let inherited = WineEnvironment.make(engine: e, space: s, backend: .dxvk,
+                                             base: ["GST_PLUGIN_PATH": "/Library/Frameworks/GStreamer.framework/x", "HOME": "/h"])
+        #expect(inherited["GST_PLUGIN_PATH"] == nil && inherited["HOME"] == "/h")
+    }
+
+    @Test func revisionOneAndWineStagingNeverGetG_PlayerWinesGStreamer() throws {
+        let tmp = TempFolder()
+        let e = engine(tmp)
+        let s = Space(name: "Main", path: "/tmp/Main", engineID: e.info.id, origin: .managed)
+        // Revision 1 has no plugin folder, so it gets nothing (and its spaces run as before).
+        let revision1 = Engine(info: EngineCatalog.crossoverRevision1, wineRoot: e.wineRoot, wine: e.wine, dxvk: e.dxvk, dxmt: e.dxmt)
+        for variable in gstreamerVariables { #expect(WineEnvironment.make(engine: revision1, space: s, backend: .dxvk, base: [:])[variable] == nil) }
+        // Wine Staging links a GStreamer.framework the user installed, if there is one; a plugin folder in its tree changes nothing.
+        tmp.dir("Engines/\(EngineCatalog.crossover.id)/wine/lib/gstreamer-1.0")
+        let staging = Engine(info: EngineCatalog.wineStaging, wineRoot: e.wineRoot, wine: e.wine, dxvk: e.dxvk)
+        #expect(staging.gstreamerPlugins == nil)
+        for variable in gstreamerVariables { #expect(WineEnvironment.make(engine: staging, space: s, backend: .dxvk, base: [:])[variable] == nil) }
+        let toolkit = Engine(info: EngineCatalog.gptk, wineRoot: e.wineRoot, wine: e.wine, dxvk: nil)
+        for variable in gstreamerVariables { #expect(WineEnvironment.make(engine: toolkit, space: s, backend: .auto, base: [:])[variable] == nil) }
+    }
+
     @Test func aLinkCutShortIsTakenBackAndANewImportGoesIn() throws {
         let tmp = TempFolder()
         let e = engine(tmp)

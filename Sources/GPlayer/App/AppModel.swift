@@ -504,7 +504,7 @@ final class AppModel {
     /// same download.
     func installFirstRunEngines() {
         guard firstRunInstall == nil, let manager = engineManager else { return }
-        // Both engines take about 2.7 GB: said before anything is downloaded, not when the disk fills up.
+        // Both engines take about 3.3 GB: said before anything is downloaded, not when the disk fills up.
         let missing = EngineCatalog.firstRunInstalls.filter { !isInstalled($0) }
         if let problem = manager.diskProblem(installing: missing) { errorMessage = problem; return }
         firstRunPaused = false

@@ -5,7 +5,7 @@ import Foundation
 public enum FirstRunSetup {
     /// What the first run's two engines need on this disk: unpacked, with room for the archive being unpacked.
     public static var diskBytes: Int64 { EngineCatalog.diskBytes(installing: EngineCatalog.firstRunInstalls) }
-    /// "2.7 GB" for both engines; less once one is installed.
+    /// "3.3 GB" for both engines; less once one is installed.
     public static func diskLabel(installed: [EngineInfo] = []) -> String {
         String(format: "%.1f GB", Double(EngineCatalog.firstRunDiskBytes(installed: installed)) / 1_000_000_000)
     }
@@ -27,7 +27,7 @@ public enum FirstRunSetup {
             : "Continue downloads \(mb) MB more and needs about \(diskLabel(installed: installed)) on this disk."
     }
 
-    /// "The download is about 485 MB" before anything is installed, "288 MB is still to download" after part of it.
+    /// "The download is about 640 MB" before anything is installed, "440 MB is still to download" after part of it.
     private static func downloadLabel(installed: [EngineInfo]) -> String? {
         let left = EngineCatalog.firstRunBytes(installed: installed)
         guard left > 0 else { return nil }
