@@ -3,7 +3,7 @@ import Foundation
 /// Legendary (https://github.com/legendary-gl/legendary, GPL-3.0-or-later): an open-source client for Epic Games' store, the
 /// way Heroic Games Launcher gets Epic games without Epic's own launcher. G-Player runs it as a separate program, on
 /// arguments and output, and never links it or ships it: the user's Mac downloads it from its GitHub release the first time
-/// the user signs in to Epic, and every use checks the file against a pinned SHA-256.
+/// the user signs in to Epic, and every run checks the file against a pinned SHA-256 first.
 ///
 /// Its login, its list of installed games and its settings live in `Tools/legendary-config` of the library (folder 0700;
 /// `LEGENDARY_CONFIG_PATH`), never in the user's home folder. The commands are built by `LegendaryCommand` and read by
@@ -21,10 +21,14 @@ public struct Legendary: Sendable {
     public let paths: LibraryPaths
     /// A stand-in program, for tests.
     private let override: URL?
+    /// The SHA-256 the file has to have for every run (`verified`): the pinned one. A test's stand-in may have another, or none.
+    private let checksum: String?
 
-    public init(paths: LibraryPaths) { self.paths = paths; self.override = nil }
+    public init(paths: LibraryPaths) { self.paths = paths; self.override = nil; self.checksum = Self.download.sha256 }
 
-    init(paths: LibraryPaths, executable: URL) { self.paths = paths; self.override = executable }
+    init(paths: LibraryPaths, executable: URL, checksum: String? = nil) {
+        self.paths = paths; self.override = executable; self.checksum = checksum
+    }
 
     /// `Tools/legendary-0.21.1`: a new version gets a folder of its own, and the old one's goes when nothing needs it.
     public var toolFolder: URL { paths.tools.appendingPathComponent("legendary-\(Self.version)", isDirectory: true) }
@@ -102,6 +106,19 @@ public struct Legendary: Sendable {
         if wanted != current { try wanted.write(to: file, atomically: true, encoding: .utf8) }
     }
 
+    /// Throws unless the file that would be run is the pinned Legendary. Asked before every run, not only after a download: the
+    /// file lives in the user's folder, where anything can replace it, and what it is given (a login, a one-time code) is not
+    /// for another program. Hashing 15 MB takes a few hundredths of a second, next to the seconds Legendary takes to start.
+    func verified() throws {
+        guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+            throw ShellError.failed("Legendary isn't on this Mac. Refresh Epic Games to download it again.")
+        }
+        guard let checksum else { return }
+        guard (try? Files.sha256(of: executable)) == checksum else {
+            throw ShellError.failed("The Legendary file on this Mac isn't the one G-Player expects, so G-Player didn't run it. Refresh Epic Games to download it again.")
+        }
+    }
+
     /// Makes sure the pinned Legendary is on this Mac: downloads it when it isn't there (or isn't the pinned file), makes it
     /// executable and clears the quarantine mark, as for the engine's files. `progress` gets the fraction downloaded.
     public func ensureInstalled(progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
@@ -125,6 +142,7 @@ public struct Legendary: Sendable {
                     stopWhen: (@Sendable (String) -> Bool)? = nil,
                     onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessResult {
         try prepareConfig()
+        try verified()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments

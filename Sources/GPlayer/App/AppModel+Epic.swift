@@ -60,6 +60,7 @@ extension AppModel {
         let legendary = Legendary(paths: paths)
         guard legendary.isDownloaded else { epic.looked = true; return }
         do {
+            try await legendary.ensureInstalled()                         // the file is checked, and fetched again if it isn't the pinned one
             let status = try await legendary.status()
             let installed = try await legendary.installedGames()
             epic.account = status.account
@@ -118,7 +119,9 @@ extension AppModel {
         epic.refreshFailure = nil
         defer { epic.refreshing = false }
         do {
-            let games = try await Legendary(paths: paths).library()
+            let legendary = Legendary(paths: paths)
+            try await legendary.ensureInstalled()
+            let games = try await legendary.library()
             epic.games = games
             epic.fetched = true
             try? EpicGames.saveList(games, in: paths)
@@ -180,7 +183,9 @@ extension AppModel {
         let activity = begin("Signing in to Epic Games", "Checking with Epic")
         defer { end(activity); epic.busy = nil }
         do {
-            let status = try await Legendary(paths: paths).signIn(code: code)
+            let legendary = Legendary(paths: paths)
+            try await legendary.ensureInstalled()
+            let status = try await legendary.signIn(code: code)
             epic.account = status.account
             epic.looked = true
             return true
@@ -197,7 +202,9 @@ extension AppModel {
         Task {
             defer { epic.busy = nil }
             do {
-                try await Legendary(paths: paths).signOut()
+                let legendary = Legendary(paths: paths)
+                try await legendary.ensureInstalled()
+                try await legendary.signOut()
                 epic.account = nil
                 epic.games = []
                 epic.refreshFailure = nil

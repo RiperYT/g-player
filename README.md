@@ -18,8 +18,9 @@ them with [Wine](https://www.winehq.org): Steam games, Epic games and games you 
 - **Brings over what you have.** CrossOver bottles, Whisky bottles and hand-made prefixes are found on first
   launch and used in place, with their games and saves. G-Player asks once before it changes one of them.
 - **No account, no telemetry.** G-Player talks to GitHub (engine downloads, Legendary, and whether a newer G-Player is out),
-  the stores' own CDNs (installers, cover art), Epic when you sign in to Epic Games, the makers of Windows components when it
-  installs them (Microsoft, NVIDIA…), and nothing else.
+  the stores' own CDNs (installers, cover art), the makers of Windows components when it installs them (Microsoft, NVIDIA…),
+  and, if you use Epic Games, Legendary does: it talks to Epic's servers for your library, installs and launches, and to
+  `legendary.gl` (`api.legendary.gl`) for its own version information when you sign in. Nothing else.
 
 ## Download
 

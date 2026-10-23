@@ -437,7 +437,7 @@ private let sampleInstalled = """
         """
         let file = tmp.file("stand/legendary", contents: Data(script.utf8))
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
-        return Legendary(paths: paths, executable: file)
+        return Legendary(paths: paths, executable: file, checksum: try Files.sha256(of: file))
     }
 
     private func trace(_ name: String) -> String { (try? String(contentsOf: tmp.url.appendingPathComponent("trace/\(name)"), encoding: .utf8)) ?? "" }
@@ -455,6 +455,51 @@ private let sampleInstalled = """
         #expect(env.contains("LEGENDARY_CONFIG_PATH=\(legendary.configFolder.path)"))
         #expect(!env.contains("CX_BOTTLE") && !env.contains("WINEPREFIX"))
         #expect(calls() == [["-y", "status", "--offline", "--json"]])
+    }
+
+    @Test func theFileIsCheckedBeforeEveryRunNotOnlyAfterTheDownload() async throws {
+        let legendary = try stand(in: "echo '{\"account\": \"Sample Player\"}'")
+        _ = try await legendary.status()                                               // the file is what it was pinned as: it runs
+        #expect(calls().count == 1)
+        // Something else takes its place between two runs: the second doesn't run it, and says so.
+        try Data("#!/bin/bash\necho ran > '\(tmp.url.path)/trace/intruder.txt'\n".utf8).write(to: legendary.executable)
+        do {
+            _ = try await legendary.status()
+            Issue.record("expected an error")
+        } catch {
+            #expect(error.localizedDescription.contains("isn't the one G-Player expects"), "\(error)")
+        }
+        #expect(trace("intruder.txt").isEmpty)
+        #expect(calls().count == 1)
+    }
+
+    @Test func everyOperationGoesThroughTheCheck() async throws {
+        let legendary = try stand(in: "echo '[]'")
+        try Data("#!/bin/bash\necho ran > '\(tmp.url.path)/trace/intruder.txt'\n".utf8).write(to: legendary.executable)
+        let wine = URL(fileURLWithPath: "/engine/bin/wine")
+        func fails(_ work: () async throws -> Void) async -> Bool { do { try await work(); return false } catch { return true } }
+        #expect(await fails { _ = try await legendary.status() })
+        #expect(await fails { _ = try await legendary.installedGames() })
+        #expect(await fails { _ = try await legendary.library() })
+        #expect(await fails { try await legendary.signOut() })
+        #expect(await fails { _ = try await legendary.signIn(code: "0123456789abcdef0123456789abcdef") })
+        #expect(await fails { try await legendary.install("SampleApp", basePath: tmp.url.appendingPathComponent("b")) { _ in } })
+        #expect(await fails { try await legendary.uninstall("SampleApp") })
+        #expect(await fails { _ = try await legendary.launchParameters(for: "SampleApp", wine: wine) })
+        #expect(trace("intruder.txt").isEmpty)
+    }
+
+    @Test func aFileThatIsGoneIsSaidSoAndThePinnedFileIsTheOneAskedFor() async throws {
+        let legendary = try stand(in: "true")
+        try FileManager.default.removeItem(at: legendary.executable)
+        await #expect(throws: ShellError.self) { _ = try await legendary.status() }
+        // The real thing holds the pinned checksum, so anything but the pinned file at its place is refused.
+        let real = Legendary(paths: paths)
+        tmp.file("Library/Tools/legendary-0.21.1/legendary", contents: Data("#!/bin/bash\necho ran > '\(tmp.url.path)/trace/intruder.txt'\n".utf8))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: real.executable.path)
+        #expect(throws: ShellError.self) { try real.verified() }
+        await #expect(throws: ShellError.self) { _ = try await real.status() }
+        #expect(trace("intruder.txt").isEmpty)
     }
 
     @Test func theSettingsFolderIsPrivateAndHoldsTheSettings() async throws {
