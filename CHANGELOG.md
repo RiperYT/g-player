@@ -17,6 +17,12 @@
   the new one when you start something in it, instead of switching to Wine Staging.
 - The first run now says it needs about 3.3 GB free and downloads about 640 MB, since GStreamer is part of G-Player
   Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
+- **Share What Worked.** When a game has run well, its panel and its menu offer Share What Worked…: it opens a GitHub
+  issue in your browser, already filled in with what made the game run (the engine, the graphics, the profile and settings
+  you changed, extra Windows components, what G-Player found out about the game), so that others, and G-Player's own
+  fixes later, can use it. You type the game's name, you see the whole text first, and you can copy it instead. It has no
+  file paths, user name, logs or store IDs (the Steam app ID only if you tick the box), and settings with a path or your
+  name in them show as hidden. G-Player sends nothing itself: nothing reaches GitHub until you submit the issue there.
 
 ## [0.4.2] - 2026-10-23
 

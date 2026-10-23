@@ -39,6 +39,9 @@ install it), about 3.3 GB for the two engines (a download of about 640 MB) plus 
 
 The first minutes of a game can stutter while shaders compile. That settles once the cache is built.
 
+When a game runs well, **Share What Worked…** in its panel opens a GitHub issue, filled in with the engine, graphics and
+settings that worked, for you to read and submit; G-Player itself sends nothing.
+
 ### Engines
 
 - **G-Player Wine** (the default for new spaces): Wine 11 that G-Player builds from CodeWeavers' CrossOver 26.3 source

@@ -117,6 +117,8 @@ final class AppModel {
     var launcherQuit: LauncherQuit?
     /// A game the user just started that didn't start: shown in a dialog in the middle of the window.
     var failedLaunch: UUID?
+    /// The game whose "Share What Worked" sheet is open.
+    var sharingWorked: UUID?
     /// External spaces waiting for the user to allow or refuse changes, first one shown.
     var changesRequests: [ChangesRequest] = []
     var changesRequest: ChangesRequest? { changesRequests.first }

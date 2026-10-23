@@ -208,6 +208,9 @@ struct GameMenu: View {
         if let s = model.space(game.spaceID) {
             Button("Go to Space “\(s.name)”") { model.selection = .space(s.id) }
         }
+        if model.canShareWhatWorked(game) {
+            Button("Share What Worked…") { model.shareWhatWorked(game) }
+        }
         Divider()
         if game.isHidden {
             Button("Show in Library") { model.setHidden(game, false) }

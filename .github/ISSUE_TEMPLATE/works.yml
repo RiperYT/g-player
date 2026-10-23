@@ -1,0 +1,34 @@
+name: It works
+description: Say what made a game run on your Mac, so others can use it too.
+title: "Works: "
+labels: ["works"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing. G-Player's **Share What Worked…** (in a game's panel and its menu) opens this form already
+        filled in. Nothing reaches GitHub until you press **Submit new issue**, so read the details first and take out
+        anything you'd rather keep private.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: The name of the game.
+      placeholder: Game name
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What made it work
+      description: The engine, the graphics and the settings the game ran with. G-Player fills this in; you can also write it by hand.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else that helped, or that still doesn't work.
+    validations:
+      required: false

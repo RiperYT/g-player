@@ -29,6 +29,9 @@ struct MainView: View {
         .sheet(isPresented: Binding(get: { model.failedLaunch != nil }, set: { if !$0 { model.failedLaunch = nil } })) {
             if let g = model.game(model.failedLaunch) { FailedLaunchSheet(game: g) }
         }
+        .sheet(isPresented: Binding(get: { model.sharingWorked != nil }, set: { if !$0 { model.sharingWorked = nil } })) {
+            if let g = model.game(model.sharingWorked), let setup = model.workedSetup(for: g) { ShareWorkedSheet(game: g, setup: setup) }
+        }
         .alert("Steam has to close for a minute", isPresented: Binding(get: { model.launcherQuit != nil },
                                                                      set: { if !$0 { model.launcherQuit = nil } }),
                presenting: model.launcherQuit) { request in
