@@ -186,10 +186,10 @@ struct GameInspector: View {
         let info = model.engineInfo(for: space)
         VStack(alignment: .leading, spacing: 8) {
             Text("Graphics").sectionTitle()
-            if let pinned = AppPresets.preset(space.presetID)?.launcherBackend(on: info.kind) {
-                // A launcher that only opens with one kind of graphics on this engine: nothing to pick.
+            if let pinned = AppPresets.preset(space.presetID)?.launcherBackend(on: info.kind, ready: info.backends) {
+                // A launcher that only opens with some graphics on this engine: G-Player picks them, nothing to choose.
                 Text(pinned.displayName)
-                Text("On \(info.shortName), G-Player starts \(game.title) with these graphics, the ones it is known to open with.")
+                Text("Chosen for \(game.title). The other graphics don't open it.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },

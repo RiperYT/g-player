@@ -2,14 +2,16 @@ import Foundation
 import Testing
 @testable import GPlayerCore
 
-/// Epic's own launcher. On G-Player Wine it runs with the web helper Epic made and the engine's own Direct3D (its network
-/// service crashes in a loop behind G-Player's wrapper, and its renderer can't make a swap chain on DXVK); on Wine Staging
-/// nothing changes. Which engine decides is a function of the preset and the engine's kind.
+/// Epic's own launcher. On G-Player Wine it runs with the web helper Epic made (its network service crashes in a loop behind
+/// G-Player's wrapper) and on D3DMetal, or DXMT without it (on DXVK its renderer can't make a swap chain, on WineD3D it
+/// crashes); on Wine Staging nothing changes. Both decisions are functions of the preset and the engine's kind.
 @Suite struct EpicLauncherTests {
     let staging = EngineCatalog.wineStaging
     let gplayerWine = EngineCatalog.crossover
     let epic = AppPresets.epic
     let kinds: [EngineInfo.Kind] = [.wineStaging, .crossover, .gptk]
+    let withMetal: [GraphicsBackend] = [.dxvk, .d3dmetal, .dxmt, .wined3d]
+    let withoutMetal: [GraphicsBackend] = [.dxvk, .dxmt, .wined3d]
     let launcherPath = "Epic/drive_c/Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe"
 
     private func epicSpace(_ tmp: TempFolder, on engine: EngineInfo, origin: Space.Origin = .managed) -> Space {
@@ -45,34 +47,56 @@ import Testing
             for kind in kinds {
                 #expect(preset.helpersToWrap(on: kind) == preset.chromiumHelpers)
                 #expect(preset.helpersToUnwrap(on: kind).isEmpty)
-                #expect(preset.launcherBackend(on: kind) == nil)
+                #expect(preset.launcherBackend(on: kind, ready: withMetal) == nil)
                 #expect(!preset.needsGPlayerWine)
             }
         }
     }
 
-    @Test func epicsLauncherIsPinnedToTheEnginesOwnDirect3DOnGPlayerWineOnly() {
-        #expect(epic.launcherBackend(on: .crossover) == .wined3d)
-        #expect(epic.launcherBackend(on: .wineStaging) == nil)
-        #expect(epic.launcherBackend(on: .gptk) == nil)
+    @Test func epicsLauncherIsPinnedToD3DMetalOrDXMTOnGPlayerWineAndNeverToWineD3D() {
+        // D3DMetal when the engine has it ready (it runs DirectX 12 games the launcher starts too), DXMT otherwise.
+        #expect(epic.launcherBackend(on: .crossover, ready: withMetal) == .d3dmetal)
+        #expect(epic.launcherBackend(on: .crossover, ready: withoutMetal) == .dxmt)
+        // Whatever is ready, in every combination: never WineD3D or DXVK, which don't open the 2026 launcher. Without either of
+        // the two the last choice stands, and the engine runs what it has.
+        for mask in 0..<16 {
+            let ready = withMetal.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element)
+            #expect(epic.launcherBackend(on: .crossover, ready: ready) == (ready.contains(.d3dmetal) ? .d3dmetal : .dxmt))
+        }
+        // G-Player Wine only.
+        for kind in [EngineInfo.Kind.wineStaging, .gptk] {
+            #expect(epic.launcherBackend(on: kind, ready: withMetal) == nil)
+        }
     }
 
     // MARK: What a launch gets
 
-    @Test func theLauncherOnGPlayerWineStartsOnWineD3DWhateverIsChosen() throws {
+    private func plan(_ s: Space, graphics: GraphicsBackend = .auto, ready: [GraphicsBackend]? = nil) throws -> LaunchPlan {
+        try LaunchPlanner.plan(for: launcher(in: s, graphics: graphics), in: s, ready: ready)
+    }
+
+    @Test func theLauncherOnGPlayerWineStartsOnD3DMetalOrDXMTWhateverIsChosen() throws {
         let tmp = TempFolder()
         let s = epicSpace(tmp, on: gplayerWine)
-        for chosen in [GraphicsBackend.auto, .dxvk, .d3dmetal, .dxmt] {
-            let plan = try LaunchPlanner.plan(for: launcher(in: s, graphics: chosen), in: s)
-            #expect(plan.backend == .wined3d)
+        for chosen in [GraphicsBackend.auto, .dxvk, .wined3d, .d3dmetal, .dxmt] {
+            #expect(try plan(s, graphics: chosen, ready: withMetal).backend == .d3dmetal)
+            #expect(try plan(s, graphics: chosen, ready: withoutMetal).backend == .dxmt)
+            #expect(try plan(s, graphics: chosen).backend == .d3dmetal)              // nothing known of the engine yet: the first choice
         }
-        let plan = try LaunchPlanner.plan(for: launcher(in: s), in: s)
-        #expect(plan.arguments.contains("-SkipBuildPatchPrereq"))
-        #expect(plan.chromiumHelpers.isEmpty && plan.unwrapHelpers == epic.chromiumHelpers)
-        // The engine's builtin d3d11, d3d10core and dxgi: no override for them, nothing of DXVK's.
-        let env = WineEnvironment.make(engine: fakeEngine(gplayerWine), space: s, backend: plan.backend, tweaks: plan.tweaks, base: [:])
-        let overrides = env["WINEDLLOVERRIDES"] ?? ""
-        #expect(!overrides.contains("d3d11") && !overrides.contains("d3d10core") && !overrides.contains("dxgi"))
+        let launch = try plan(s)
+        #expect(launch.arguments.contains("-SkipBuildPatchPrereq"))
+        #expect(launch.chromiumHelpers.isEmpty && launch.unwrapHelpers == epic.chromiumHelpers)
+    }
+
+    @Test func withoutD3DMetalTheLauncherGetsDXMTsDLLsAndNotDXVKs() throws {
+        let tmp = TempFolder()
+        let s = epicSpace(tmp, on: gplayerWine)
+        let launch = try plan(s, ready: withoutMetal)
+        let root = URL(fileURLWithPath: "/tmp/engine/wine")
+        let engine = Engine(info: gplayerWine.limited(to: withoutMetal), wineRoot: root, wine: root.appendingPathComponent("bin/wine"),
+                            dxvk: URL(fileURLWithPath: "/tmp/engine/dxvk"), dxmt: URL(fileURLWithPath: "/tmp/engine/dxmt"))
+        let env = WineEnvironment.make(engine: engine, space: s, backend: launch.backend, tweaks: launch.tweaks, base: [:])
+        #expect(env["WINEDLLOVERRIDES"]?.contains(";dxgi,d3d11,d3d10core=n,b") == true)    // its DLLs go into the space as native ones
         #expect(env["DXVK_ASYNC"] == nil)
     }
 
@@ -93,16 +117,16 @@ import Testing
         // Epic's launcher hands the game to its own process, which inherits the launcher's environment: what G-Player
         // decides for the game itself (its backend here) is not replaced by the launcher's pin.
         var game = Game(title: "G", spaceID: s.id, source: .epic(appName: "x", launchURI: "com.epicgames.launcher://apps/x?action=launch"),
-                        graphics: .dxmt)
+                        graphics: .dxvk)
         game.options = LaunchOptions(profile: .custom)                 // graphics chosen by hand count only with Custom
-        let plan = try LaunchPlanner.plan(for: game, in: s)
-        #expect(plan.backend == .dxmt)
-        #expect(plan.chromiumHelpers.isEmpty && plan.unwrapHelpers == epic.chromiumHelpers)   // the helper is Epic's own here too
+        let started = try LaunchPlanner.plan(for: game, in: s, ready: withMetal)
+        #expect(started.backend == .dxvk)
+        #expect(started.chromiumHelpers.isEmpty && started.unwrapHelpers == epic.chromiumHelpers)   // the helper is Epic's own here too
         // And a program the user added to the space gets what it asked for, the pin being the launcher's alone.
         var mine = Game(title: "P", spaceID: s.id, executablePath: "drive_c/Games/p.exe", graphics: .dxvk)
         mine.options = LaunchOptions(profile: .custom)
         tmp.file("Epic/drive_c/Games/p.exe")
-        #expect(try LaunchPlanner.plan(for: mine, in: s).backend == .dxvk)
+        #expect(try LaunchPlanner.plan(for: mine, in: s, ready: withMetal).backend == .dxvk)
     }
 
     @Test func steamIsPlannedExactlyAsBefore() throws {
@@ -120,12 +144,14 @@ import Testing
         #expect(steamGame.chromiumHelpers == AppPresets.steam.chromiumHelpers && steamGame.unwrapHelpers.isEmpty)
     }
 
-    @Test func aLauncherOnGPlayerWineAsksForNoConsentToStart() throws {
+    @Test func aLauncherOnGPlayerWineAsksForConsentOnlyForDXMTsFiles() throws {
         let tmp = TempFolder()
         var s = epicSpace(tmp, on: gplayerWine)
-        #expect(!(try LaunchPlanner.plan(for: launcher(in: s), in: s)).writesToSpace(engine: gplayerWine))
+        // D3DMetal and the unwrap write nothing the owner of another app's bottle has to allow; DXMT's DLLs and the wrapper do.
+        #expect(!(try plan(s, ready: withMetal)).writesToSpace(engine: gplayerWine.limited(to: withMetal)))
+        #expect(try plan(s, ready: withoutMetal).writesToSpace(engine: gplayerWine.limited(to: withoutMetal)))
         s.engineID = staging.id
-        #expect(try LaunchPlanner.plan(for: launcher(in: s), in: s).writesToSpace(engine: staging))      // the wrapper, as before
+        #expect(try plan(s).writesToSpace(engine: staging))                         // the wrapper, as before
     }
 
     // MARK: Taking the wrapper out
@@ -284,6 +310,7 @@ import Testing
 
     @Test func theLauncherIsTheRecommendedWayAndSaysItRunsOnGPlayerWine() {
         #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.")
+        #expect(!epic.experimental)                                                // one badge: Recommended
         #expect(!epic.summary.contains("loading screen"))
         #expect(EpicWay.allCases == [.launcher, .legendary])
         #expect(EpicWay.launcher.title == "Epic Games Launcher" && EpicWay.launcher.badge == "Recommended")

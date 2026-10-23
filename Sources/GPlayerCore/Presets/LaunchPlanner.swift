@@ -227,11 +227,12 @@ public enum LaunchPlanner {
         return groups.filter { !user.contains($0[0]) }.flatMap { $0 }
     }
 
-    /// What a store launcher runs with. A launcher whose preset pins graphics on this engine kind (Epic's on G-Player Wine) gets
-    /// those, whatever was chosen. Otherwise, when the user chose nothing: on G-Player Wine with D3DMetal, D3DMetal, which
-    /// most games it starts take (64-bit DirectX 10–12), so they don't need it restarted; the engine's default otherwise.
+    /// What a store launcher runs with. A launcher whose preset pins graphics on this engine kind (Epic's on G-Player Wine: D3DMetal
+    /// when the engine has it ready, else DXMT) gets those, whatever was chosen. Otherwise, when the user chose nothing: on
+    /// G-Player Wine with D3DMetal, D3DMetal, which most games it starts take (64-bit DirectX 10–12), so they don't need it
+    /// restarted; the engine's default otherwise. `engine` has only the backends that are ready (`ready` of `plan`).
     static func launcherBackend(on engine: EngineInfo, chosen: GraphicsBackend, preset: AppPreset? = nil) -> GraphicsBackend {
-        if let pinned = preset?.launcherBackend(on: engine.kind) { return pinned }
+        if let pinned = preset?.launcherBackend(on: engine.kind, ready: engine.backends) { return pinned }
         return chosen == .auto && engine.kind == .crossover && engine.backends.contains(.d3dmetal) ? .d3dmetal : chosen
     }
 
