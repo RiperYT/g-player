@@ -340,20 +340,20 @@ private let sampleInstalled = """
     """
 
     @Test func noLoginMeansSignIn() {
-        #expect(LegendaryFailure.kind(stdout: "", stderr: signedOut) == .signedOut)
+        #expect(LegendaryFailure.kind(stderr: signedOut) == .signedOut)
         #expect(LegendaryFailure.reason(stdout: "", stderr: signedOut, status: 1) == LegendaryFailure.signedOutMessage)
         let expired = "[Core] ERROR: Stored credentials are no longer valid! Please login again.\n[cli] ERROR: Login failed, cannot continue!"
-        #expect(LegendaryFailure.kind(stdout: "", stderr: expired) == .signedOut)
+        #expect(LegendaryFailure.kind(stderr: expired) == .signedOut)
     }
 
     @Test func anInstallElsewhereMeansWait() {
         let text = "[cli] CRITICAL: Failed to acquire installed data lock, only one instance of Legendary may install/import/move applications at a time."
-        #expect(LegendaryFailure.kind(stdout: "", stderr: text) == .busy)
+        #expect(LegendaryFailure.kind(stderr: text) == .busy)
     }
 
     @Test func noNetworkIsSaidSo() {
         let text = "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.legendary.gl', port=443): Max retries exceeded"
-        #expect(LegendaryFailure.kind(stdout: "", stderr: text) == .network)
+        #expect(LegendaryFailure.kind(stderr: text) == .network)
         #expect(LegendaryFailure.reason(stdout: "", stderr: "[Core] ERROR: HTTP request for login failed: x", status: 1).hasPrefix("Couldn't connect"))
     }
 
@@ -502,6 +502,21 @@ private let sampleInstalled = """
         esac
         """)
         await #expect(throws: ShellError.self) { _ = try await legendary.signIn(code: "0123456789abcdef0123456789abcdef") }
+    }
+
+    @Test func noNetworkWhileSigningInIsSaidSo() async throws {
+        let legendary = try stand(in: """
+        case "$2" in
+          auth) echo "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.legendary.gl', port=443): Max retries exceeded" >&2; exit 1 ;;
+          status) echo '{"account": "<not logged in>"}' ;;
+        esac
+        """)
+        do {
+            _ = try await legendary.signIn(code: "0123456789abcdef0123456789abcdef")
+            Issue.record("expected an error")
+        } catch {
+            #expect(error.localizedDescription.hasPrefix("Couldn't connect"), "\(error)")
+        }
     }
 
     @Test func aCodeThatCouldNotBeOneIsNotSentToLegendary() async throws {

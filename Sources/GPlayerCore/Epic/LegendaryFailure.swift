@@ -16,8 +16,8 @@ public enum LegendaryFailure {
 
     public static let signedOutMessage = "You're signed out of Epic Games. Sign in again from Epic Games in the sidebar."
 
-    public static func kind(stdout: String, stderr: String) -> Kind {
-        let text = stdout + "\n" + stderr
+    /// What Legendary's log (stderr) says went wrong. Its stdout is not looked at: it can hold a game's description.
+    public static func kind(stderr text: String) -> Kind {
         if text.contains("No saved credentials") || text.contains("no longer valid") || text.contains("InvalidCredentialsError") {
             return .signedOut
         }
@@ -30,7 +30,7 @@ public enum LegendaryFailure {
     /// The reason, as one short sentence and Legendary's exit code. A one-time code or account name that got into the output
     /// is hidden (`LaunchSecrets`).
     public static func reason(stdout: String, stderr: String, status: Int32) -> String {
-        switch kind(stdout: stdout, stderr: stderr) {
+        switch kind(stderr: stderr) {
         case .signedOut: return signedOutMessage
         case .busy: return "Epic Games is busy with another install. Wait for it to finish, then try again."
         case .network: return "Couldn't connect to Epic Games. Check your internet connection, then try again."

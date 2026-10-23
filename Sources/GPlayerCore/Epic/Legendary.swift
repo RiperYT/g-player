@@ -192,7 +192,7 @@ public struct Legendary: Sendable {
         let result = try await run(LegendaryCommand.signIn(code: code), timeout: 120)
         let status = try await status()
         guard status.isSignedIn else {
-            if LegendaryFailure.kind(stdout: result.stdout, stderr: result.stderr) == .network { throw fail(result) }
+            if LegendaryFailure.kind(stderr: result.stderr) == .network { throw fail(result) }
             throw ShellError.failed("Epic didn't accept the sign-in. Try again.")
         }
         return status
@@ -256,7 +256,7 @@ public struct Legendary: Sendable {
         guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
         let online = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: false), timeout: 90)
         if online.succeeded, let launch = LegendaryOutput.launch(online.stdout) { return launch }
-        if LegendaryFailure.kind(stdout: online.stdout, stderr: online.stderr) == .signedOut { throw fail(online) }
+        if LegendaryFailure.kind(stderr: online.stderr) == .signedOut { throw fail(online) }
         let offline = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: true), timeout: 60)
         guard offline.succeeded, let launch = LegendaryOutput.launch(offline.stdout) else { throw fail(offline) }
         return launch

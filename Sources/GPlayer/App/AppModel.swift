@@ -1451,12 +1451,14 @@ final class AppModel {
             failedAutoLaunches[game.id] = nil
             // An Epic game from Legendary is planned again with Legendary's launch parameters, right before it starts (they hold
             // a one-time code): the plan above is for everything that has to be settled before.
-            var replan: EpicReplan?
+            let replan: EpicReplan?
             if case .legendary = current.source {
                 replan = { launch in
                     try LaunchPlanner.plan(for: planned, in: space, fixes: fixes, verboseLogs: verbose, ready: ready,
                                            launcher: launcher, legendary: launch)
                 }
+            } else {
+                replan = nil
             }
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
