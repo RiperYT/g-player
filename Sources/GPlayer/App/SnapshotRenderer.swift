@@ -98,6 +98,21 @@ enum SnapshotRenderer {
                                     note: EngineMigration.shortUpdateNote(for: EngineCatalog.crossover))
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
+            Shot(name: "epic-signed-out", size: mainSize) { box in
+                box.libraryWithGames()
+                box.model.epic.looked = true
+                return AnyView(MainWindow(detail: EpicView()).environment(box.model))
+            },
+            Shot(name: "epic-signed-in", size: mainSize) { box in
+                box.libraryWithGames()
+                box.model.epic.looked = true
+                box.model.epic.account = "Sample Player"
+                box.model.epic.games = [EpicGame(appName: "SampleApp", title: "Sample Game"),
+                                        EpicGame(appName: "OtherApp", title: "Another Sample Game")]
+                box.model.epic.fetched = true
+                box.model.epic.installedKnown = true
+                return AnyView(MainWindow(detail: EpicView()).environment(box.model))
+            },
             Shot(name: "main-library-notes", size: mainSize) { box in
                 box.libraryWithGames()
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
