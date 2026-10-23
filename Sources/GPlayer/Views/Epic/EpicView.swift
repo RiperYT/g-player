@@ -29,7 +29,7 @@ struct EpicView: View {
         .searchable(text: $search, placement: .toolbar, prompt: "Search Epic games")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { Task { await model.refreshEpicList() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                Button { Task { await model.refreshEpic() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                     .help("Ask Epic for your games")
                     .disabled(!model.epic.isSignedIn || model.epic.isOccupied)
             }
@@ -129,7 +129,7 @@ private struct EpicListFailure: View {
             if text == LegendaryFailure.signedOutMessage {
                 Button("Sign In…") { model.beginEpicSignIn() }.buttonStyle(.borderedProminent).disabled(model.epic.isOccupied)
             } else {
-                Button("Try Again") { Task { await model.refreshEpicList() } }.disabled(model.epic.isOccupied)
+                Button("Try Again") { Task { await model.refreshEpic() } }.disabled(model.epic.isOccupied)
             }
         }
     }

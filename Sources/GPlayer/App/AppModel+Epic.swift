@@ -81,14 +81,22 @@ extension AppModel {
         refreshPrograms()
     }
 
-    /// The Epic Games page opened: look again, and ask Epic for the list once per run. Not tied to the page: leaving it doesn't
-    /// stop Legendary halfway through the list.
+    /// The Epic Games page opened: look once per run (signing in, installing and uninstalling keep what it shows up to date, and
+    /// Refresh looks again), and ask Epic for the list once per run. Not tied to the page: leaving it doesn't stop Legendary
+    /// halfway through the list.
     func openEpicPage() {
-        lookAtEpic()
+        if !epic.looked { lookAtEpic() }
         Task {
             await epicLooking?.value
             if epic.isSignedIn, !epic.fetched { await refreshEpicList() }
         }
+    }
+
+    /// Refresh: what is on this Mac, and the list from Epic.
+    func refreshEpic() async {
+        lookAtEpic()
+        await epicLooking?.value
+        await refreshEpicList()
     }
 
     /// Asks Epic for the games the account owns. Needs the network.

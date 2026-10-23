@@ -88,8 +88,8 @@ the first time the user signs in, and G-Player runs it as a separate program (`L
 - **In the library.** Games install into a space of their own, "Epic Games" (`EpicGames.presetID`, on G-Player Wine), under
   `drive_c/Games/Epic`, one at a time (Legendary locks what it installs; progress is read from its log, `LegendaryInstallStatus`;
   Stop ends Legendary, and so does quitting G-Player; the next install goes on from its resume file). Nothing runs at start:
-  each Legendary command takes seconds, so who is signed in and what is installed are looked at when the Epic Games page opens or
-  something changes them. What Legendary lists as installed becomes
+  each Legendary command takes seconds, so who is signed in and what is installed are looked at when the Epic Games page first
+  opens, on Refresh, or when something changes them. What Legendary lists as installed becomes
   library entries with the source `.legendary(appName:)` (`EpicGames.merge`); the games Epic says the account owns, with their box
   art, are kept in `Tools/epic-library.json` and shown on the Epic Games page, where the ones not installed offer Install.
 - **A launch.** A `.legendary` game is a program G-Player starts itself, so it goes through `LaunchPlanner` like one the user
