@@ -315,7 +315,7 @@ import Testing
     // MARK: Words
 
     @Test func theLauncherIsTheRecommendedWayAndSaysItRunsOnGPlayerWine() {
-        #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account. Its first start adds Wine Mono (.NET) for Epic Online Services: a download of 40 MB, 245 MB on disk.")
+        #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account. Its first start adds Wine Mono (.NET) for Epic Online Services: a 40 MB download, about 245 MB on disk.")
         #expect(!epic.experimental)                                                // one badge: Recommended
         #expect(!epic.summary.contains("loading screen"))
         #expect(EpicWay.allCases == [.launcher, .legendary])
