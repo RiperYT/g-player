@@ -10,7 +10,11 @@
   works through [Legendary](https://github.com/legendary-gl/legendary) 0.21.1 (GPL-3.0), an open-source Epic client that is
   not part of G-Player: the first time you sign in, G-Player downloads it (15 MB) from its GitHub release and checks it
   against a pinned SHA-256, and runs it as a separate program with settings of its own in the library's `Tools` folder. The
-  one-time code a game is started with is hidden in launch logs and messages. Not in this version: game updates, verify and
+  one-time code a game is started with is hidden in launch logs and messages. Before the first Epic game
+  goes into the library, G-Player keeps `library.json` as `library.json.before-epic-<date>`, because a G-Player from before Epic
+  Games takes a library with an Epic game in it for damaged (use the copy to go back); from now on a game this version can't read
+  is kept as it is and left out instead of breaking the library. Moving the library leaves Epic games marked "Files not found"
+  with Repair or Remove… instead of dropping them. Not in this version: game updates, verify and
   repair, cloud saves, Epic's overlay and games' prerequisite installers; games with EasyAntiCheat or BattlEye don't run on a
   Mac. The Epic Games Launcher in **Get Apps** stays for those who have it, and Epic Games is now the recommended way.
 - **G-Player updates itself.** **G-Player › Check for Updates…** looks for a newer version and installs it, so you no

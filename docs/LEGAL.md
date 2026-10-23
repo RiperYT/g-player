@@ -44,7 +44,7 @@ downloaded onto the user's Mac when a game needs them.
 
 Legendary is GPL-3.0-or-later software and G-Player is Apache-2.0, so G-Player never includes it: it is a separate program
 that the user's Mac downloads and runs, talking to it only through arguments and what it prints (the same terms as winetricks
-above). Its login and settings stay in the user's library folder (`Tools/legendary-config`, readable by the user only). G-Player
+above). Its login and settings stay in the user's library folder (`Tools/legendary-config`, readable by the user only on a disk that keeps permissions: not on exFAT, most network volumes or iCloud). G-Player
 turns off Legendary's check for newer versions; it still asks legendary.gl for its version information once, when you sign in,
 and for the few games with selectable language packs, which packs there are, and sends nothing about the account.
 

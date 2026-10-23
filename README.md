@@ -55,15 +55,22 @@ way G-Player recommends for Epic is **Epic Games** in the sidebar:
 1. **Sign In…** opens Epic's own sign-in page in a window. You sign in there, with Epic, Google, Apple or whatever you use. Your
    password goes to Epic and never to G-Player, which reads nothing on that page; it only takes the one-time code Epic's page
    gives the app that asked, and hands it to Legendary. The window keeps nothing. If you'd rather use your own browser, **Sign
-   in in your browser instead** opens Legendary's page there and takes the code you paste.
-2. The first time, G-Player downloads Legendary 0.21.1 (15 MB) from its GitHub release, checks it against a pinned SHA-256 and
-   keeps it, with its settings and your login, in `Tools` in your library folder. It isn't part of G-Player: it runs as a separate
-   program, and it is the same program Heroic Games Launcher uses.
-3. The page lists the games your account owns. **Install** puts a game into a space of its own, "Epic Games", on G-Player Wine,
-   one game at a time, with progress and a Stop in the sidebar (installing again goes on from where it stopped). **Play**
-   starts it the way G-Player starts any game, with its graphics, components and automatic retry. Each start asks Epic for a
-   one-time code to log the game in, so it needs your sign-in (offline, the game starts without the code, which most
-   single-player games accept). **Uninstall…** is on the game's panel and on this page. **Sign Out** forgets the login on this Mac.
+   in in your browser instead** explains `legendary.gl` (a helper page by Legendary's authors that shows the code) and opens it
+   on a button, and takes the code you paste.
+2. Before the first sign-in the page says that G-Player downloads Legendary 0.21.1 (15 MB) from its GitHub release. It checks the
+   file against a pinned SHA-256 before every run, and keeps it, with its settings and your sign-in token, in `Tools` in your
+   library folder (a library on an exFAT, network or iCloud disk can't keep that token private). It isn't part of G-Player: it
+   runs as a separate program, and it is the same program Heroic Games Launcher uses.
+3. The page lists the games your account owns. **Install…** asks first: where the game goes (a space of its own, "Epic Games",
+   on G-Player Wine, made first if it isn't there, with G-Player Wine downloaded first if it isn't installed), and how much room
+   it takes. Then it installs one game at a time, with progress and a Stop in the sidebar (installing again goes on from where it
+   stopped). **Play** starts it the way G-Player starts any game, with its graphics, components and automatic retry. Each start
+   asks Epic for a one-time code to log the game in, so it needs your sign-in; when Epic can't be reached the game starts
+   without the code, which most single-player games accept, and its panel says "Started offline". **Uninstall…** is on the
+   game's panel and on this page. **Sign Out** forgets the login on this Mac.
+4. If you move your library folder or its disk, Legendary still has the old place on record: the game says "Files not found" and
+   offers **Repair** when its files are in this library's Epic Games space, or **Remove…**, which makes Legendary forget it
+   without deleting a file. Nothing about the game is lost until you remove it.
 
 Not in this version: updating games, verify and repair, cloud saves, Epic's overlay, and the installers of a game's
 prerequisites. Games with EasyAntiCheat or BattlEye don't run on a Mac. Legendary isn't made by Epic, and Epic hasn't published
