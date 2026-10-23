@@ -105,6 +105,21 @@ enum SnapshotRenderer {
                 let space = box.newSpace()
                 return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
             },
+            // A space made before G-Player Wine was the one engine: it says what it runs on, and offers the move.
+            Shot(name: "main-space-on-staging", size: mainSize) { box in
+                let space = box.newSpace(on: EngineCatalog.wineStaging)
+                return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
+            },
+            Shot(name: "main-space-on-toolkit-off", size: mainSize) { box in
+                let space = box.newSpace(on: EngineCatalog.gptk)
+                return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
+            },
+            // With "Choose the Wine engine for each space" on, the engine menu is back.
+            Shot(name: "main-space-on-staging-choosing", size: mainSize) { box in
+                let space = box.newSpace(on: EngineCatalog.wineStaging)
+                box.model.choosesEngines = true
+                return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
+            },
             // The screen over the window when the library can't be opened, in each of its four cases.
             problem("library-problem-folder-missing", LibraryProblem(kind: .folderMissing, root: URL(fileURLWithPath: "/Volumes/Games/G-Player"))),
             problem("library-problem-file-missing", LibraryProblem(kind: .fileMissing, root: LibraryPaths.defaultRoot, previousIsUsable: true)),
@@ -114,9 +129,10 @@ enum SnapshotRenderer {
             problem("library-problem-unreadable", LibraryProblem(kind: .unreadable, root: LibraryPaths.defaultRoot,
                                                                  reason: "you don’t have permission to view it")),
             Shot(name: "sheet-new-space") { box in AnyView(NewSpaceSheet().environment(box.model)) },
-            Shot(name: "sheet-new-space-staging-only") { box in
+            Shot(name: "sheet-new-space-choosing-engine") { box in
                 box.finishedOnboarding()
                 box.installEngine(EngineCatalog.wineStaging)
+                box.model.choosesEngines = true
                 return AnyView(NewSpaceSheet().environment(box.model))
             },
             Shot(name: "sheet-add-existing-space") { box in
@@ -137,6 +153,13 @@ enum SnapshotRenderer {
                 AnyView(FailedLaunchSheet(game: box.failedGame(tryOthers: false)).environment(box.model))
             },
             Shot(name: "settings-engines", size: settingsSize) { box in AnyView(EngineSettings(focus: .constant("")).environment(box.model)) },
+            Shot(name: "settings-engines-advanced", size: settingsSize) { box in
+                box.installEngine(EngineCatalog.wineStaging)
+                return AnyView(Form { AdvancedEngineSection(expanded: true) }.formStyle(.grouped).environment(box.model))
+            },
+            Shot(name: "settings-advanced", size: CGSize(width: 560, height: 330)) { box in
+                AnyView(AdvancedSettings().environment(box.model))
+            },
             Shot(name: "settings-engines-from-d3dmetal-alert", size: CGSize(width: 560, height: 410)) { box in
                 AnyView(EngineSettings(focus: .constant(SettingsTab.Focus.toolkit.rawValue)).environment(box.model))
             },
@@ -243,12 +266,12 @@ enum SnapshotRenderer {
         }
 
         /// A space as "New Space" leaves it before Windows is set up in it: its folder is a prefix, nothing in it.
-        func newSpace() -> Space {
+        func newSpace(on engine: EngineInfo = EngineCatalog.defaultForNewSpaces) -> Space {
             finishedOnboarding()
             let folder = model.paths!.spaces.appendingPathComponent("Main", isDirectory: true)
             try? FileManager.default.createDirectory(at: folder.appendingPathComponent("drive_c/windows"), withIntermediateDirectories: true)
             FileManager.default.createFile(atPath: folder.appendingPathComponent("system.reg").path, contents: Data())
-            let space = Space(name: "Main", path: folder.path, engineID: EngineCatalog.defaultForNewSpaces.id, origin: .managed)
+            let space = Space(name: "Main", path: folder.path, engineID: engine.id, origin: .managed)
             model.mutate { $0.spaces.append(space) }
             model.selection = .space(space.id)
             return space

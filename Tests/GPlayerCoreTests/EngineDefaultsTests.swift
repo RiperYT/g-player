@@ -9,8 +9,38 @@ import Testing
     @Test func newSpacesGetGPlayerWineAndThePickersListItFirst() {
         #expect(EngineCatalog.defaultForNewSpaces.id == gplayerWine.id)
         #expect(EngineCatalog.all.first?.id == gplayerWine.id)
-        #expect(EngineCatalog.all.map(\.id) == [gplayerWine.id, staging.id, EngineCatalog.gptk.id])
+        #expect(EngineCatalog.all.map(\.id) == [gplayerWine.id, staging.id])
         #expect(EngineCatalog.all.filter(\.isRecommended).map(\.id) == [gplayerWine.id])
+    }
+
+    @Test func appleToolkitIsNeverOfferedAsAnEngineButStaysRunnable() {
+        let toolkit = EngineCatalog.gptk
+        // Not in what the pickers and Settings list, and no new space, found bottle or first run gets it.
+        #expect(!EngineCatalog.all.contains { $0.id == toolkit.id })
+        #expect(EngineCatalog.engineForNewSpace(installed: [toolkit]).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [toolkit, staging]).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [], picked: toolkit.id, choosing: true).id == gplayerWine.id)
+        #expect(EngineCatalog.firstRunEngine(installed: [toolkit]) == nil)
+        // Spaces that already use it still find it: to run, to look after, and to move off.
+        #expect(EngineCatalog.known.contains { $0.id == toolkit.id } && EngineCatalog.info(toolkit.id)?.kind == .gptk)
+        #expect(!toolkit.isRetired && EngineCatalog.replacement(of: toolkit) == nil)
+    }
+
+    @Test func aNewSpaceSheetOnlyHonoursAPickWhileEnginesAreChosen() {
+        let revision1 = EngineCatalog.crossoverRevision1
+        // Menus off: whatever was picked (a stale pick, say), the space gets what a space gets without a choice.
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine, staging], picked: staging.id, choosing: false).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: gplayerWine.id, choosing: false).id == staging.id)   // offline
+        #expect(EngineCatalog.engineForNewSpace(installed: [], picked: nil, choosing: false).id == gplayerWine.id)
+        // Menus on: the pick, if it is one of the engines offered.
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine], picked: staging.id, choosing: true).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: gplayerWine.id, choosing: true).id == gplayerWine.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine], picked: nil, choosing: true).id == gplayerWine.id)
+        // Never an engine that isn't offered, a retired one included; and picking G-Player Wine gives the revision that is installed.
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1], picked: revision1.id, choosing: true).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging], picked: revision1.id, choosing: true).id == staging.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [revision1, staging], picked: gplayerWine.id, choosing: true).id == revision1.id)
+        #expect(EngineCatalog.engineForNewSpace(installed: [gplayerWine, revision1], picked: gplayerWine.id, choosing: true).id == gplayerWine.id)
     }
 
     @Test func existingEngineIDsStillResolve() {
@@ -26,7 +56,7 @@ import Testing
         let revision1 = EngineCatalog.crossoverRevision1
         #expect(revision1.id == "wine-cx-26.3.0-1" && gplayerWine.id == "wine-cx-26.3.0-2")
         #expect(EngineCatalog.retired.map(\.id) == [revision1.id])
-        #expect(EngineCatalog.known.map(\.id) == EngineCatalog.all.map(\.id) + [revision1.id])
+        #expect(EngineCatalog.known.map(\.id) == EngineCatalog.all.map(\.id) + [EngineCatalog.gptk.id, revision1.id])
         // Not in the pickers, the first run or Settings (`all`), not recommended, and a new space only gets it while it is the
         // G-Player Wine that is installed (`anInstalledRetiredRevisionCountsAsGPlayerWine…`).
         #expect(!EngineCatalog.all.contains { $0.id == revision1.id })

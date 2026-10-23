@@ -36,6 +36,7 @@ public enum EnvironmentFinder {
         let skip = Set(excluding.map { $0.standardizedFileURL.path })
         var found: [FoundEnvironment] = []
         var seen = Set<String>()
+        let gplayerWine = (EngineCatalog.installedGPlayerWine(in: installed) ?? EngineCatalog.defaultForNewSpaces).id
         for (root, note, depth) in searchRoots(home: home) where fm.fileExists(atPath: root.path) {
             for url in candidates(in: root, depth: depth) {
                 let path = url.standardizedFileURL.path
@@ -46,14 +47,14 @@ public enum EnvironmentFinder {
                 let engine: String = {
                     // What the prefix's own launcher script names wins: moving a prefix to an older Wine than it was
                     // opened with could break it. Steam doesn't start on Apple's wine 7.7, so a script naming it
-                    // doesn't count for a Steam prefix.
-                    if let e = scripts.engineID, !(hasSteam && e == EngineCatalog.gptk.id) { return e }
+                    // doesn't count for a Steam prefix. Apple's toolkit is no engine G-Player offers any more: what ran
+                    // on it (a script naming it, or a toolkit on this Mac and no other clue) goes to G-Player Wine, a newer
+                    // Wine that takes the toolkit's D3DMetal.
+                    if let e = scripts.engineID, !(hasSteam && e == EngineCatalog.gptk.id) { return e == EngineCatalog.gptk.id ? gplayerWine : e }
                     // Bottles were made by CrossOver's or Whisky's Wine; G-Player Wine comes from CrossOver's source.
-                    if note == "CrossOver" || note == "Whisky" {
-                        return (EngineCatalog.installedGPlayerWine(in: installed) ?? EngineCatalog.defaultForNewSpaces).id
-                    }
+                    if note == "CrossOver" || note == "Whisky" { return gplayerWine }
                     if hasSteam { return EngineCatalog.wineStaging.id }
-                    return gptkInstalled ? EngineCatalog.gptk.id : EngineCatalog.wineStaging.id
+                    return gptkInstalled ? gplayerWine : EngineCatalog.wineStaging.id
                 }()
                 found.append(FoundEnvironment(name: url.lastPathComponent, url: url, originNote: note,
                                               suggestedEngineID: engine, presetID: hasSteam ? "steam" : nil,

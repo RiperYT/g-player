@@ -327,7 +327,7 @@ import Testing
         #expect(byName["Steam"]?.presetID == "steam")
         #expect(byName["Steam"]?.suggestedEngineID == EngineCatalog.defaultForNewSpaces.id)     // a CrossOver bottle
         #expect(byName["Celeste"]?.games.first?.executable.path == exe.path)
-        #expect(byName["Celeste"]?.suggestedEngineID == EngineCatalog.gptk.id)
+        #expect(byName["Celeste"]?.suggestedEngineID == EngineCatalog.crossover.id)       // its script ran on Apple's toolkit: no engine now
         #expect(byName["Lumen"]?.games.first?.executable.path == lumen.path)
         #expect(byName["Lumen"]?.games.first?.title == "Lumen")
         #expect(byName["Lumen"]?.games.first?.arguments.contains("--in-process-gpu") == true)
@@ -348,8 +348,9 @@ import Testing
             let byName = Dictionary(uniqueKeysWithValues: EnvironmentFinder.find(home: tmp.url, gptkInstalled: toolkit).map { ($0.name, $0) })
             #expect(byName["Bottle"]?.suggestedEngineID == gplayerWine)
             #expect(byName["Old"]?.suggestedEngineID == gplayerWine)
-            // A plain prefix may have been opened by Wine Staging 11.18: it isn't moved to an older Wine unasked.
-            #expect(byName["Plain"]?.suggestedEngineID == (toolkit ? EngineCatalog.gptk.id : staging))
+            // A plain prefix may have been opened by Wine Staging 11.18: it isn't moved to an older Wine unasked. With Apple's
+            // toolkit on this Mac it is taken as the toolkit's (wine 7.7, which is no engine any more): G-Player Wine is newer.
+            #expect(byName["Plain"]?.suggestedEngineID == (toolkit ? gplayerWine : staging))
             #expect(byName["Scripted"]?.suggestedEngineID == staging)
         }
     }

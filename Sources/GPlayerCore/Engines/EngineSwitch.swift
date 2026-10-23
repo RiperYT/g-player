@@ -1,9 +1,31 @@
 import Foundation
 
-/// What a space's "Switch engine?" question says: which engine, what it downloads, and whether it is a newer or an older
+/// What a space's "Move to…?" question says: which engine, what it downloads, and whether it is a newer or an older
 /// Wine than the space runs on now (a newer one updates the space's files, which an older one may not open afterwards).
+/// Also what a space's page offers about its engine (`pageOffer`).
 public enum EngineSwitch {
     public enum Age: Sendable, Equatable { case newer, older, same }
+
+    /// What a space's page offers about its engine.
+    public enum PageOffer: Sendable, Equatable {
+        /// Nothing: the space is on G-Player Wine (any revision) and nobody asked to choose engines, or its engine is unknown.
+        case nothing
+        /// The engine menu, with this engine selected: the offered engine the space is on (a retired revision of G-Player Wine
+        /// shows as G-Player Wine).
+        case picker(selected: String)
+        /// Plain words about the engine the space is on, and "Move to G-Player Wine…": it is on an engine new spaces don't
+        /// use (Wine Staging, or Apple's toolkit, which the menu doesn't list).
+        case move
+    }
+
+    /// What the page of a space on `engineID` offers. The engine menu is for those who turned on "Choose the Wine engine for
+    /// each space" (`choosingEngines`); a space on Apple's toolkit has no place in it, so it gets the move either way.
+    public static func pageOffer(engineID: String, choosingEngines: Bool) -> PageOffer {
+        guard EngineCatalog.info(engineID) != nil else { return .nothing }
+        let listed = EngineCatalog.all.first { EngineCatalog.isRevision(engineID, of: $0) }
+        if choosingEngines, let listed { return .picker(selected: listed.id) }
+        return listed?.id == EngineCatalog.defaultForNewSpaces.id ? .nothing : .move
+    }
 
     /// The Wine release an engine is made from: 11.18 for Wine Staging 11.18, 11.0 for G-Player Wine, 7.7 for Apple's toolkit.
     static func release(of info: EngineInfo) -> [Int] {
@@ -22,7 +44,7 @@ public enum EngineSwitch {
     }
 
     public static func title(space: String, to target: EngineInfo) -> String {
-        "Switch “\(space)” to \(target.name)?"
+        "Move “\(space)” to \(target.name)?"
     }
 
     /// The question's text. `current` is nil when the space's engine isn't one G-Player knows.

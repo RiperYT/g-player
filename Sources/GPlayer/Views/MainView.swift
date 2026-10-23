@@ -70,7 +70,7 @@ struct MainView: View {
             Button("Move and Play") { model.moveToGPlayerWine(move.gameID) }
             Button("Cancel", role: .cancel) {}
         } message: { move in
-            Text("Every program in “\(move.spaceName)” will run on \(EngineCatalog.crossover.displayName) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "") You can switch back in the space's settings.")
+            Text("Every program in “\(move.spaceName)” will run on \(EngineCatalog.crossover.displayName) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "")\(move.olderWine ? " To move it back, turn on “Choose the Wine engine for each space” in Settings › Advanced." : "")")
         }
         .alert("Steam is already running", isPresented: Binding(get: { model.steamRestart != nil },
                                                                 set: { if !$0 { model.steamRestart = nil } }),

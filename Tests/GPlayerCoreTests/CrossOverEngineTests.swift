@@ -265,6 +265,6 @@ import Testing
         #expect(resolve(x86, [.d3dmetal, .dxvk, .dxmt, .wined3d], LaunchOptions(profile: .fast)).backend == .dxvk)
         // On Wine Staging the blocker points to G-Player Wine.
         let staging = CompatResolver.resolve(.init(engine: EngineCatalog.wineStaging, analysis: dx12, fixes: [], options: .default))
-        #expect(staging.blockers.first?.detail?.contains("Switch this space to G-Player Wine") == true)
+        #expect(staging.blockers.first?.detail?.contains("Move this space to G-Player Wine") == true)
     }
 }

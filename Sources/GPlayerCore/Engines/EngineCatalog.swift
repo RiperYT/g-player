@@ -171,6 +171,9 @@ public enum EngineCatalog {
     /// G-Player never ships, downloads or installs Apple's files: Apple's license allows the toolkit for
     /// developing, testing and evaluating games, and distribution only for non-commercial purposes.
     /// Off by default; turned on in Settings › Engines. The 2026 Steam client doesn't start on wine 7.7.
+    /// It is no engine G-Player offers any more (not in `all`: no picker lists it, no new space or found bottle gets it). It
+    /// stays in `known` so that a space that already runs on it keeps running while the toolkit is installed and turned on;
+    /// what is offered is the setting that copies its D3DMetal into G-Player Wine (`D3DMetalStore`).
     public static let gptk = EngineInfo(
         id: "gptk",
         name: "Game Porting Toolkit",
@@ -180,12 +183,14 @@ public enum EngineCatalog {
         backends: [.d3dmetal, .wined3d],
         downloads: [])
 
-    /// The engines G-Player offers, recommended first: pickers, Settings and the first run list them in this order.
-    public static let all = [crossover, wineStaging, gptk]
+    /// The engines G-Player offers, recommended first: the pickers (only while "Choose the Wine engine for each space" is on)
+    /// and Settings list them in this order. Wine Staging is offered as an advanced option, not as a choice for everyone.
+    public static let all = [crossover, wineStaging]
     /// Engines G-Player no longer offers or installs, but runs and looks after while they are installed.
     public static let retired = [crossoverRevision1]
-    /// Every engine G-Player can run: what to use to find an engine by its id, and to look after the installed ones.
-    public static let known = all + retired
+    /// Every engine G-Player can run: what to use to find an engine by its id, and to look after the installed ones. Apple's
+    /// toolkit is here for the spaces that already use it, though it isn't offered (`gptk`).
+    public static let known = all + [gptk] + retired
     /// Callers read a space whose engine id isn't here as `wineStaging` (`info(id) ?? .wineStaging`). Finds retired engines too.
     public static func info(_ id: String) -> EngineInfo? { known.first { $0.id == id } }
 
@@ -227,6 +232,14 @@ public enum EngineCatalog {
     public static func engineForNewSpace(installed: [EngineInfo]) -> EngineInfo {
         if let gplayerWine = installedGPlayerWine(in: installed) { return gplayerWine }
         return installed.contains { $0.id == wineStaging.id } ? wineStaging : defaultForNewSpaces
+    }
+
+    /// The engine a New Space sheet makes its space on: with the engine menus off (`choosing` false) always what a space gets
+    /// without a choice (`engineForNewSpace`), whatever was `picked`; with them on, the picked engine if G-Player offers it
+    /// (never Apple's toolkit or a retired engine), else the same. Picking G-Player Wine gives the installed revision of it.
+    public static func engineForNewSpace(installed: [EngineInfo], picked: String?, choosing: Bool) -> EngineInfo {
+        guard choosing, let pick = all.first(where: { $0.id == picked }) else { return engineForNewSpace(installed: installed) }
+        return pick.id == defaultForNewSpaces.id ? installedGPlayerWine(in: installed) ?? pick : pick
     }
 
     /// What the first run installs: G-Player Wine alone. Its runtime libraries come out of Gcenx's Wine Staging archive, which

@@ -115,7 +115,7 @@ import Testing
     }
 
     @Test func theSwitchQuestionNamesTheTargetItsSizeAndWhetherItIsNewer() {
-        #expect(EngineSwitch.title(space: "Main", to: gplayerWine) == "Switch “Main” to G-Player Wine?")
+        #expect(EngineSwitch.title(space: "Main", to: gplayerWine) == "Move “Main” to G-Player Wine?")
         let toGPlayerWine = EngineSwitch.message(space: "Main", from: staging, to: gplayerWine, downloadBytes: 287_881_528)
         #expect(toGPlayerWine.hasPrefix("Every program in “Main” will run on G-Player Wine (Wine 11 from CrossOver 26.3) instead of Wine Staging 11.18."))
         #expect(toGPlayerWine.contains("G-Player Wine downloads first, about 288 MB."))      // from the bytes the question is given
@@ -127,6 +127,34 @@ import Testing
         let unknown = EngineSwitch.message(space: "Main", from: nil, to: staging, downloadBytes: 0)
         #expect(unknown == "Every program in “Main” will run on Wine Staging 11.18.")
         #expect(EngineSwitch.busyMessage(space: "Main").contains("Programs are running in “Main”"))
+    }
+
+    @Test func aSpacesPageOffersTheMenuOnlyToThoseWhoAskedForIt() {
+        let toolkit = EngineCatalog.gptk, revision1 = EngineCatalog.crossoverRevision1
+        func offer(_ engineID: String, choosing: Bool) -> EngineSwitch.PageOffer {
+            EngineSwitch.pageOffer(engineID: engineID, choosingEngines: choosing)
+        }
+        // On G-Player Wine (either revision) the page says nothing about engines, unless the menu was asked for.
+        #expect(offer(gplayerWine.id, choosing: false) == .nothing && offer(revision1.id, choosing: false) == .nothing)
+        #expect(offer(gplayerWine.id, choosing: true) == .picker(selected: gplayerWine.id))
+        #expect(offer(revision1.id, choosing: true) == .picker(selected: gplayerWine.id))            // the menu never lists a retired engine
+        // A space on Wine Staging says so and offers the move; with the menu on, the menu does it.
+        #expect(offer(staging.id, choosing: false) == .move)
+        #expect(offer(staging.id, choosing: true) == .picker(selected: staging.id))
+        // Apple's toolkit isn't in the menu, so its space is offered the move either way.
+        #expect(offer(toolkit.id, choosing: false) == .move && offer(toolkit.id, choosing: true) == .move)
+        // An engine nobody knows has nothing to say.
+        #expect(offer("wine-from-the-future", choosing: false) == .nothing && offer("wine-from-the-future", choosing: true) == .nothing)
+    }
+
+    @Test func movingASpaceOffTheToolkitIsToANewerWineAndOffStagingToAnOlderOne() {
+        let toolkit = EngineCatalog.gptk
+        let fromToolkit = EngineSwitch.message(space: "Main", from: toolkit, to: gplayerWine, downloadBytes: 0)
+        #expect(fromToolkit.hasPrefix("Every program in “Main” will run on G-Player Wine (Wine 11 from CrossOver 26.3) instead of Game Porting Toolkit (D3DMetal)."))
+        #expect(fromToolkit.contains("newer Wine than the space has now") && fromToolkit.contains("the older Wine may not open the space afterwards"))
+        // From Wine Staging 11.18 to G-Player Wine's Wine 11.0 the warning is the old-Wine one: nothing moves without it.
+        let fromStaging = EngineSwitch.message(space: "Main", from: staging, to: gplayerWine, downloadBytes: 0)
+        #expect(fromStaging.contains("older Wine than the space has now") && fromStaging.contains("may not open on it"))
     }
 
     @Test func pickersUseShortNames() {
@@ -171,7 +199,7 @@ import Testing
     }
 
     @Test func anOldMoltenVKPointsToGPlayerWine() {
-        #expect(CompatResolver.oldMoltenVK.hasSuffix("Switch this space to G-Player Wine, which has a newer one."))
+        #expect(CompatResolver.oldMoltenVK.hasSuffix("Move this space to G-Player Wine, which has a newer one."))
         #expect(!CompatResolver.oldMoltenVK.contains("Wine Staging 11.18 it downloads"))
     }
 }

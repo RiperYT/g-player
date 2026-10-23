@@ -116,7 +116,7 @@ struct GameInspector: View {
                     }.buttonStyle(.link)
                 }
                 GridRow {
-                    Text("Engine").foregroundStyle(.secondary)
+                    Text("Runs on").foregroundStyle(.secondary)
                     Text(EngineCatalog.info(space.engineID)?.displayName ?? space.engineID)
                 }
             }

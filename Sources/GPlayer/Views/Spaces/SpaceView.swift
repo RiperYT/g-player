@@ -18,6 +18,7 @@ struct SpaceView: View {
             VStack(alignment: .leading, spacing: 28) {
                 header
                 if model.needsAppleToolkit(space) { ToolkitOffBanner() }
+                if model.engineOffer(for: space) == .move { EngineMoveNote(space: space) { askToSwitch(to: EngineCatalog.crossover.id) } }
                 if let preset = AppPresets.preset(space.presetID), !preset.isInstalled(in: space) {
                     presetMissing(preset)
                 }
@@ -53,7 +54,7 @@ struct SpaceView: View {
                  : "Its files stay where they are (\(space.originNote ?? "on this Mac")).")
         }
         .alert(switchTitle, isPresented: Binding(get: { pendingEngine != nil }, set: { if !$0 { pendingEngine = nil } })) {
-            Button("Switch") { if let target = pendingEngine.flatMap(EngineCatalog.info) { model.switchEngine(of: space, to: target) }; pendingEngine = nil }
+            Button("Move") { if let target = pendingEngine.flatMap(EngineCatalog.info) { model.switchEngine(of: space, to: target) }; pendingEngine = nil }
                 .disabled(switchBlocked)
             Button("Cancel", role: .cancel) { pendingEngine = nil }
         } message: {
@@ -61,11 +62,11 @@ struct SpaceView: View {
         }
     }
 
-    /// Nothing is switched under a program that runs in the space: a newer Wine updates its files on the first start.
+    /// Nothing is moved under a program that runs in the space: a newer Wine updates its files on the first start.
     private var switchBlocked: Bool { programsRunning || model.hasRunningGames(in: space) }
 
     private var switchTitle: String {
-        pendingEngine.flatMap(EngineCatalog.info).map { EngineSwitch.title(space: space.name, to: $0) } ?? "Switch engine?"
+        pendingEngine.flatMap(EngineCatalog.info).map { EngineSwitch.title(space: space.name, to: $0) } ?? "Move this space?"
     }
 
     private var switchMessage: String {
@@ -112,13 +113,14 @@ struct SpaceView: View {
             }
             PathRow(url: space.url)
             HStack(spacing: 18) {
-                Picker("Engine", selection: Binding(get: { space.engineID }, set: { if $0 != space.engineID { askToSwitch(to: $0) } })) {
-                    ForEach(model.engineChoices(for: space)) { info in
-                        Text(info.kind == .gptk ? "\(info.name) (D3DMetal)" : info.displayName)
-                            + Text(model.engineNote(info)).foregroundStyle(.secondary)
+                if case .picker(let selected) = model.engineOffer(for: space) {
+                    Picker("Engine", selection: Binding(get: { selected }, set: { if $0 != selected { askToSwitch(to: $0) } })) {
+                        ForEach(EngineCatalog.all) { info in
+                            Text(info.displayName) + Text(model.engineNote(info)).foregroundStyle(.secondary)
+                        }
                     }
+                    .fixedSize()
                 }
-                .fixedSize()
                 Text(size.map { "\($0.formattedBytes) on disk" } ?? "Measuring…").font(.callout).foregroundStyle(.secondary)
             }
             HStack(spacing: 8) {
@@ -221,7 +223,7 @@ private struct ToolkitOffBanner: View {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.title3)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Needs Apple's Game Porting Toolkit, which is turned off").font(.callout.weight(.semibold))
-                Text("Programs in this space won't start until you turn it on, or switch the space to another engine. Apple's license allows the toolkit for developing, testing and evaluating games; G-Player only uses the copy you installed.")
+                Text("Programs in this space won't start until you turn it on, or move the space to G-Player Wine. Apple's license allows the toolkit for developing, testing and evaluating games; G-Player only uses the copy you installed.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -229,6 +231,36 @@ private struct ToolkitOffBanner: View {
         }
         .padding(12)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// A space on an engine new spaces don't use (Wine Staging, or Apple's toolkit): says so in plain words, and offers G-Player Wine.
+/// The question that follows says what moving does (`EngineSwitch.message`), and nothing moves without a yes.
+private struct EngineMoveNote: View {
+    @Environment(AppModel.self) private var model
+    let space: Space
+    let move: () -> Void
+
+    private var info: EngineInfo? { EngineCatalog.info(space.engineID) }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle").foregroundStyle(.secondary).font(.title3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(info?.kind == .gptk ? "This space runs on Apple's Game Porting Toolkit" : "This space runs on \(info?.shortName ?? "an older engine")")
+                    .font(.callout.weight(.semibold))
+                Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button("Move to G-Player Wine…", action: move).disabled(model.movingSpaces.contains(space.id))
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var detail: String {
+        let newer = "New spaces use G-Player Wine, which plays game videos and can use Apple's D3DMetal. Moving asks first."
+        return info?.kind == .gptk ? "It keeps running while the toolkit is installed and turned on in Settings. " + newer : newer
     }
 }
 
@@ -253,14 +285,18 @@ struct NewSpaceSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    /// The user's pick; until then the engine a new space gets without a choice (G-Player Wine, or Wine Staging while
-    /// that is the only one installed, so nothing downloads unasked).
+    /// The user's pick, while the engine menus are on (Settings › Advanced); until then, and always with them off, the engine a
+    /// new space gets without a choice (G-Player Wine, or Wine Staging while that is the only one installed, so nothing
+    /// downloads unasked).
     @State private var picked: String?
     /// Showing the spaces already on this Mac (`ExistingSpacesView`) instead of the form.
     @State private var showingExisting = false
 
-    private var engine: EngineInfo {
-        picked.flatMap(EngineCatalog.info) ?? model.newSpaceEngine
+    private var engine: EngineInfo { model.engineForNewSpace(picking: picked) }
+
+    /// What the menu shows: the offered engine that `engine` is (an earlier revision of G-Player Wine shows as G-Player Wine).
+    private var selection: String {
+        EngineCatalog.all.first { EngineCatalog.isRevision(engine.id, of: $0) }?.id ?? engine.id
     }
 
     var body: some View {
@@ -278,16 +314,20 @@ struct NewSpaceSheet: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Form {
                 TextField("Name", text: $name, prompt: Text("e.g. Main or Overcooked"))
-                // The short name and the note fit in the menu; the full name is in the text below.
-                Picker("Engine", selection: Binding(get: { engine.id }, set: { picked = $0 })) {
-                    ForEach(model.availableEngines) { info in
-                        Text(info.shortName + model.engineNote(info, listsInstalled: true)).tag(info.id)
+                if model.choosesEngines {
+                    // The short name and the note fit in the menu; the full name is in the text below.
+                    Picker("Engine", selection: Binding(get: { selection }, set: { picked = $0 })) {
+                        ForEach(EngineCatalog.all) { info in
+                            Text(info.shortName + model.engineNote(info, listsInstalled: true)).tag(info.id)
+                        }
                     }
                 }
             }
-            .formStyle(.grouped).scrollDisabled(true).frame(height: 120)
-            Text("\(engine.displayName). \(engine.summary)").font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .formStyle(.grouped).scrollDisabled(true).frame(height: model.choosesEngines ? 120 : 64)
+            if model.choosesEngines {
+                Text("\(engine.displayName). \(engine.summary)").font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Button("Add Existing Space…") { showingExisting = true }
                     .help("Use a CrossOver or Whisky bottle or a Wine prefix that is already on this Mac")
