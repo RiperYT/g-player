@@ -147,6 +147,26 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(EpicGames.loadList(in: paths).isEmpty)
     }
 
+    @Test func theKeptListIsPrivateToTheUserFromItsFirstByte() throws {
+        let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
+        try EpicGames.saveList([EpicGame(appName: "SampleApp", title: "Sample Game")], in: paths)
+        func mode() throws -> Int { (try FileManager.default.attributesOfItem(atPath: EpicGames.listFile(in: paths).path)[.posixPermissions] as? Int) ?? 0 }
+        #expect(try mode() == 0o600)
+        try EpicGames.saveList([], in: paths)                                                // a second save keeps it private
+        #expect(try mode() == 0o600)
+        let left = try FileManager.default.contentsOfDirectory(atPath: paths.tools.path)
+        #expect(left == ["epic-library.json"])                                                // no temporary file is left behind
+    }
+
+    @Test func aWriteThatNeverFinishedLeavesATemporaryFileTheCleanupKnows() throws {
+        let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
+        try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)
+        tmp.file("Library/Tools/.epic-library.json.1A2B3C4D")
+        tmp.file("Library/Tools/epic-library.json")
+        Leftovers.clean(paths, processes: [])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.tools.path) == ["epic-library.json"])
+    }
+
     @Test func aListThatCannotBeReadIsEmptyAndABadNameIsDropped() throws {
         let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
         try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)

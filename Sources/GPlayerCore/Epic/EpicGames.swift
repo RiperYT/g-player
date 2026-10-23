@@ -36,8 +36,7 @@ public enum EpicGames {
     }
 
     public static func saveList(_ games: [EpicGame], in paths: LibraryPaths) throws {
-        try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)
-        try JSONEncoder().encode(games).write(to: listFile(in: paths), options: .atomic)
+        try Files.writePrivately(JSONEncoder().encode(games), to: listFile(in: paths))
     }
 
     /// Signing out takes the account's list with it.

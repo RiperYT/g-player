@@ -17,11 +17,12 @@ public enum LaunchSecrets {
 
     public static func masked(_ arguments: [String]) -> [String] { arguments.map(masked) }
 
-    /// Free text (a program's output, an error) with the value of every such argument hidden, up to the next space or quote.
+    /// Free text (a program's output, an error) with the value of every such argument hidden. A value can hold spaces (an
+    /// account's name), so it runs up to the next option (a space and a dash), a quote or the end of the line.
     public static func scrub(_ text: String) -> String {
         var result = text
         for name in names {
-            let pattern = "(?i)(" + NSRegularExpression.escapedPattern(for: name) + #"=)[^\s"']+"#
+            let pattern = "(?im)(" + NSRegularExpression.escapedPattern(for: name) + #"=)[^"'\n]*?(?= -|["']|$)"#
             result = result.replacingOccurrences(of: pattern, with: "$1" + hidden, options: .regularExpression)
         }
         return result
