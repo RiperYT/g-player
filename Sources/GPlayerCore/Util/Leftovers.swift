@@ -33,7 +33,8 @@ public enum Leftovers {
     public static func clean(_ paths: LibraryPaths, processes: [WineProcess]) {
         let fm = FileManager.default
         let components = paths.downloads.appendingPathComponent("components", isDirectory: true)
-        for (folder, matches) in [(components, isComponentDownload), (paths.engines.appendingPathComponent("tools", isDirectory: true), isComponentDownload)] {
+        let tools = [components, paths.engines.appendingPathComponent("tools", isDirectory: true), Legendary(paths: paths).toolFolder]
+        for (folder, matches) in tools.map({ ($0, isComponentDownload) }) {
             for name in (try? fm.contentsOfDirectory(atPath: folder.path)) ?? [] where matches(name) {
                 try? fm.removeItem(at: folder.appendingPathComponent(name))
             }
