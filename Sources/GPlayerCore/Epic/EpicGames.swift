@@ -12,8 +12,15 @@ public enum EpicGames {
     public static let libraryPlace = "Get Apps › Epic Games"
 
     public static func space(in spaces: [Space]) -> Space? {
-        spaces.first { $0.presetID == presetID && $0.origin == .managed }
+        spaces.first { isGamesSpace($0) && $0.origin == .managed }
     }
+
+    /// The space is the one Legendary installs into (by its `presetID`): its page links to Epic's.
+    public static func isGamesSpace(_ space: Space) -> Bool { space.presetID == presetID }
+
+    /// What the buttons that open the page of the account and its games say: the second way on Get Apps' Epic Games card, and the
+    /// link on the Epic Games space's page. It is a place, not an action that needs more input, so no ellipsis.
+    public static let libraryTitle = "Your Epic Library"
 
     /// Where Legendary puts the games of the space (it makes a folder for each): `C:\Games\Epic`.
     public static func installBase(in space: Space) -> URL {
@@ -235,14 +242,14 @@ public enum EpicGames {
         case .filesNotFound(.some):
             return Note(title: "Files not found",
                         detail: "Legendary's record of “\(title)” points at its old place, but its files are in this library's Epic Games space. Repair points the record at them.",
-                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from Epic Games.")
+                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace).")
         case .filesNotFound(nil):
             return Note(title: "Files not found",
                         detail: "“\(title)” isn't where Epic Games installed it. If you moved its files, put them back, or remove it and install it again.",
-                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from Epic Games.")
+                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace).")
         case .notRecorded:
             return Note(title: "Not installed",
-                        detail: "Legendary has no record of “\(title)” any more. Remove it from the library, then install it again from Epic Games.",
+                        detail: "Legendary has no record of “\(title)” any more. Remove it from the library, then install it again from \(libraryPlace).",
                         removal: "“\(title)” leaves the library. Legendary has no record of it, and no file is deleted.")
         }
     }

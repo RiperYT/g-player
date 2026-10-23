@@ -18,6 +18,7 @@ struct SpaceView: View {
             VStack(alignment: .leading, spacing: 28) {
                 header
                 if model.needsAppleToolkit(space) { ToolkitOffBanner() }
+                if model.wineMonoNotes[space.id] != nil { LibraryNoteBanner(note: .wineMono(space.id)) }
                 // One offer at a time, the bottle's consent first: a bottle of another app on the retired engine asks for its
                 // owner's yes (`EngineMigration.offersMove`); a space on another engine is offered G-Player Wine (`pageOffer`), a
                 // launcher space that opens only there (Epic's) also while the engine menus are on.
@@ -120,7 +121,7 @@ struct SpaceView: View {
                 }
             }
             PathRow(url: space.url)
-            if space.presetID == EpicGames.presetID { EpicLibraryLink() }
+            if EpicGames.isGamesSpace(space) { EpicLibraryLink() }
             HStack(spacing: 18) {
                 if case .picker(let selected) = model.engineOffer(for: space) {
                     Picker("Engine", selection: Binding(get: { selected }, set: { if $0 != selected { askToSwitch(to: $0) } })) {
@@ -228,7 +229,7 @@ private struct EpicLibraryLink: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button { model.openEpicLibrary() } label: { Label("Your Epic library…", systemImage: "shippingbox") }
+        Button { model.openEpicLibrary() } label: { Label(EpicGames.libraryTitle, systemImage: "shippingbox") }
             .buttonStyle(.link)
     }
 }

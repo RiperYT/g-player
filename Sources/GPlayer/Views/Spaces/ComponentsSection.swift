@@ -98,9 +98,13 @@ private struct ExternalSpaceNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(space.allowsChanges == false
-                 ? "You chose to keep this space as it is: G-Player doesn't install components, change its settings or replace its graphics files."
+                 ? "You chose to keep this space as it is: G-Player doesn't install components or .NET (Wine Mono), change its settings or replace its graphics files."
                  : "This space belongs to \(space.originNote ?? "another app"). G-Player asks before it installs anything into it.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if space.allowsChanges == false, let preset = AppPresets.preset(space.presetID), let purpose = preset.dotNetReason {
+                Text(WineMono.refusedLine(program: preset.name, purpose: purpose))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             Button("Allow Changes") { model.setAllowsChanges(true, for: space) }.controlSize(.small)
         }
     }

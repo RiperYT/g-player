@@ -276,17 +276,39 @@ in `kernelbase` and `advapi32`. The recipe, in `AppPreset.epic` (`engineRecipes`
   (`msiexec /i Z:\…\winemono-support.msi /qn`; afterwards `system.reg` lists "Wine Mono Windows Support" 10.4.1); and
   `mscoree` not disabled for that space's launches, with `mshtml=` kept. Then the EOS installer exits 0 and Epic Online
   Services is in the space (files under `Program Files (x86)/Epic Games/Epic Online Services`, its service in the registry).
-  G-Player does it for a preset that declares `needsDotNet` (only Epic's), on an engine whose catalogue entry names a Wine Mono
-  (`EngineInfo.mono`; G-Player Wine, not Wine Staging): the pinned download (`EngineCatalog.wineMono10_4_1`) is fetched into the
-  engine when first needed, `WineMono.register` installs the support package once (found again by that registry entry, so an
-  engine with another Wine Mono registers its own), before the launcher's installer runs and before each start of the launcher.
-  A space that G-Player may not change (a bottle of another app, before the user allows it) is left as it is, and a launcher
-  that is already open is not touched: it keeps the environment it started with.
+  G-Player does it for a preset that declares `dotNetReason` (only Epic's: "Epic Online Services"), on an engine whose catalogue
+  entry names a Wine Mono (`EngineInfo.mono`; G-Player Wine, not Wine Staging): the pinned download
+  (`EngineCatalog.wineMono10_4_1`) is fetched into the engine when first needed, `WineMono.register` installs the support
+  package once (found again by that registry entry, so an engine with another Wine Mono registers its own), before the
+  launcher's installer runs and before each start of the launcher. Details that matter:
+  - **A space G-Player may not change** (a bottle of another app, before the user allows it) is left as it is.
+  - **A launcher that is already open** keeps the environment it started with, so nothing is downloaded then: a note says
+    "Quit Epic Games Launcher and open it again to add .NET (needed for Epic Online Services)."
+  - **Failures are remembered** in the space (`.gplayer-wine-mono.json`) like a failed component: not tried again for three days
+    (ten minutes when the Mac was offline, which gets a note and no alert), unless the engine has another Wine Mono.
+  - **The engine is busy** while Wine Mono is fetched, unpacked or registered, so it can't be removed under it, and the folder
+    counts as unpacked only with a marker written last (`.gplayer-unpacked`, the archive's SHA-256).
+  - **Path length.** `mscoree` builds the path to `libmono-2.0-x86_64.dll` (`Z:` + the engine's data folder +
+    `\mono\wine-mono-10.4.1\bin\…`, 92 characters + the library folder's) in a 260-character buffer with no length check
+    (`WCHAR mono_dll_path[MAX_PATH]`, `lstrcpyW`, in `dlls/mscoree/metahost.c`). The longest library folder G-Player accepts (114)
+    leaves 54 to spare; a folder an older version allowed, over 167, would overflow it, so G-Player leaves .NET off and says so
+    (`WineMono.pathFits`). Inside the package, 141 of its 2 921 files (mostly deep GAC assemblies, such as
+    `System.Runtime.Serialization.Formatters.Soap`) have a Windows path over 260 characters when the library folder is 114
+    characters long; with a folder of up to 61 none does. Whether Wine Mono's runtime has trouble opening those few assemblies
+    hasn't been tried.
 - **Wine Staging** is set up as before (wrapper, the engine's usual graphics); it isn't known to help there.
 
-Games the launcher starts inherit its environment, so they run on its graphics (DXMT) too; G-Player can't give
-a game started from inside the launcher graphics of its own. Epic Games without the launcher (Legendary) starts each game through
-G-Player's own launch, with its own.
+G-Player starts an Epic library game by starting `EpicGamesLauncher.exe` with the game's link
+(`com.epicgames.launcher://apps/…?action=launch`), and a game the launcher starts inherits the launcher's environment. So:
+- **With the launcher open**, the open one takes the link and starts the game, which runs on the launcher's graphics: DXMT. A
+  DirectX 12 game, which needs D3DMetal, can't use it then and may not run. G-Player can't give a game started from inside
+  the launcher graphics of its own.
+- **With the launcher closed**, the process G-Player starts becomes the launcher, with the game's own graphics (the plan's
+  backend is the game's, not the launcher's pin), and games it starts later inherit them. A DirectX 12 game on D3DMetal works,
+  and the launcher then runs on D3DMetal too: its web view renders without the GPU (see above), slowly, until it is closed.
+- Starting the launcher's own tile always pins DXMT.
+
+Epic Games without the launcher (Legendary) starts each game through G-Player's own launch, with its own graphics.
 
 Lines in the launcher's log that mean nothing: `WSALookupServiceBegin failed`, "Memory pressure detected … commit limit",
 and a failure to create the process for `curl.exe`.
@@ -294,9 +316,9 @@ and a failure to create the process for `curl.exe`.
 ## Spaces from other apps
 
 A CrossOver or Whisky bottle, or a prefix you made by hand, is used in place. G-Player changes nothing in it until you
-allow it, once per space: the first launch that would change it asks. Allowing it lets G-Player install components,
-write registry values (per-program DLL and Windows-version settings, Retina mode, and removing values it set before),
-copy DXVK's DLLs over Wine's own (keeping Wine's copies as `*.gplayer-wine`) and put Steam's helper wrapper in place.
+allow it, once per space: the first launch that would change it asks. Allowing it lets G-Player install components, add
+Wine Mono (.NET) for a launcher that needs it (Epic's), write registry values (per-program DLL and Windows-version
+settings, Retina mode, and removing values it set before), copy DXVK's DLLs over Wine's own (keeping Wine's copies as `*.gplayer-wine`) and put Steam's helper wrapper in place.
 Refusing starts games and launchers with the space as it is; their inspector says so, with a button to allow changes
 later.
 Spaces G-Player made itself are always set up as needed.

@@ -76,7 +76,7 @@ G-Player runs it as a separate program (`Legendary.run`).
 The page (`EpicView`) has no item in the sidebar: Get Apps has one Epic Games card with both ways to Epic (`EpicWay`), and the
 second one opens the page over its list, as a destination of Get Apps' `NavigationStack` (`AppModel.appsPath`,
 `AppsDestination.epicLibrary`; it closes when another sidebar item is chosen). `AppModel.openEpicLibrary` opens it from anywhere,
-as the Epic Games space's "Your Epic library…" does, and messages that point people there say `EpicGames.libraryPlace`.
+as the Epic Games space's "Your Epic Library" does, and messages that point people there say `EpicGames.libraryPlace`.
 
 - **Isolated and checked.** `LEGENDARY_CONFIG_PATH` is `Tools/legendary-config` (0700), whose `config.ini` sets
   `default_platform = Windows` (Legendary's default on a Mac is `Mac`), `disable_auto_crossover` (G-Player passes `--wine` itself)

@@ -27,10 +27,11 @@ public struct AppPreset: Identifiable, Sendable, Hashable {
     public var engineRecipes: [EngineInfo.Kind: EngineRecipe] = [:]
     /// The launcher doesn't open on Wine Staging: its space is made on G-Player Wine, and one on another engine is offered the move.
     public var needsGPlayerWine = false
-    /// The launcher runs managed (.NET) code: Epic's launcher installs Epic Online Services with an installer whose custom actions
-    /// are .NET, and without Wine Mono that fails with "Epic Online Services is not installed" (error II-E1007). Its programs run
-    /// with Wine Mono in place (`WineMono`), on an engine that has one to go with it.
-    public var needsDotNet = false
+    /// What the launcher needs .NET for, when it runs managed code: Epic's launcher installs Epic Online Services with an installer
+    /// whose custom actions are .NET, and without Wine Mono that fails with "Epic Online Services is not installed" (error
+    /// II-E1007). Its programs run with Wine Mono in place (`WineMono`), on an engine that has one to go with it. Nil: it needs none.
+    public var dotNetReason: String? = nil
+    public var needsDotNet: Bool { dotNetReason != nil }
 
     /// What a launcher does differently on one engine kind. The defaults are the usual setup.
     public struct EngineRecipe: Sendable, Hashable {
@@ -102,7 +103,8 @@ public enum AppPresets {
 
     public static let epic = AppPreset(
         id: "epic", name: "Epic Games Launcher",
-        summary: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.",
+        summary: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account. Its first start adds Wine Mono (.NET) for "
+            + "Epic Online Services: a \(WineMono.sizeLabel(EngineCatalog.wineMono10_4_1)) download, about \(WineMono.installedSizeLabel(EngineCatalog.wineMono10_4_1)) on disk.",
         symbol: "shippingbox", experimental: false,
         installerURL: URL(string: "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi")!,
         installerFileName: "EpicGamesLauncherInstaller.msi", installerArguments: ["/qn"],
@@ -119,7 +121,7 @@ public enum AppPresets {
         // at about 34% CPU where DXMT idles at about 11%. On Wine Staging nothing changes: it doesn't open there.
         engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.dxmt])], needsGPlayerWine: true,
         // Its Epic Online Services installer has .NET custom actions, which need Wine Mono.
-        needsDotNet: true)
+        dotNetReason: "Epic Online Services")
 
     public static let gog = AppPreset(
         id: "gog", name: "GOG Galaxy",

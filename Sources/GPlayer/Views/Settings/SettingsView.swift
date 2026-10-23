@@ -150,7 +150,7 @@ struct EngineRows: View {
                     .alert("Can't remove \(info.name)", isPresented: Binding(get: { !busySpaces.isEmpty }, set: { if !$0 { busySpaces = [] } })) {
                         Button("OK", role: .cancel) {}
                     } message: {
-                        Text("It's in use: programs are running or installing in \(list(busySpaces)). Quit them or wait, then try again.")
+                        Text("It's in use: programs are running, or something is being installed or set up, in \(list(busySpaces)). Quit them or wait, then try again.")
                     }
             } else if model.isUpdating(info) {
                 EngineUpdateStatus(info: info)

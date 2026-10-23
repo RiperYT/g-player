@@ -13,21 +13,24 @@
   and feels sluggish. A space that already has the wrapper in Epic's helper gets Epic's helper back
   before the next start, and nothing is deleted.
   An Epic Games Launcher space on Wine Staging is offered **Move to G-Player Wine…** on its page, and new ones are made on
-  G-Player Wine. Games the launcher starts inherit its graphics (DXMT). Get Apps has one **Epic Games** card with both ways to
+  G-Player Wine. A game from Epic's launcher that you play in G-Player goes through the launcher (G-Player starts
+  `EpicGamesLauncher.exe` with the game's link), so while the launcher is open the game inherits its DXMT: a DirectX 12 game,
+  which needs D3DMetal, may not run then. Quit the launcher first and G-Player starts it with the game's own graphics, which
+  makes the launcher itself run on them (D3DMetal renders its web view in software). Get Apps has one **Epic Games** card with both ways to
   Epic's games: Epic Games Launcher (recommended), and Without the launcher, which is faster and goes through Legendary.
 - **Epic's launcher installs Epic Online Services.** Games can be installed from Epic's launcher now: its first start no
   longer ends with "Epic Online Services is not installed" (error II-E1007). Epic's installer for it has .NET steps, and
   G-Player kept .NET off to spare you Wine's own download prompts. For this launcher G-Player now brings **Wine Mono**
   (.NET for Wine, 10.4.1, the version G-Player Wine expects): the first time you open the launcher (or set it up) it
   downloads Wine Mono (40 MB, checked against a pinned SHA-256, with progress and a Stop in the sidebar) into G-Player
-  Wine, where it takes about 240 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
+  Wine, where it takes about 245 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
   gets it: other apps and games start as before, and Wine Staging has none. In a bottle of another app it asks first, like
   every change G-Player makes there. A launcher that is already open keeps what it started with: quit it and open it again.
 - **Epic games without Epic's launcher.** The card's second way, **Without the launcher**, opens the Epic Games page over Get
   Apps (with a back button). It signs you in on Epic's own page (with Epic, Google, Apple or whatever you use: G-Player never
   sees your password, and the window keeps nothing) and lists the games your account owns. **Install** puts a game into a space
   of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop in the sidebar; that space is in Spaces
-  like any other and links back to the page with **Your Epic library…**, and the games in it show in All Games; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
+  like any other and links back to the page with **Your Epic Library**, and the games in it show in All Games; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
   one-time code each time, or starting offline when Epic can't be reached; **Uninstall…** and **Sign Out** undo them. It
   works through [Legendary](https://github.com/legendary-gl/legendary) 0.21.1 (GPL-3.0), an open-source Epic client that is
   not part of G-Player: the first time you sign in, G-Player downloads it (15 MB) from its GitHub release and checks it

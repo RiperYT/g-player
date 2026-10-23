@@ -126,6 +126,20 @@ enum SnapshotRenderer {
                 let space = box.epicGamesSpace()
                 return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
             },
+            // Epic's launcher is open, so Wine Mono isn't added now: one line at the top of All Games, and on the space's page.
+            Shot(name: "main-library-wine-mono-launcher-open", size: mainSize) { box in
+                let space = box.epicLauncherSpace()
+                box.model.wineMonoNotes[space.id] = WineMono.note(for: .spaceBusy, program: AppPresets.epic.name, purpose: "Epic Online Services")
+                box.model.selection = .allGames
+                return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
+            },
+            // The Mac was offline when Wine Mono was to be downloaded: a note, no alert.
+            Shot(name: "main-space-wine-mono-offline", size: mainSize) { box in
+                let space = box.epicLauncherSpace()
+                let offline = WineMono.Failure(version: "10.4.1", date: Date(), offline: true, reason: "The Internet connection appears to be offline.")
+                box.model.wineMonoNotes[space.id] = WineMono.note(for: .failed(offline), program: AppPresets.epic.name, purpose: "Epic Online Services")
+                return AnyView(MainWindow(detail: SpaceView(space: space)).environment(box.model))
+            },
             // Wine Mono on its way into the engine, the first time Epic's launcher starts.
             Shot(name: "main-library-downloading-wine-mono", size: mainSize) { box in
                 box.libraryWithGames()
@@ -313,6 +327,20 @@ enum SnapshotRenderer {
             FileManager.default.createFile(atPath: folder.appendingPathComponent("system.reg").path, contents: Data())
             let space = Space(name: "Main", path: folder.path, engineID: engine.id, origin: .managed)
             model.mutate { $0.spaces.append(space) }
+            model.selection = .space(space.id)
+            return space
+        }
+
+        /// The space Epic's launcher was set up in, with its tile in the library.
+        func epicLauncherSpace() -> Space {
+            libraryWithGames()
+            let folder = model.paths!.spaces.appendingPathComponent(AppPresets.epic.name, isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder.appendingPathComponent("drive_c/windows"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: folder.appendingPathComponent("system.reg").path, contents: Data())
+            let space = Space(name: AppPresets.epic.name, path: folder.path, engineID: EngineCatalog.crossover.id, origin: .managed,
+                              presetID: AppPresets.epic.id, colorIndex: 2)
+            let launcher = Game(title: AppPresets.epic.name, kind: .app, spaceID: space.id, executablePath: "C:\\Program Files\\Epic Games\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe")
+            model.mutate { $0.spaces.append(space); $0.games.append(launcher) }
             model.selection = .space(space.id)
             return space
         }
