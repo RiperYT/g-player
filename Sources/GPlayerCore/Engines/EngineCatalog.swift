@@ -266,9 +266,8 @@ public enum EngineCatalog {
 /// engine-cx26.3.0-<revision> together with CodeWeavers' source tarball it was built from).
 enum CrossOverEnginePin {
     // Revision 2 (engine-cx26.3.0-2).
-    // TODO(pin): placeholders until the archive is built and published; replace both with the real SHA-256 and size.
-    static let sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
-    static let bytes: Int64 = 285_000_000
+    static let sha256 = "86973401d3040bf3f762c1cea96fc67a773aadf2d0424a3ad0bbebac325d8010"
+    static let bytes: Int64 = 285_662_140
 
     // Revision 1 (engine-cx26.3.0-1), retired.
     static let revision1SHA256 = "c10b3dff14429944f99ce660ff294c11d58dff3c39df9a0b91bdfd114e223686"

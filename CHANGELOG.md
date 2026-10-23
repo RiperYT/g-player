@@ -4,8 +4,11 @@
 
 - **Game videos play on G-Player Wine.** Intros and cutscenes that go through Windows Media Foundation can play now.
   G-Player Wine comes with GStreamer for it: when G-Player installs G-Player Wine it also downloads GStreamer's official
-  macOS package (about 157 MB) and checks it first. H.264 and HEVC videos use Apple's video decoder. There is no FFmpeg,
-  so some formats (WMV and other older codecs) may still not play. Wine Staging is unchanged.
+  macOS package (about 157 MB) and checks it first. H.264 and HEVC videos use Apple's video decoder, and AAC and MP3
+  sound Apple's audio decoder. There is no FFmpeg, so some formats (WMV and other older codecs) may still not play.
+  Wine Staging is unchanged.
+- **Newer DXMT** in G-Player Wine (from DXMT's main branch). It fixes the black 3D scene of Unity games that use URP
+  when they run on DXMT. DXMT compiles its shaders again the first time each game runs.
 - **G-Player Wine updates by itself, and your spaces follow.** G-Player downloads the new G-Player Wine (about 450 MB) in
   the background after you update the app, and says so in the sidebar and in Settings › Engines. Your games keep working
   on the old version meanwhile, offline too; if the download fails, G-Player tries again the next time it opens. A space

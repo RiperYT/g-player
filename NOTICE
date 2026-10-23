@@ -17,10 +17,13 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
     (https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz, SHA-256
     ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872) with tools/wine-patches/cx-*.patch
     (LGPL-2.1+; cx-nx-compat.patch is by Alexander Theißen, from https://github.com/athei/wine commit
-    539aa62220ad23a390ce9f2a1c99ee5d3831907b), DXMT v0.80 (MIT, Copyright (c) 2023 Feifan He,
-    https://github.com/3Shain/dxmt) and MoltenVK 1.4.2. The exact Wine source it was built from, patches applied, is
-    attached to the same release (g-player-engine-cx26.3.0-2-wine-source.tar.xz); that, the patches and the build
-    script are its complete corresponding source. The engine carries its own license texts and notice. Its runtime
+    539aa62220ad23a390ce9f2a1c99ee5d3831907b), DXMT (LGPL-2.1+, its code up to v0.80 MIT; Copyright (c) 2023-2026
+    Feifan He for CodeWeavers, https://github.com/3Shain/dxmt), commit ce001dfbedd7116aa9beb2e816c6ba44e599c15d as
+    DXMT's own CI built it, unchanged, and MoltenVK 1.4.2. The exact Wine source it was built from, patches applied,
+    is attached to the same release (g-player-engine-cx26.3.0-2-wine-source.tar.xz); that, the patches and the build
+    script are its complete corresponding source. DXMT's complete source at that commit, with its submodules, is
+    attached too (g-player-engine-cx26.3.0-2-dxmt-source.tar.xz), next to the build itself
+    (dxmt-ce001dfbedd7116aa9beb2e816c6ba44e599c15d.tar.gz). The engine carries its own license texts and notice. Its runtime
     libraries (FreeType, GnuTLS, SDL2 and what they use) and its GStreamer files (next entry) are not in G-Player's
     archive: G-Player copies the libraries on the user's Mac from Gcenx's Wine Staging 11.18 download, under their own
     licenses. The earlier release engine-cx26.3.0-1 (built from the same source before cx-nx-compat.patch and

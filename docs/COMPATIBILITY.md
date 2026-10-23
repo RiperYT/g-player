@@ -146,7 +146,7 @@ title you chose) is left out of the reading, so a game folder called "BattlEye" 
   turned off). Launches get `CX_APPLEGPTK_LIBD3DSHARED_PATH` and `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal`.
 - **DXVK** (Gcenx's 1.10.3) goes through Vulkan and MoltenVK 1.4.2. On G-Player Wine with D3DMetal in, Wine's own
   `dxgi` goes into the space's system32 for DXVK launches (`dxgi=n,b`): DXVK can't present with Apple's.
-- **DXMT** (3Shain, v0.80, MIT) turns DirectX 10 and 11 straight into Metal, 32- and 64-bit. Its DLLs go into the
+- **DXMT** (3Shain, main branch at `ce001dfbe`, LGPL-2.1+) turns DirectX 10 and 11 straight into Metal, 32- and 64-bit. Its DLLs go into the
   space as native ones for DXMT launches (`dxgi,d3d11,d3d10core=n,b`).
 - **WineD3D** is Wine's own, on Apple's OpenGL 4.1: DirectX 9, not 10 or 11.
 
