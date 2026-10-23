@@ -889,7 +889,9 @@ final class AppModel {
             askToChange(found) { allowed in if allowed { Task { await self.installPreset(preset) } } }
             return
         }
-        if space == nil { space = await createSpace(name: preset.name, engineInfo: engineInfo, presetID: preset.id) }
+        // A launcher that opens only on G-Player Wine gets it even when Wine Staging is all that is installed (it downloads).
+        let wanted = engineInfo ?? (preset.needsGPlayerWine ? preset.engineForNewSpace(installed: installedEngines) : nil)
+        if space == nil { space = await createSpace(name: preset.name, engineInfo: wanted, presetID: preset.id) }
         guard let space else { return }
         // The space's engine may be gone (removed, or a download that was stopped): get it again, don't do nothing.
         var ready = engine(for: space)
@@ -1255,12 +1257,17 @@ final class AppModel {
 
     /// Steam replaces its helper when it updates itself on start, and its window turns black again. While a launcher
     /// with Chromium helpers runs, the wrapper is put back as soon as it is gone; helpers that already started without
-    /// it are stopped after 15 seconds if they haven't quit by themselves, and the launcher starts them again.
+    /// it are stopped after 15 seconds if they haven't quit by themselves, and the launcher starts them again. A launcher that
+    /// runs with its own helpers on the space's engine (Epic's on G-Player Wine) has nothing to guard, and is never wrapped here.
     private func guardHelperWrappers(_ all: [WineProcess]) {
         let now = Date()
         helperWatchUntil = helperWatchUntil.filter { $0.value > now }
         for space in state.spaces where space.mayChange {
-            guard let helpers = AppPresets.preset(space.presetID)?.chromiumHelpers, !helpers.isEmpty else { continue }
+            let engineKind = (EngineCatalog.info(space.engineID) ?? .wineStaging).kind
+            guard let helpers = AppPresets.preset(space.presetID)?.helpersToWrap(on: engineKind), !helpers.isEmpty else {
+                unwrappedSince[space.id] = nil
+                continue
+            }
             let mine = WineProcesses.programs(in: space, from: all)
             guard mine.contains(where: { !$0.isWineService }) else { unwrappedSince[space.id] = nil; continue }
             let stale = ChromiumHelperWrapper.unwrappedProcesses(helpers: helpers, in: mine)
@@ -1544,7 +1551,7 @@ final class AppModel {
         } else {
             toStart = plan
         }
-        let helpers = toStart.chromiumHelpers, backend = toStart.backend
+        let helpers = toStart.chromiumHelpers, unwrap = toStart.unwrapHelpers, backend = toStart.backend
         let allowed = self.space(space.id)?.mayChange == true
         let gameID = game.id, logName = game.title
         // The Steam helper wrapper and DXVK's files compare multi-MB files, so off the main thread.
@@ -1552,6 +1559,8 @@ final class AppModel {
             Result {
                 if allowed {
                     if !helpers.isEmpty { _ = try ChromiumHelperWrapper.apply(helpers: helpers, in: space) }
+                    // A space that moved to G-Player Wine (or was wrapped before this version) has Epic's helper back before it starts.
+                    if !unwrap.isEmpty { _ = try ChromiumHelperWrapper.unwrap(helpers: unwrap, in: space) }
                     try SpaceManager(paths: paths).prepareGraphics(backend, engine: engine, space: space)
                 }
                 return try WineLauncher.start(
