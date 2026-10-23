@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+- **Game videos play on G-Player Wine.** Intros and cutscenes that go through Windows Media Foundation can play now.
+  G-Player Wine comes with GStreamer for it: when G-Player installs G-Player Wine it also downloads GStreamer's official
+  macOS package (about 157 MB) and checks it first. H.264 and HEVC videos use Apple's video decoder. There is no FFmpeg,
+  so some formats (WMV and other older codecs) may still not play. Wine Staging is unchanged.
+- **G-Player Wine updates by itself, and your spaces follow.** G-Player downloads the new G-Player Wine (about 450 MB) in
+  the background after you update the app, and says so in the sidebar and in Settings › Engines. Your games keep working
+  on the old version meanwhile, offline too; if the download fails, G-Player tries again the next time it opens. A space
+  moves to the new version once nothing runs in it, with its files, Steam login and what G-Player learned about each
+  game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose old version is gone installs
+  the new one when you start something in it, instead of switching to Wine Staging.
+- The first run now says it needs about 3.3 GB free and downloads about 640 MB, since GStreamer is part of G-Player
+  Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
+
 ## [0.4.2] - 2026-10-23
 
 - Safer edges found in review: Start Empty keeps the previous copy as `library.json.before-empty-<date>`; Locate… moves

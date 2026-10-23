@@ -12,17 +12,27 @@ Copyright 2026 Steale LLC, licensed under the Apache License 2.0:
 G-Player downloads, but does not include, these third-party components at run time, each from its
 original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - Wine Staging for macOS (LGPL-2.1+), built by Gcenx: https://github.com/Gcenx/macOS_Wine_builds
-  - G-Player Wine, from G-Player's own GitHub release engine-cx26.3.0-1: Wine (LGPL-2.1+) built by
+  - G-Player Wine, from G-Player's own GitHub release engine-cx26.3.0-2: Wine (LGPL-2.1+) built by
     scripts/build-engine-cx.sh from CodeWeavers' CrossOver 26.3.0 source
     (https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz, SHA-256
-    ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872) with tools/wine-patches/cx-real-user-name.patch
-    (LGPL-2.1+), DXMT v0.80 (MIT, Copyright (c) 2023 Feifan He, https://github.com/3Shain/dxmt) and MoltenVK 1.4.2.
-    The exact Wine source it was built from, patch applied, is attached to the same release
-    (g-player-engine-cx26.3.0-1-wine-source.tar.xz); that, the patch and the build script are its complete
-    corresponding source. The engine carries its own license texts and notice. Its runtime libraries (FreeType,
-    GnuTLS, SDL2 and what they use) are not in G-Player's archive: G-Player copies them on the user's Mac from Gcenx's
-    Wine Staging 11.18 download, under their own licenses. "CrossOver" is a trademark of CodeWeavers, Inc.; G-Player
+    ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872) with tools/wine-patches/cx-*.patch
+    (LGPL-2.1+; cx-nx-compat.patch is by Alexander Theißen, from https://github.com/athei/wine commit
+    539aa62220ad23a390ce9f2a1c99ee5d3831907b), DXMT v0.80 (MIT, Copyright (c) 2023 Feifan He,
+    https://github.com/3Shain/dxmt) and MoltenVK 1.4.2. The exact Wine source it was built from, patches applied, is
+    attached to the same release (g-player-engine-cx26.3.0-2-wine-source.tar.xz); that, the patches and the build
+    script are its complete corresponding source. The engine carries its own license texts and notice. Its runtime
+    libraries (FreeType, GnuTLS, SDL2 and what they use) and its GStreamer files (next entry) are not in G-Player's
+    archive: G-Player copies the libraries on the user's Mac from Gcenx's Wine Staging 11.18 download, under their own
+    licenses. The earlier release engine-cx26.3.0-1 (built from the same source before cx-nx-compat.patch and
+    cx-coreaudio-stream-volume.patch, with cx-real-user-name.patch) is no longer installed; Macs that have it keep using
+    it until their spaces have moved to revision 2. "CrossOver" is a trademark of CodeWeavers, Inc.; G-Player
     Wine isn't CrossOver and isn't made or endorsed by CodeWeavers.
+  - GStreamer 1.28.8, for game videos in G-Player Wine (LGPL-2.1+; glib LGPL-2.1+; libffi and graphene MIT; pcre2
+    and orc BSD; libpng and libjpeg-turbo under their own licenses), from the GStreamer project's official macOS
+    runtime package (https://gstreamer.freedesktop.org/data/pkg/osx/1.28.8/gstreamer-1.0-1.28.8-universal.pkg,
+    SHA-256 d371ab04a7632713626836c2fc234e863cc98484c74c473eba99b0fbd9b3a3fe). G-Player downloads the package on the
+    user's Mac and copies from it, unchanged, the files G-Player Wine's gstreamer-files.txt lists. GStreamer's source
+    is at https://gstreamer.freedesktop.org/src/.
   - DXVK for macOS (zlib), by Gcenx: https://github.com/Gcenx/DXVK-macOS
   - winetricks 20260125 (LGPL-2.1+): https://github.com/Winetricks/winetricks. G-Player runs it as a separate
     program and, on the user's Mac, writes a copy that refuses unverified downloads.
@@ -33,7 +43,8 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - Store installers (Steam, Epic Games Launcher, GOG Galaxy, Ubisoft Connect) from their publishers.
   - Steam cover art from Valve's CDN, shown in the library and cached on the user's Mac.
 
-G-Player includes four modified Wine files for G-Player Wine, Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll.so,
+G-Player includes four modified Wine files for G-Player Wine 26.3.0-1 (revision 2 is built with the same patches, so it
+needs none), Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll.so,
 cx-ntdll-x86_64.dll, cx-ntdll-i386.dll and cx-winecoreaudio.so, built from CodeWeavers' CrossOver 26.3.0 source
 (https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz, SHA-256
 ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872, LGPL-2.1+) with tools/wine-patches/cx-*.patch

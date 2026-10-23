@@ -26,7 +26,7 @@ The app is signed with a Developer ID and notarized by Apple, so it opens like a
 goes over the old one the same way: your library, spaces and games stay where they are.
 
 **Needs:** a Mac with Apple Silicon (M1 or later), macOS 15 Sequoia or later, Rosetta 2 (G-Player offers to
-install it), about 2.7 GB for the two engines (a download of about 485 MB) plus room for games.
+install it), about 3.3 GB for the two engines (a download of about 640 MB) plus room for games.
 
 ## What runs
 
@@ -42,7 +42,8 @@ The first minutes of a game can stutter while shaders compile. That settles once
 ### Engines
 
 - **G-Player Wine** (the default for new spaces): Wine 11 that G-Player builds from CodeWeavers' CrossOver 26.3 source
-  ([scripts/build-engine-cx.sh](scripts/build-engine-cx.sh)), with DXMT (DirectX 10/11 straight to Metal) and DXVK.
+  ([scripts/build-engine-cx.sh](scripts/build-engine-cx.sh)), with DXMT (DirectX 10/11 straight to Metal), DXVK and
+  GStreamer for game videos.
   CrossOver's Wine has what Apple's D3DMetal needs, so with D3DMetal (below) 64-bit DirectX 10–12 games run through
   it in the same space as Steam, with Steam signed in. G-Player Wine isn't CrossOver and isn't made by CodeWeavers.
 - **Wine Staging 11.18** (Gcenx's build) with DXVK: open source, runs Steam and most DirectX 9–11 games. The first
@@ -51,7 +52,9 @@ The first minutes of a game can stutter while shaders compile. That settles once
 
 Each space picks its engine. A new space gets G-Player Wine, or Wine Staging while that is the only engine installed;
 spaces made before keep theirs. Moving between Wine Staging and G-Player Wine keeps the space's files, saves and
-Steam login; G-Player asks first, since the other Wine updates the space for itself.
+Steam login; G-Player asks first, since the other Wine updates the space for itself. A space on an earlier revision of
+G-Player Wine moves to the current one by itself once nothing runs in it: G-Player downloads the new revision in the
+background first, and your games keep working on the old one meanwhile, offline too.
 
 ### Apple's D3DMetal (optional, off by default)
 

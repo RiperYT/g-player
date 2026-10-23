@@ -36,7 +36,7 @@ extension AppModel {
         guard let paths, let manager = engineManager else { return }
         let store = D3DMetalStore(paths: paths)
         let on = useAppleToolkit
-        let engines = EngineCatalog.all.filter { $0.kind == .crossover }.compactMap(manager.engine)
+        let engines = EngineCatalog.known.filter { $0.kind == .crossover }.compactMap(manager.engine)     // retired ones too
         // An engine with programs open keeps what it has until they quit: its DLLs are in use.
         let spaces = state.spaces
         let autoImport = on && store.installed == nil && D3DMetalStore.toolkitSource != nil
@@ -105,8 +105,8 @@ extension AppModel {
     /// if that fails), D3DMetal goes in, Steam quits, and only then does the space switch. An outside space needs the
     /// user's yes to changes, since its prefix gets updated for the other Wine.
     func moveToGPlayerWine(_ gameID: UUID) {
-        guard let game = game(gameID), let space = space(game.spaceID), space.engineID != EngineCatalog.crossover.id,
-              !movingSpaces.contains(space.id) else { return }
+        guard let game = game(gameID), let space = space(game.spaceID),
+              !EngineCatalog.isRevision(space.engineID, of: EngineCatalog.crossover), !movingSpaces.contains(space.id) else { return }
         if !space.mayChange {
             guard space.allowsChanges == nil else {
                 errorMessage = "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first."

@@ -62,6 +62,21 @@ saves would rotate it away; neither dated copy is ever deleted. Locate… is als
 folder, start G-Player, choose it. The spaces G-Player made in it (not those found elsewhere on the Mac) are pointed at
 the new place (`LibraryState.movingLibrary`).
 
+## Engine revisions
+
+G-Player Wine is published in revisions (`wine-cx-26.3.0-1`, `-2`). A revision that a newer one replaces stays in
+`EngineCatalog` as a retired engine (`EngineInfo.replacedBy`, `EngineCatalog.retired`): `EngineCatalog.all` is what is
+offered (pickers, Settings, the first run, new spaces), `EngineCatalog.known` is everything G-Player can run, and
+everything that runs or looks after an installed engine (launching, `EngineFixes`, D3DMetal, Stop All, leftovers) goes
+by `known`. `EngineMigration` plans the move from a retired engine to its replacement: a space moves once the
+replacement is installed and nothing runs or starts in it, or at once when the retired engine isn't installed; the
+replacement downloads in the background once per run when spaces still need it; and the retired engine's folder goes
+when no space is on it. `AppModel` looks at start, after an engine install, and at every look at the running programs.
+What G-Player learned about a game's graphics (`AutoGraphics`, which names its engine) moves with the space.
+
+An engine archive that lists GStreamer files (`gstreamer-files.txt`, `GStreamerRuntime`) gets them copied, at install,
+out of GStreamer's official macOS package (`EngineCatalog.gstreamer`), which `pkgutil` expands in the staging folder.
+
 ## A launch
 
 `LaunchPlanner.plan` turns a game and its space into arguments, working folder, graphics backend and tweaks.

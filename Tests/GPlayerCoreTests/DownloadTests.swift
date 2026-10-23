@@ -142,7 +142,7 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         // The catalogue's sizes are approximate: never more than the whole.
         #expect(DownloadResume.message(received: 99_500_000, total: 98_000_000) == "Downloading 98 of 98 MB")
         #expect(DownloadResume.message(received: 5_000_000, total: 0) == "Downloading 5 MB")
-        // Rounded as everywhere: G-Player Wine and its extras are 287,881,528 bytes, which is 288 MB and ends as "288 of 288".
+        // Rounded as everywhere: a total of 287,881,528 bytes is 288 MB and ends as "288 of 288".
         #expect(DownloadResume.message(received: 287_881_528, total: 287_881_528) == "Downloading 288 of 288 MB")
         #expect(DownloadResume.message(received: 143_990_000, total: 287_881_528) == "Downloading 144 of 288 MB")
         #expect(DownloadResume.message(received: 600_000, total: 98_000_000) == "Downloading 1 of 98 MB")
@@ -378,6 +378,27 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
         manager.cleanLeftovers()
         #expect(!FileManager.default.fileExists(atPath: staging.path))
         for kept in [other, visible, tools] { #expect(FileManager.default.fileExists(atPath: kept.path)) }
+    }
+
+    @Test func aRetiredEngineIsFoundWhereItIsInstalledAndItsLeftoversAreCleanedToo() throws {
+        let tmp = TempFolder()
+        let manager = EngineManager(paths: LibraryPaths(root: tmp.url))
+        try manager.paths.createFolders()
+        let retired = EngineCatalog.crossoverRevision1
+        #expect(manager.engine(id: retired.id) == nil)
+        let bin = tmp.dir("Engines/\(retired.id)/wine/bin")
+        FileManager.default.createFile(atPath: bin.appendingPathComponent("wine").path, contents: Data("#!/bin/sh\n".utf8),
+                                       attributes: [.posixPermissions: 0o755])
+        #expect(manager.engine(id: retired.id)?.info.id == retired.id && manager.isInstalled(retired))
+        #expect(manager.engine(id: EngineCatalog.crossover.id) == nil)                    // revision 2 isn't there
+        let staging = tmp.dir("Engines/.\(retired.id)-1A2B3C4D")
+        let downloads = tmp.file("Downloads/\(retired.id)/g-player-engine.tar.xz")
+        manager.cleanLeftovers()
+        #expect(!FileManager.default.fileExists(atPath: staging.path))
+        #expect(!FileManager.default.fileExists(atPath: downloads.path))                  // installed: its downloads go
+        #expect(manager.isInstalled(retired))
+        try manager.remove(retired)
+        #expect(!manager.isInstalled(retired))
     }
 
     @Test func downloadsOfAnInstalledEngineGoAndThoseOfOtherEnginesStayUntilTheyAreOld() throws {

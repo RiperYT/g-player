@@ -25,6 +25,20 @@ public struct Engine: Sendable, Hashable {
         return FileManager.default.fileExists(atPath: lib.path) ? lib : nil
     }
 
+    /// G-Player Wine's GStreamer plugins, when its install copied them in (`GStreamerRuntime`): what Media Foundation's video
+    /// decoding loads. Wine Staging has none of its own (it links a GStreamer.framework the user installed, if there is one).
+    public var gstreamerPlugins: URL? {
+        guard info.kind == .crossover else { return nil }
+        let folder = wineRoot.appendingPathComponent("lib/gstreamer-1.0")
+        return Files.isDirectory(folder) ? folder : nil
+    }
+
+    /// Where GStreamer keeps this engine's plugin registry: in the engine's own folder, next to `wine/`, so removing the engine
+    /// removes it.
+    public var gstreamerRegistry: URL {
+        wineRoot.deletingLastPathComponent().appendingPathComponent("gstreamer-1.0-registry.x86_64.bin")
+    }
+
     /// The backends this engine can run right now: G-Player Wine runs D3DMetal only once it has been linked in
     /// completely from the user's Game Porting Toolkit, and DXVK and DXMT only when their DLLs are there.
     public var readyBackends: [GraphicsBackend] {
@@ -138,6 +152,14 @@ public struct EngineManager: Sendable {
                 try copyRuntimeLibraries(from: installed.wineRoot.appendingPathComponent("lib"), into: staging.appendingPathComponent("wine/lib"))
                 continue
             }
+            // GStreamer's files come out of its package only for an engine whose archive lists them. The package the list
+            // names is checked before anything is downloaded.
+            var gstreamer: GStreamerRuntime.Manifest?
+            if item.role == .gstreamer {
+                guard let listed = try GStreamerRuntime.manifest(in: staging) else { done += item.approximateBytes; continue }
+                try GStreamerRuntime.check(listed, against: item)
+                gstreamer = listed
+            }
             let file = downloadFile(item, of: info)
             if !(FileManager.default.fileExists(atPath: file.path) && (try? Files.sha256(of: file)) == item.sha256) {
                 let base = done
@@ -159,6 +181,9 @@ public struct EngineManager: Sendable {
                 guard let lib else { throw ShellError.failed("\(item.fileName) doesn't hold Wine's libraries.") }
                 try copyRuntimeLibraries(from: lib, into: staging.appendingPathComponent("wine/lib"))
                 try? FileManager.default.removeItem(at: unpacked)
+            case .gstreamer:
+                // After the runtime libraries (the item order): it never lists a name they have, and would replace it.
+                if let gstreamer { try await installGStreamer(from: file, manifest: gstreamer, into: staging.appendingPathComponent("wine")) }
             }
             try? FileManager.default.removeItem(at: file)
         }
@@ -215,10 +240,10 @@ public struct EngineManager: Sendable {
     public func cleanLeftovers(now: Date = Date(), partialLifetime: TimeInterval = 7 * 24 * 3600) {
         let fm = FileManager.default
         for name in (try? fm.contentsOfDirectory(atPath: paths.engines.path)) ?? [] where name.hasPrefix(".") {
-            let isStaging = EngineCatalog.all.contains { name.hasPrefix(".\($0.id)-") && name.count == $0.id.count + 10 }
+            let isStaging = EngineCatalog.known.contains { name.hasPrefix(".\($0.id)-") && name.count == $0.id.count + 10 }
             if isStaging { try? fm.removeItem(at: paths.engines.appendingPathComponent(name)) }
         }
-        for info in EngineCatalog.all where !info.downloads.isEmpty {
+        for info in EngineCatalog.known where !info.downloads.isEmpty {
             let downloads = downloadFolder(for: info)
             guard fm.fileExists(atPath: downloads.path) else { continue }
             if isInstalled(info) { try? fm.removeItem(at: downloads); continue }
@@ -249,6 +274,17 @@ public struct EngineManager: Sendable {
 
     /// The libraries G-Player Wine was built against (scripts/build-engine-cx.sh checks Gcenx's build has them).
     static let runtimeLibraries = ["libfreetype.6.dylib", "libgnutls.30.dylib", "libSDL2-2.0.0.dylib"]
+
+    /// Expands GStreamer's package with stock `pkgutil` (a few seconds, and room for about 705 MB: `PinnedDownload.scratchBytes`),
+    /// copies the files the engine lists into its `wine` folder and deletes the expansion at once. It lives next to `wine` in
+    /// the engine being made, so a stop or a failure takes it away with the rest.
+    func installGStreamer(from package: URL, manifest: GStreamerRuntime.Manifest, into wineRoot: URL) async throws {
+        let expanded = wineRoot.deletingLastPathComponent().appendingPathComponent("gstreamer-unpack", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: expanded) }
+        let r = try await Shell.runStoppable(Shell.tool("pkgutil"), ["--expand-full", package.path, expanded.path])
+        guard r.succeeded else { throw ShellError.failed("Couldn't unpack \(package.lastPathComponent): \(r.stderr)") }
+        try GStreamerRuntime.copyFiles(of: manifest, from: expanded, into: wineRoot)
+    }
 
     private func unpack(_ archive: URL, into folder: URL, isDXVK: Bool) async throws {
         let dest = isDXVK ? folder.appendingPathComponent("dxvk-unpack") : folder
