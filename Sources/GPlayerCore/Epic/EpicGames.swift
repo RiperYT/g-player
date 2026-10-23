@@ -44,6 +44,15 @@ public enum EpicGames {
 
     // MARK: In the library
 
+    /// True when `merged` has an Epic game `existing` doesn't. The library written then can't be read by a G-Player from before
+    /// Epic Games, so a copy of the file as it is goes first (`LibraryStore.keepBeforeEpic`).
+    public static func addsGames(_ merged: [Game], to existing: [Game]) -> Bool {
+        func names(_ games: [Game]) -> Set<String> {
+            Set(games.compactMap { game in if case .legendary(let name) = game.source { name } else { nil } })
+        }
+        return !names(merged).subtracting(names(existing)).isEmpty
+    }
+
     /// Brings the library's Epic games of `space` in line with `installed`, which is everything Legendary has installed (not a
     /// partial list: a game missing from it is taken out). A new game becomes a library entry; one that is already there keeps
     /// its title, playtime, settings and `hidden`, and learns again what it is if its program moved; one that Legendary no longer

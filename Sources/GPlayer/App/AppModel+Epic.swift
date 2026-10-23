@@ -75,6 +75,18 @@ extension AppModel {
         guard let space = EpicGames.space(in: spaces) else { return }
         let merged = EpicGames.merge(existing: state.games, installed: installed, space: space)
         guard merged.changed else { return }
+        // A library with an Epic game in it can't be read by a G-Player from before Epic Games: the file as it is is kept first,
+        // and without that copy no game is added.
+        if EpicGames.addsGames(merged.games, to: state.games), let paths {
+            do { try LibraryStore(paths: paths).keepBeforeEpic() }
+            catch {
+                if !epicBackupWarned {
+                    epicBackupWarned = true
+                    errorMessage = "G-Player couldn't keep a copy of library.json before adding your first Epic game, so your Epic games aren't in the library yet. \(error.localizedDescription)"
+                }
+                return
+            }
+        }
         mutate { $0.games = merged.games }
         fetchMissingCovers()
         analyzeMissing()

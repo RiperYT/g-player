@@ -46,6 +46,8 @@ public struct LibraryStore: Sendable {
     static let beforeEmptyPrefix = "library.json.before-empty-"
     /// The copy kept before spaces are first moved to another engine, likewise never rotated away.
     static let beforeEngineUpdatePrefix = "library.json.before-engine-update-"
+    /// The copy kept before the first Epic game is added, likewise never rotated away.
+    static let beforeEpicPrefix = "library.json.before-epic-"
 
     /// Opens the library. A read that fails is a problem to show, never an empty library: the caller must not save
     /// anything until the user has decided what to do.
@@ -127,12 +129,25 @@ public struct LibraryStore: Sendable {
     /// library must not be changed then.
     @discardableResult
     public func keepBeforeEngineUpdate(now: Date = Date()) throws -> URL? {
+        try keepOnce(prefix: Self.beforeEngineUpdatePrefix, now: now)
+    }
+
+    /// Before the first Epic game is added to the library: keeps library.json as `library.json.before-epic-<date>`. A library with
+    /// an Epic game in it can't be read by a G-Player from before Epic Games (it takes the file for damaged), and this copy lets
+    /// the user go back to the library as it was. Once, like `keepBeforeEngineUpdate`; throws when the copy can't be made, and the
+    /// game must not be added then.
+    @discardableResult
+    public func keepBeforeEpic(now: Date = Date()) throws -> URL? {
+        try keepOnce(prefix: Self.beforeEpicPrefix, now: now)
+    }
+
+    private func keepOnce(prefix: String, now: Date) throws -> URL? {
         let fm = FileManager.default
-        if let earlier = (try? fm.contentsOfDirectory(atPath: paths.root.path))?.sorted().first(where: { $0.hasPrefix(Self.beforeEngineUpdatePrefix) }) {
+        if let earlier = (try? fm.contentsOfDirectory(atPath: paths.root.path))?.sorted().first(where: { $0.hasPrefix(prefix) }) {
             return paths.root.appendingPathComponent(earlier)
         }
         guard fm.fileExists(atPath: paths.libraryFile.path) else { return nil }
-        let copy = Files.uniqueURL(in: paths.root, name: Self.dayName(Self.beforeEngineUpdatePrefix, at: now))
+        let copy = Files.uniqueURL(in: paths.root, name: Self.dayName(prefix, at: now))
         try fm.copyItem(at: paths.libraryFile, to: copy)
         return copy
     }
