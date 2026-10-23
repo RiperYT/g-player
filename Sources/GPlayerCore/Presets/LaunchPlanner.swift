@@ -44,6 +44,9 @@ public struct LaunchPlan: Sendable, Equatable {
     public var tweaks: LaunchTweaks
     /// Helpers to wrap right before starting.
     public var chromiumHelpers: [String]
+    /// Helpers whose wrapper is taken out right before starting: the launcher runs with its own on this engine. Only where
+    /// G-Player may change the space, and a space without G-Player's wrapper in it is left as it is, so it asks for no consent.
+    public var unwrapHelpers: [String] = []
     /// Runtime components the space must have first.
     public var components: [String] = []
     /// Registry values to set first (one `regedit /S` call).
@@ -116,8 +119,9 @@ public enum LaunchPlanner {
         overrides += (compat?.dllOverrides ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }
         let tweaks = LaunchTweaks(dllOverrides: overrides, environment: environment, verboseLogs: verboseLogs,
                                   dotNetAvailable: dotNet)
-        let helpers = preset?.chromiumHelpers ?? []
-        let backend = compat?.backend ?? (isLauncher ? Self.launcherBackend(on: engine, chosen: game.graphics) : game.graphics)
+        let helpers = preset?.helpersToWrap(on: engine.kind) ?? []
+        let unwrap = preset?.helpersToUnwrap(on: engine.kind) ?? []
+        let backend = compat?.backend ?? (isLauncher ? Self.launcherBackend(on: engine, chosen: game.graphics, preset: preset) : game.graphics)
         var registry = compat?.registry ?? []
 
         /// Engine/fix arguments first, then the user's, without the options the user sets themselves.
@@ -158,7 +162,7 @@ public enum LaunchPlanner {
             }
             args = CompatResolver.apply(compat?.replacements ?? [], to: args)
             return LaunchPlan(arguments: args, workingDirectory: exe.deletingLastPathComponent(), backend: backend,
-                              tweaks: tweaks, chromiumHelpers: helpers, components: compat?.components ?? [],
+                              tweaks: tweaks, chromiumHelpers: helpers, unwrapHelpers: unwrap, components: compat?.components ?? [],
                               registry: registry, compat: compat, launcherSettings: launcherSettings)
 
         case .legendary:
@@ -172,8 +176,8 @@ public enum LaunchPlanner {
             let args = CompatResolver.apply(compat?.replacements ?? [], to: WineLauncher.arguments(toOpen: exe, extra: own))
                 + (legendary?.eglParameters ?? [])
             return LaunchPlan(arguments: args, workingDirectory: legendary?.workingDirectoryURL ?? exe.deletingLastPathComponent(),
-                              backend: backend, tweaks: tweaks, chromiumHelpers: helpers, components: compat?.components ?? [],
-                              registry: registry, compat: compat)
+                              backend: backend, tweaks: tweaks, chromiumHelpers: helpers, unwrapHelpers: unwrap,
+                              components: compat?.components ?? [], registry: registry, compat: compat)
 
         case .steam(let appID):
             let steam = AppPresets.steam
@@ -202,9 +206,12 @@ public enum LaunchPlanner {
             let epic = AppPresets.epic
             guard epic.isInstalled(in: space) else { throw PlanError.launcherMissing("Epic Games Launcher") }
             let exe = epic.executableURL(in: space)
+            // The backend is the game's own, not the launcher's pin (that is for the launcher's own start). The process is the
+            // launcher when it isn't open yet, and then the game inherits this environment; an open launcher keeps its own.
             return LaunchPlan(arguments: [exe.path] + epic.launchArguments + [uri],
                               workingDirectory: exe.deletingLastPathComponent(), backend: backend,
-                              tweaks: tweaks, chromiumHelpers: epic.chromiumHelpers, components: compat?.components ?? [],
+                              tweaks: tweaks, chromiumHelpers: epic.helpersToWrap(on: engine.kind),
+                              unwrapHelpers: epic.helpersToUnwrap(on: engine.kind), components: compat?.components ?? [],
                               registry: registry, compat: compat)
         }
     }
@@ -220,10 +227,13 @@ public enum LaunchPlanner {
         return groups.filter { !user.contains($0[0]) }.flatMap { $0 }
     }
 
-    /// What a store launcher runs with when the user chose nothing: on G-Player Wine with D3DMetal, D3DMetal, which
-    /// most games it starts take (64-bit DirectX 10–12), so they don't need it restarted; the engine's default otherwise.
-    static func launcherBackend(on engine: EngineInfo, chosen: GraphicsBackend) -> GraphicsBackend {
-        chosen == .auto && engine.kind == .crossover && engine.backends.contains(.d3dmetal) ? .d3dmetal : chosen
+    /// What a store launcher runs with. A launcher whose preset pins graphics on this engine kind (Epic's on G-Player Wine: D3DMetal
+    /// when the engine has it ready, else DXMT) gets those, whatever was chosen. Otherwise, when the user chose nothing: on
+    /// G-Player Wine with D3DMetal, D3DMetal, which most games it starts take (64-bit DirectX 10–12), so they don't need it
+    /// restarted; the engine's default otherwise. `engine` has only the backends that are ready (`ready` of `plan`).
+    static func launcherBackend(on engine: EngineInfo, chosen: GraphicsBackend, preset: AppPreset? = nil) -> GraphicsBackend {
+        if let pinned = preset?.launcherBackend(on: engine.kind, ready: engine.backends) { return pinned }
+        return chosen == .auto && engine.kind == .crossover && engine.backends.contains(.d3dmetal) ? .d3dmetal : chosen
     }
 
     /// The programs a game starts, for settings Wine keeps per program. Searching a Steam game's folder is slow, so it only

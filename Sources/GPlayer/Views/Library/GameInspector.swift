@@ -186,14 +186,21 @@ struct GameInspector: View {
         let info = model.engineInfo(for: space)
         VStack(alignment: .leading, spacing: 8) {
             Text("Graphics").sectionTitle()
-            Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },
-                                                  set: { model.setGraphics($0, for: game) })) {
-                Text(GraphicsBackend.auto.displayName).tag(GraphicsBackend.auto)
-                ForEach(info.backends) { Text($0.displayName).tag($0) }
+            if let pinned = AppPresets.preset(space.presetID)?.launcherBackend(on: info.kind, ready: info.backends) {
+                // A launcher that only opens with some graphics on this engine: G-Player picks them, nothing to choose.
+                Text(pinned.displayName)
+                Text("Chosen for \(game.title). The other graphics don't open it.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                Picker("Graphics", selection: Binding(get: { info.backends.contains(game.graphics) ? game.graphics : .auto },
+                                                      set: { model.setGraphics($0, for: game) })) {
+                    Text(GraphicsBackend.auto.displayName).tag(GraphicsBackend.auto)
+                    ForEach(info.backends) { Text($0.displayName).tag($0) }
+                }
+                .labelsHidden()
+                Text(info.graphicsHint(for: game.graphics, profile: game.launchOptions.profile))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            .labelsHidden()
-            Text(info.graphicsHint(for: game.graphics, profile: game.launchOptions.profile))
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

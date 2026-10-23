@@ -27,6 +27,18 @@ public enum EngineSwitch {
         return listed?.id == EngineCatalog.defaultForNewSpaces.id ? .nothing : .move
     }
 
+    /// A space made for a launcher that opens only on G-Player Wine (`AppPreset.needsGPlayerWine`) runs on another engine: its page
+    /// offers the move whether or not the engine menus are on, and says why (`launcherMoveDetail`).
+    public static func launcherNeedsMove(presetID: String?, engineID: String) -> Bool {
+        AppPresets.preset(presetID)?.needsGPlayerWine == true && !EngineCatalog.isRevision(engineID, of: EngineCatalog.crossover)
+    }
+
+    /// The line under that offer, or nil for a space of another kind.
+    public static func launcherMoveDetail(presetID: String?) -> String? {
+        guard let preset = AppPresets.preset(presetID), preset.needsGPlayerWine else { return nil }
+        return "\(preset.name) opens only on G-Player Wine. Moving asks first."
+    }
+
     /// The Wine release an engine is made from: 11.18 for Wine Staging 11.18, 11.0 for G-Player Wine, 7.7 for Apple's toolkit.
     static func release(of info: EngineInfo) -> [Int] {
         if info.kind == .gptk { return [7, 7] }

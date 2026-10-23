@@ -7,7 +7,8 @@ import Foundation
 /// MaPC's MacadeKit, Apache-2.0) takes the helper's place, starts `<name>_real.exe` and adds
 /// `--disable-gpu --disable-gpu-compositing --in-process-gpu`. Steam ignores `-cef-*` flags on its own
 /// command line since 2026, so the flags have to go to the helper itself. Updates restore the vendor helper,
-/// so `apply` runs before every launch, and again while the launcher runs (it updates itself on start).
+/// so `apply` runs before every launch, and again while the launcher runs (it updates itself on start). A launcher that
+/// runs better with its own helper on an engine (Epic on G-Player Wine) isn't wrapped there, and `unwrap` puts it back.
 public enum ChromiumHelperWrapper {
     static let marker = Data("macade-chromium-wrapper/2".utf8)
 
@@ -29,10 +30,7 @@ public enum ChromiumHelperWrapper {
     /// Returns the helpers it changed.
     @discardableResult
     public static func apply(helpers: [String], in space: Space, wrapper: Data? = nil) throws -> [URL] {
-        guard let wrapper = wrapper ?? wrapperURL.flatMap({ FileManager.default.contents(atPath: $0.path) }),
-              isWrapper(wrapper) else {
-            throw ShellError.failed("The Chromium helper wrapper is missing from G-Player.")
-        }
+        let wrapper = try wrapperData(wrapper)
         var changed: [URL] = []
         for pattern in helpers {
             for helper in expand(pattern, in: space.driveC) where try wrap(helper, with: wrapper) {
@@ -40,6 +38,32 @@ public enum ChromiumHelperWrapper {
             }
         }
         return changed
+    }
+
+    /// Takes G-Player's wrapper out of every helper matching `helpers`, for a launcher that runs better with its own
+    /// (`AppPreset.helpersToUnwrap`). The vendor helper is copied back from `<name>_real.exe`, which stays where it is. A helper is
+    /// only touched when the file there is exactly the wrapper G-Player ships and the vendor copy is there: a helper the
+    /// launcher updated, or another tool's wrapper, is left as it is. Nothing at all in a space G-Player may not change
+    /// (`Space.mayChange`). Returns the helpers it changed.
+    @discardableResult
+    public static func unwrap(helpers: [String], in space: Space, wrapper: Data? = nil) throws -> [URL] {
+        guard space.mayChange else { return [] }
+        let wrapper = try wrapperData(wrapper)
+        var changed: [URL] = []
+        for pattern in helpers {
+            for helper in expand(pattern, in: space.driveC) where try unwrap(helper, wrapper: wrapper) {
+                changed.append(helper)
+            }
+        }
+        return changed
+    }
+
+    private static func wrapperData(_ given: Data?) throws -> Data {
+        guard let wrapper = given ?? wrapperURL.flatMap({ FileManager.default.contents(atPath: $0.path) }),
+              isWrapper(wrapper) else {
+            throw ShellError.failed("The Chromium helper wrapper is missing from G-Player.")
+        }
+        return wrapper
     }
 
     /// `Program Files (x86)/Steam/bin/cef/cef.*/steamwebhelper.exe` → every matching file that exists.
@@ -88,6 +112,16 @@ public enum ChromiumHelperWrapper {
         }
         try current.write(to: real, options: .atomic)
         try wrapper.write(to: helper, options: .atomic)
+        return true
+    }
+
+    /// Swaps one helper back. Nothing is deleted, and the helper is written whole in one step, so a failure leaves one that starts.
+    static func unwrap(_ helper: URL, wrapper: Data) throws -> Bool {
+        let fm = FileManager.default
+        // The size first: most starts find the vendor helper, which is a different size, and read nothing.
+        guard Files.size(of: helper) == Int64(wrapper.count), fm.contents(atPath: helper.path) == wrapper,
+              let saved = fm.contents(atPath: realURL(for: helper).path), !saved.isEmpty, !isWrapper(saved) else { return false }
+        try saved.write(to: helper, options: .atomic)
         return true
     }
 

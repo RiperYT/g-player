@@ -12,9 +12,10 @@ struct EpicView: View {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Epic Games").font(.largeTitle.weight(.semibold))
-                    Text("Legendary is an open-source Epic client not made by Epic. Games with anti-cheat (EasyAntiCheat, BattlEye) don't run on a Mac.")
+                    Text("Games with anti-cheat (EasyAntiCheat, BattlEye) don't run on a Mac.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
+                EpicWays()
                 if let failure = model.epic.lookFailure {
                     EpicFailureLine(text: failure) { Task { await model.refreshEpic() } }
                 }
@@ -41,6 +42,52 @@ struct EpicView: View {
     }
 }
 
+/// The two ways to Epic's games side by side, each with what it trades. This page is the second.
+private struct EpicWays: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            EpicWayTile(way: .launcher) { launcherButton }
+            EpicWayTile(way: .legendary) {
+                Label("This page", systemImage: "checkmark").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: 640, alignment: .leading)
+    }
+
+    @ViewBuilder private var launcherButton: some View {
+        let epic = AppPresets.epic
+        if model.isInstalled(epic) {
+            Button("Open") { model.openLauncher(of: epic) }
+        } else {
+            let busy = model.isInstalling(epic)
+            Button(busy ? "Installing…" : "Install") { Task { await model.installPreset(epic) } }.disabled(busy)
+        }
+    }
+}
+
+private struct EpicWayTile<Footer: View>: View {
+    let way: EpicWay
+    @ViewBuilder let footer: Footer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(way.title).font(.callout.weight(.semibold))
+                CardBadge(text: way.badge, tint: way == .launcher ? .accentColor : .secondary)
+            }
+            Text(way.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            footer
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 /// Nobody is signed in: what signing in does, and the button.
 private struct EpicSignedOut: View {
     @Environment(AppModel.self) private var model
@@ -49,7 +96,7 @@ private struct EpicSignedOut: View {
         let downloads = model.legendaryNeedsDownload
         VStack(alignment: .leading, spacing: 12) {
             Label("Sign in to install your Epic games", systemImage: "person.crop.circle").font(.headline)
-            Text("G-Player opens Epic's own sign-in page. You sign in there, with Epic, Google, Apple or whatever you use: your password goes to Epic and never to G-Player. Games install without Epic's launcher, which doesn't run under Wine yet.")
+            Text("G-Player opens Epic's own sign-in page. You sign in there, with Epic, Google, Apple or whatever you use: your password goes to Epic and never to G-Player. Games install without Epic's launcher.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if downloads {
                 Label("Signing in first downloads \(Legendary.downloadSummary).", systemImage: "arrow.down.circle")

@@ -17,12 +17,50 @@ public struct AppPreset: Identifiable, Sendable, Hashable {
     /// Where the launcher may end up, relative to drive_c, most likely first. Installers move between
     /// Program Files and Program Files (x86) across versions.
     public let executables: [String]
-    /// Chromium helpers to wrap (see `ChromiumHelperWrapper`).
+    /// The launcher's Chromium helpers, which get wrapped (see `ChromiumHelperWrapper`) unless the engine's recipe says not to.
     public let chromiumHelpers: [String]
     public let launchArguments: [String]
     public let dllOverrides: [String]
     public let environment: [String: String]
     public let discovery: Discovery
+    /// Where the launcher's setup differs from the usual one, by engine kind (`helpersToWrap(on:)`, `launcherBackend(on:)`).
+    public var engineRecipes: [EngineInfo.Kind: EngineRecipe] = [:]
+    /// The launcher doesn't open on Wine Staging: its space is made on G-Player Wine, and one on another engine is offered the move.
+    public var needsGPlayerWine = false
+
+    /// What a launcher does differently on one engine kind. The defaults are the usual setup.
+    public struct EngineRecipe: Sendable, Hashable {
+        /// Its Chromium helpers are wrapped. Off, they stay as the vendor made them.
+        public var wrapsHelpers = true
+        /// The graphics the launcher itself starts with, whatever its library entry says, best first: the first one the engine has
+        /// ready (`AppPreset.launcherBackend(on:ready:)`). Programs it starts inherit them. Empty: the entry and the engine decide.
+        public var backends: [GraphicsBackend] = []
+    }
+
+    /// The helpers to wrap before a start on this engine kind.
+    public func helpersToWrap(on engine: EngineInfo.Kind) -> [String] {
+        engineRecipes[engine]?.wrapsHelpers == false ? [] : chromiumHelpers
+    }
+
+    /// The helpers whose wrapper is taken out before a start on this engine kind: those the launcher runs without there.
+    public func helpersToUnwrap(on engine: EngineInfo.Kind) -> [String] {
+        engineRecipes[engine]?.wrapsHelpers == false ? chromiumHelpers : []
+    }
+
+    /// The graphics the launcher is pinned to on this engine kind, or nil when its library entry and the engine decide. `ready` is
+    /// what the engine can run now (`Engine.readyBackends`, with D3DMetal only while Apple's toolkit is on): the best of the
+    /// recipe's backends that is in it, else its last one (the engine then runs what it has instead).
+    public func launcherBackend(on engine: EngineInfo.Kind, ready: [GraphicsBackend]) -> GraphicsBackend? {
+        guard let wanted = engineRecipes[engine]?.backends, let last = wanted.last else { return nil }
+        return wanted.first { ready.contains($0) } ?? last
+    }
+
+    /// The engine for the preset's new space: what any new space gets (`EngineCatalog.engineForNewSpace`), except that a launcher
+    /// that needs G-Player Wine gets it also when only Wine Staging is installed (it downloads then).
+    public func engineForNewSpace(installed: [EngineInfo]) -> EngineInfo {
+        needsGPlayerWine ? EngineCatalog.installedGPlayerWine(in: installed) ?? EngineCatalog.defaultForNewSpaces
+                         : EngineCatalog.engineForNewSpace(installed: installed)
+    }
 
     /// The installed launcher, or the most likely place for it.
     public func executableURL(in space: Space) -> URL {
@@ -53,8 +91,8 @@ public enum AppPresets {
 
     public static let epic = AppPreset(
         id: "epic", name: "Epic Games Launcher",
-        summary: "Epic's own launcher. Installs and starts, but under Wine it currently stops at its loading screen. The recommended Epic Games card installs your games without it.",
-        symbol: "shippingbox", experimental: true,
+        summary: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.",
+        symbol: "shippingbox", experimental: false,
         installerURL: URL(string: "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi")!,
         installerFileName: "EpicGamesLauncherInstaller.msi", installerArguments: ["/qn"],
         executables: ["Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe",
@@ -62,7 +100,11 @@ public enum AppPresets {
         chromiumHelpers: ["Program Files/Epic Games/Launcher/Engine/Binaries/Win64/EpicWebHelper.exe",
                           "Program Files (x86)/Epic Games/Launcher/Engine/Binaries/Win64/EpicWebHelper.exe"],
         launchArguments: ["-SkipBuildPatchPrereq"],
-        dllOverrides: [], environment: qtWebEngine, discovery: .epic)
+        dllOverrides: [], environment: qtWebEngine, discovery: .epic,
+        // On G-Player Wine its web helper runs as Epic made it (wrapped, its network service crashes again and again), and its
+        // renderer needs D3DMetal, or DXMT without it: on DXVK it can't make its swap chain and restarts itself, and on WineD3D
+        // (OpenGL 4.1) it falls back to software rendering and crashes. On Wine Staging nothing changes: it doesn't open there.
+        engineRecipes: [.crossover: .init(wrapsHelpers: false, backends: [.d3dmetal, .dxmt])], needsGPlayerWine: true)
 
     public static let gog = AppPreset(
         id: "gog", name: "GOG Galaxy",

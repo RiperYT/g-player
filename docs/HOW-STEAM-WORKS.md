@@ -27,5 +27,6 @@ Since 2026 Steam drops `-cef-*` options from its own command line, so the flags 
 Other things Steam's space gets: `bcrypt` and `ncrypt` from Wine, the overlay DLLs disabled, and
 Qt WebEngine flags for launchers that games start from Steam.
 
-The same wrapper works for other Chromium-based launchers (Epic's `EpicWebHelper.exe`, GOG Galaxy) and for
-Electron and NW.js games, which get the same flags on their command line.
+The same wrapper works for other Chromium-based launchers (GOG Galaxy, and Epic's `EpicWebHelper.exe` on Wine Staging) and
+for Electron and NW.js games, which get the same flags on their command line. Epic's launcher on G-Player Wine runs without
+it (see [COMPATIBILITY](COMPATIBILITY.md#epic-games-launcher)).

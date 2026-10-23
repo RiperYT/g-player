@@ -68,8 +68,8 @@ the new place (`LibraryState.movingLibrary`).
 
 ## Epic Games without Epic's launcher
 
-Epic's own launcher stops at its loading screen under Wine, so G-Player can also install and start Epic games through
-[Legendary](https://github.com/legendary-gl/legendary) (GPL-3.0-or-later), as Heroic does. Legendary is never bundled or linked:
+Epic's own launcher runs on G-Player Wine (`AppPreset.epic`, see `docs/COMPATIBILITY.md`), and G-Player can also install and
+start Epic games without it, through [Legendary](https://github.com/legendary-gl/legendary) (GPL-3.0-or-later), as Heroic does. Legendary is never bundled or linked:
 the Mac downloads the pinned release (`Legendary.download`, `Tools/legendary-0.21.1/`) the first time the user signs in, and
 G-Player runs it as a separate program (`Legendary.run`).
 
@@ -169,8 +169,9 @@ Engines › Advanced and never by itself.
 ## A launch
 
 `LaunchPlanner.plan` turns a game and its space into arguments, working folder, graphics backend and tweaks.
-Then `AppModel.play` wraps Chromium helpers if the space's preset has any, puts DXVK's DLLs into the space
-when the backend is DXVK, and `WineLauncher.start` runs `arch -x86_64 <wine> …` with the environment from
+Then `AppModel.play` wraps the Chromium helpers the space's preset has on that engine (`AppPreset.helpersToWrap`) and
+takes the wrapper out of those it runs without there (`helpersToUnwrap`, `ChromiumHelperWrapper.unwrap`), puts DXVK's DLLs
+into the space when the backend is DXVK, and `WineLauncher.start` runs `arch -x86_64 <wine> …` with the environment from
 `WineEnvironment.make`.
 
 ## Keeping the Mac usable
