@@ -39,12 +39,18 @@ original source and checked against a pinned SHA-256 (see docs/LEGAL.md):
   - DXVK for macOS (zlib), by Gcenx: https://github.com/Gcenx/DXVK-macOS
   - winetricks 20260125 (LGPL-2.1+): https://github.com/Winetricks/winetricks. G-Player runs it as a separate
     program and, on the user's Mac, writes a copy that refuses unverified downloads.
+  - Legendary 0.21.1 (GPL-3.0-or-later), an open-source client for Epic Games' store by the legendary-gl project:
+    https://github.com/legendary-gl/legendary, from its GitHub release (legendary_macOS_arm64, SHA-256
+    d87978321dba9cb731fab40c72f0a30bed55baca8b5341ab21024c5733cd837e), downloaded when the user first signs in to Epic
+    Games. G-Player runs it as a separate program, on command-line arguments and its output; it is never bundled or
+    linked and is not part of G-Player. Its source is at the address above.
   - Microsoft Visual C++ Redistributable (Microsoft license), from Microsoft's servers.
   - d3dcompiler_47.dll (Microsoft), as winetricks gets it: https://github.com/mozilla/fxc2
   - Other Windows components through winetricks (DirectX, .NET, PhysX, XNA, OpenAL, fonts), each under its
     maker's license, from the sources winetricks pins.
   - Store installers (Steam, Epic Games Launcher, GOG Galaxy, Ubisoft Connect) from their publishers.
   - Steam cover art from Valve's CDN, shown in the library and cached on the user's Mac.
+  - Epic game box art from Epic's CDN, shown in the library and cached on the user's Mac.
 
 G-Player includes four modified Wine files for G-Player Wine 26.3.0-1 (revision 2 is built with the same patches, so it
 needs none), Sources/GPlayerCore/Resources/engine-fixes/cx-ntdll.so,
