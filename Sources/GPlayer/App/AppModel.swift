@@ -130,6 +130,8 @@ final class AppModel {
     /// Retired engines whose folder was deleted, or failed to be, in this run (not tried again). A look that found the engine in
     /// use doesn't count: the next look tries again.
     @ObservationIgnored var retiredRemovalsTried: Set<String> = []
+    /// The copy of library.json before the first move to another engine couldn't be made, and the user was told (once per run).
+    @ObservationIgnored var engineBackupWarned = false
     /// Retired engines whose removal waits for its turn or is under way (`removeRetiredEngine`).
     @ObservationIgnored var removingEngines: Set<String> = []
     /// Launches that have begun and whose program hasn't started yet, per space. The space's engine mustn't change under one

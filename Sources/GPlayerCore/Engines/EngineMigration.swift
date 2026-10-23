@@ -11,6 +11,8 @@ public enum EngineMigration {
             public let space: UUID
             public let from: String
             public let to: String
+
+            public init(space: UUID, from: String, to: String) { self.space = space; self.from = from; self.to = to }
         }
 
         /// Spaces to put on another engine now.
@@ -20,6 +22,10 @@ public enum EngineMigration {
         public var install: [String] = []
         /// Retired engines that are installed, whose replacement is installed and that no space stays on: their folders can go.
         public var remove: [String] = []
+
+        public init(switches: [Switch] = [], install: [String] = [], remove: [String] = []) {
+            self.switches = switches; self.install = install; self.remove = remove
+        }
 
         public var isEmpty: Bool { switches.isEmpty && install.isEmpty && remove.isEmpty }
     }

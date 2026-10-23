@@ -14,7 +14,8 @@
   on the old version meanwhile, offline too; if the download fails, G-Player tries again the next time it opens. A space
   moves to the new version once nothing runs in it, with its files, Steam login and what G-Player learned about each
   game's graphics, and the old version is then removed (about 1.7 GB freed). A space whose old version is gone installs
-  the new one when you start something in it, instead of switching to Wine Staging.
+  the new one when you start something in it, instead of switching to Wine Staging. Before the first move G-Player keeps
+  `library.json` as `library.json.before-engine-update-<date>`, in case you go back to an older G-Player.
 - The first run now says it needs about 3.3 GB free and downloads about 640 MB, since GStreamer is part of G-Player
   Wine. The disk check counts the room GStreamer's package takes while it is unpacked.
 

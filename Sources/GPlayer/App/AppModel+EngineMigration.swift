@@ -27,14 +27,31 @@ extension AppModel {
     /// under its program; one that can't move yet is looked at again at the next look at the programs.
     func migrateEngines(processes: [WineProcess]) {
         guard let manager = engineManager, needsEngineMigration else { return }
-        let plan = enginePlan(processes: processes, manager: manager)
-        if !plan.switches.isEmpty {
-            mutate { EngineMigration.apply(plan, to: &$0) }
-            carryOverLaunchRecords(plan.switches)
-            engineVersion += 1
-        }
+        var plan = enginePlan(processes: processes, manager: manager)
+        if !plan.switches.isEmpty, !moveSpaces(plan.switches) { plan.remove = [] }       // moved, or not at all
         for id in plan.install { if let info = EngineCatalog.info(id) { updateEngineInBackground(info) } }
         for id in plan.remove { if let info = EngineCatalog.info(id) { removeRetiredEngine(info, manager: manager) } }
+    }
+
+    /// Puts the spaces on their new engines, with what was learned about their games' graphics (`EngineMigration.apply`) and what
+    /// the app remembers about their launches. Before the first move library.json is kept as it is
+    /// (`LibraryStore.keepBeforeEngineUpdate`): an older G-Player would read the moved spaces as unknown. Moves nothing, and says
+    /// so, when that copy can't be made (the user is told once per run, and the next look tries again).
+    @discardableResult
+    func moveSpaces(_ switches: [EngineMigration.Plan.Switch]) -> Bool {
+        guard !switches.isEmpty, let paths else { return false }
+        do { try LibraryStore(paths: paths).keepBeforeEngineUpdate() }
+        catch {
+            if !engineBackupWarned {
+                engineBackupWarned = true
+                errorMessage = "G-Player couldn't keep a copy of library.json before updating G-Player Wine, so your spaces stay on the old version for now. \(error.localizedDescription)"
+            }
+            return false
+        }
+        mutate { EngineMigration.apply(EngineMigration.Plan(switches: switches), to: &$0) }
+        carryOverLaunchRecords(switches)
+        engineVersion += 1
+        return true
     }
 
     /// `EngineMigration.plan` for what is installed and in use now.
@@ -82,7 +99,7 @@ extension AppModel {
 
     /// What the app remembers about launches of the moved spaces' games belongs to the engine they ran on (the "Try Other
     /// Graphics" offer after a failure, say): the replacement is the same Wine, so it goes with them.
-    private func carryOverLaunchRecords(_ switches: [EngineMigration.Plan.Switch]) {
+    func carryOverLaunchRecords(_ switches: [EngineMigration.Plan.Switch]) {
         for move in switches {
             for game in state.games where game.spaceID == move.space {
                 if autoLaunches[game.id]?.engineID == move.from { autoLaunches[game.id]?.engineID = move.to }

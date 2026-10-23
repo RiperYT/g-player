@@ -44,6 +44,8 @@ public struct LibraryStore: Sendable {
     static let brokenPrefix = "library.json.broken-"
     /// A copy that the next saves never rotate away (they only ever write `library.json` and `library.json.previous`).
     static let beforeEmptyPrefix = "library.json.before-empty-"
+    /// The copy kept before spaces are first moved to another engine, likewise never rotated away.
+    static let beforeEngineUpdatePrefix = "library.json.before-engine-update-"
 
     /// Opens the library. A read that fails is a problem to show, never an empty library: the caller must not save
     /// anything until the user has decided what to do.
@@ -118,6 +120,23 @@ public struct LibraryStore: Sendable {
         return copy
     }
 
+    /// Before the first move of spaces to another engine changes library.json: keeps it as `library.json.before-engine-update-<date>`.
+    /// An older G-Player doesn't know the new engine's id and would run the moved spaces on Wine Staging; this copy lets the user
+    /// go back to the library as it was. Once: a copy there already is the one that matters, and a later one would hold the
+    /// moved library. Returns the copy, or nil when there is no library.json to keep. Throws when the copy can't be made: the
+    /// library must not be changed then.
+    @discardableResult
+    public func keepBeforeEngineUpdate(now: Date = Date()) throws -> URL? {
+        let fm = FileManager.default
+        if let earlier = (try? fm.contentsOfDirectory(atPath: paths.root.path))?.sorted().first(where: { $0.hasPrefix(Self.beforeEngineUpdatePrefix) }) {
+            return paths.root.appendingPathComponent(earlier)
+        }
+        guard fm.fileExists(atPath: paths.libraryFile.path) else { return nil }
+        let copy = Files.uniqueURL(in: paths.root, name: Self.dayName(Self.beforeEngineUpdatePrefix, at: now))
+        try fm.copyItem(at: paths.libraryFile, to: copy)
+        return copy
+    }
+
     /// The library folder `chosen` stands for: the folder itself when library.json (or its previous copy) is in it, or
     /// its `G-Player` folder, for someone who chose the folder that holds the library. Nil when neither is.
     public static func libraryFolder(in chosen: URL) -> URL? {
@@ -145,6 +164,15 @@ public struct LibraryStore: Sendable {
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = zone
         f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return prefix + f.string(from: date)
+    }
+
+    /// `library.json.before-engine-update-2026-10-23`
+    static func dayName(_ prefix: String, at date: Date, in zone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = zone
+        f.dateFormat = "yyyy-MM-dd"
         return prefix + f.string(from: date)
     }
 
