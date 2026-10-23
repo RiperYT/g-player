@@ -5,8 +5,10 @@ import Foundation
 /// Launcher gets it), which `legendary auth --code` turns into a login. The password is never seen: nothing here reads a
 /// form, and no URL or page that holds a code is logged.
 public enum EpicSignIn {
-    /// Epic's login page, which sends the user on to `redirectHost`/`redirectPath` with the code for this client.
-    public static let loginURL = URL(string: "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode")!
+    /// Epic's login page as Heroic opens it: told by `userAgent` it is the Epic Games Launcher, it ends on `localhost` with the
+    /// code (`code(navigatingTo:isMainFrame:)`). A `redirectUrl` to Epic's redirect API, as Legendary's docs had it, is refused
+    /// now ("the client's redirect URL is unknown").
+    public static let loginURL = URL(string: "https://www.epicgames.com/id/login?responseType=code")!
     /// What the page is told the browser is, as Legendary's own login window says it, so the page treats it as a launcher.
     public static let userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EpicGamesLauncher"
     /// Where a user who prefers their own browser signs in: Legendary's page, which shows the code to copy.

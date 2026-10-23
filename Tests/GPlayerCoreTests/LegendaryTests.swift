@@ -726,7 +726,7 @@ private let sampleInstalled = """
         } catch {
             #expect(error.localizedDescription == "It needs \(Int64(20_480 * 1_048_576).formattedBytes), and the disk is full.", "\(error)")
         }
-        #expect(asked.all == [20_480 * 1_048_576])
+        #expect(asked.all == [Int64(20_480 * 1_048_576)])
         #expect(Date().timeIntervalSince(started) < 10)
         #expect(calls().count == 1)                                                       // nothing was listed or checked afterwards
     }
@@ -756,7 +756,7 @@ private let sampleInstalled = """
         """)
         let asked = Sizes()
         try await legendary.install("SampleApp", basePath: tmp.url.appendingPathComponent("base"), hasRoom: { asked.add($0); return nil }) { _ in }
-        #expect(asked.all == [10 * 1_048_576])
+        #expect(asked.all == [Int64(10 * 1_048_576)])
     }
 
     @Test func theSizeOfAGameComesFromItsInfoAndIsNilWhenEpicCantSay() async throws {

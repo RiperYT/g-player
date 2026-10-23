@@ -20,11 +20,13 @@ import Testing
         #expect(!EpicSignIn.isRedirectPage(nil))
     }
 
-    @Test func theLoginPageIsEpicsWithTheRedirectForTheLauncher() {
+    /// As Heroic opens it: a `redirectUrl` to Epic's redirect API is refused now ("the client's redirect URL is unknown"),
+    /// so the page asks for a code and ends on `localhost` with it.
+    @Test func theLoginPageIsEpicsAskingForACode() {
         let url = EpicSignIn.loginURL
         #expect(url.host == "www.epicgames.com" && url.path == "/id/login")
-        let redirect = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "redirectUrl" }?.value
-        #expect(redirect == "https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(items.map(\.name) == ["responseType"] && items.first?.value == "code")
         #expect(EpicSignIn.userAgent == "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EpicGamesLauncher")
     }
 
