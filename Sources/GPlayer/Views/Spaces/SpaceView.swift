@@ -121,7 +121,7 @@ struct SpaceView: View {
                 }
             }
             PathRow(url: space.url)
-            if space.presetID == EpicGames.presetID { EpicLibraryLink() }
+            if EpicGames.isGamesSpace(space) { EpicLibraryLink() }
             HStack(spacing: 18) {
                 if case .picker(let selected) = model.engineOffer(for: space) {
                     Picker("Engine", selection: Binding(get: { selected }, set: { if $0 != selected { askToSwitch(to: $0) } })) {
@@ -229,7 +229,7 @@ private struct EpicLibraryLink: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button { model.openEpicLibrary() } label: { Label("Your Epic library…", systemImage: "shippingbox") }
+        Button { model.openEpicLibrary() } label: { Label(EpicGames.libraryTitle, systemImage: "shippingbox") }
             .buttonStyle(.link)
     }
 }

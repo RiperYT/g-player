@@ -133,7 +133,7 @@ private struct OpenEpicLibraryButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button("Open…") { model.openEpicLibrary() }
+        Button(EpicGames.libraryTitle) { model.openEpicLibrary() }
     }
 }
 

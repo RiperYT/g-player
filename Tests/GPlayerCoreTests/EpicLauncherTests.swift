@@ -315,7 +315,7 @@ import Testing
     // MARK: Words
 
     @Test func theLauncherIsTheRecommendedWayAndSaysItRunsOnGPlayerWine() {
-        #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.")
+        #expect(epic.summary == "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account. Its first start adds Wine Mono (.NET) for Epic Online Services: a download of 40 MB, 245 MB on disk.")
         #expect(!epic.experimental)                                                // one badge: Recommended
         #expect(!epic.summary.contains("loading screen"))
         #expect(EpicWay.allCases == [.launcher, .legendary])
@@ -334,6 +334,19 @@ import Testing
         }
         // The space Legendary installs into is no launcher's: its page links to Epic's, and it is found again by this id.
         #expect(AppPresets.preset(EpicGames.presetID) == nil)
+        let legendary = Space(name: "Epic Games", path: "/x", engineID: EngineCatalog.crossover.id, origin: .managed, presetID: EpicGames.presetID)
+        let launcher = Space(name: "Epic Games Launcher", path: "/y", engineID: EngineCatalog.crossover.id, origin: .managed, presetID: "epic")
+        #expect(EpicGames.isGamesSpace(legendary) && !EpicGames.isGamesSpace(launcher))
+        #expect(!EpicGames.isGamesSpace(Space(name: "Main", path: "/z", engineID: EngineCatalog.crossover.id, origin: .managed)))
+        #expect(EpicGames.space(in: [launcher, legendary])?.name == "Epic Games")
+        // What opens the page is named alike on the card and on the space, and differs from the launcher's own "Open".
+        #expect(EpicGames.libraryTitle == "Your Epic Library")
+        // Nothing the user is told about reinstalling points at the old sidebar item.
+        for health in [EpicGames.Health.filesNotFound(repairBase: URL(fileURLWithPath: "/b")), .filesNotFound(repairBase: nil), .notRecorded] {
+            let note = EpicGames.note(for: health, title: "Sample Game")
+            #expect(note?.detail.contains("sidebar") == false && note?.removal.contains("sidebar") == false)
+            #expect(note.map { $0.detail + $0.removal }?.contains("from Epic Games.") == false)
+        }
     }
 }
 

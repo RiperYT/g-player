@@ -54,8 +54,8 @@ settings that worked, for you to read and submit; G-Player itself sends nothing.
 Epic has two ways here, both on the **Epic Games** card in **Get Apps**. **Epic Games Launcher** is Epic's own app, the
 recommended one: it runs on G-Player Wine and reaches Epic's sign-in page (the first time you open it, G-Player adds Wine Mono,
 .NET for Wine, so that Epic's launcher can install Epic Online Services). **Without the launcher** is the alternative: faster,
-through Legendary, an open-source Epic client not made by Epic. Its **Open…** button shows the page described below, which the
-Epic Games space also opens, with **Your Epic library…**.
+through Legendary, an open-source Epic client not made by Epic. Its **Your Epic Library** button shows the page described
+below, which the Epic Games space also opens, with the same button.
 
 1. **Sign In…** opens Epic's own sign-in page in a window. You sign in there, with Epic, Google, Apple or whatever you use. Your
    password goes to Epic and never to G-Player, which reads nothing on that page; it only takes the one-time code Epic's page

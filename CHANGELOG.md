@@ -16,14 +16,14 @@
   G-Player kept .NET off to spare you Wine's own download prompts. For this launcher G-Player now brings **Wine Mono**
   (.NET for Wine, 10.4.1, the version G-Player Wine expects): the first time you open the launcher (or set it up) it
   downloads Wine Mono (40 MB, checked against a pinned SHA-256, with progress and a Stop in the sidebar) into G-Player
-  Wine, where it takes about 240 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
+  Wine, where it takes about 245 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
   gets it: other apps and games start as before, and Wine Staging has none. In a bottle of another app it asks first, like
   every change G-Player makes there. A launcher that is already open keeps what it started with: quit it and open it again.
 - **Epic games without Epic's launcher.** The card's second way, **Without the launcher**, opens the Epic Games page over Get
   Apps (with a back button). It signs you in on Epic's own page (with Epic, Google, Apple or whatever you use: G-Player never
   sees your password, and the window keeps nothing) and lists the games your account owns. **Install** puts a game into a space
   of its own, "Epic Games", on G-Player Wine, one at a time, with progress and a Stop in the sidebar; that space is in Spaces
-  like any other and links back to the page with **Your Epic library…**, and the games in it show in All Games; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
+  like any other and links back to the page with **Your Epic Library**, and the games in it show in All Games; **Play** starts it through G-Player's own launch (graphics, components, automatic retry), asking Epic for a
   one-time code each time, or starting offline when Epic can't be reached; **Uninstall…** and **Sign Out** undo them. It
   works through [Legendary](https://github.com/legendary-gl/legendary) 0.21.1 (GPL-3.0), an open-source Epic client that is
   not part of G-Player: the first time you sign in, G-Player downloads it (15 MB) from its GitHub release and checks it
