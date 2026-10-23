@@ -34,6 +34,9 @@ struct Activity: Identifiable, Equatable {
     var isSetup = false
     /// The space whose queue this waits in, until its turn comes: the sidebar then says what the queue is busy with.
     var waitsIn: UUID?
+    /// One more plain sentence under the message, for work the user didn't ask for (the engine update that goes on in the
+    /// background) and so should hear why it runs.
+    var note: String?
 }
 
 @MainActor @Observable
@@ -117,6 +120,17 @@ final class AppModel {
     /// External spaces waiting for the user to allow or refuse changes, first one shown.
     var changesRequests: [ChangesRequest] = []
     var changesRequest: ChangesRequest? { changesRequests.first }
+    /// Engines downloading in the background to take over from a retired one (`migrateEngines`): their download shows no errors,
+    /// and says why it runs.
+    private(set) var updatingEngines: Set<String> = []
+    /// The replacements the background update has tried in this run, whether they came, failed or were stopped: a failed one
+    /// is tried again at the next start, not before.
+    @ObservationIgnored var engineUpdatesTried: Set<String> = []
+    /// Retired engines whose removal was tried in this run (it is tried once, so one that can't be deleted isn't looked at again).
+    @ObservationIgnored var retiredRemovalsTried: Set<String> = []
+    /// Launches that have begun and whose program hasn't started yet, per space. The space's engine mustn't change under one
+    /// (`migrateEngines`).
+    @ObservationIgnored var launchesStarting: [UUID: Int] = [:]
     /// Stops for activities that can be stopped, by activity id.
     var cancellers: [UUID: () -> Void] = [:]
     /// Work queued per space (installs, store setup), so two installers never run in one space at once.
@@ -237,6 +251,7 @@ final class AppModel {
             if moved { save() }
             migrateAppleToolkitSetting()
             migrateManualGraphics()
+            migrateEngines()
             applyEngineFixes()
             syncD3DMetal()
             refreshStores()
@@ -359,6 +374,7 @@ final class AppModel {
     /// What an engine picker adds after an engine's name: recommended, and whether it needs a download (with its
     /// size) or isn't there. `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
     func engineNote(_ info: EngineInfo, listsInstalled: Bool = false) -> String {
+        if info.isRetired { return "  · being replaced" }
         var notes = info.isRecommended ? ["recommended"] : []
         if info.kind == .gptk && !useAppleToolkit { notes.append("turned off") }
         else if isInstalled(info) { if listsInstalled { notes.append("installed") } }
@@ -419,30 +435,60 @@ final class AppModel {
     /// Downloads an engine if it is missing. Returns nil when that failed (the error is shown). Asked again while
     /// the engine downloads (onboarding and a new space can ask at once), it waits for that download: two would
     /// write the same file.
+    /// - Parameter updating: the download is the background update that replaces a retired engine
+    ///   (`updateEngineInBackground`): nothing is asked of the user, so a failure is not shown.
     @discardableResult
-    func ensureEngine(_ info: EngineInfo) async -> Engine? {
+    func ensureEngine(_ info: EngineInfo, updating: Bool = false) async -> Engine? {
         guard let manager = engineManager else { return nil }
         if info.kind == .gptk && !useAppleToolkit {
             errorMessage = "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
             return nil
         }
         if let e = manager.engine(info) { return e }
+        // A retired engine that isn't installed is never installed again: its replacement does the same work, and a space
+        // that asked for the old one moves to it.
+        if let replacement = EngineCatalog.replacement(of: info) {
+            let engine = await ensureEngine(replacement, updating: updating)
+            migrateEngines()
+            return engine
+        }
         if info.downloads.isEmpty {
             errorMessage = useAppleToolkit
                 ? "\(info.name) isn't installed on this Mac. G-Player doesn't download it; see Settings › Engines."
                 : "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
             return nil
         }
-        if let running = engineInstalls[info.id] { return await running.value }
-        let task = Task { await self.installEngine(info, with: manager) }
+        if let running = engineInstalls[info.id] {
+            let inBackground = updatingEngines.contains(info.id)
+            let engine = await running.value
+            // A background update that failed said nothing; someone who needed the engine meanwhile hears why.
+            if engine == nil, inBackground, !updating, let failure = engineFailures[info.id] {
+                errorMessage = "Couldn't install \(info.name): \(failure.localizedDescription)"
+            }
+            return engine
+        }
+        if updating { updatingEngines.insert(info.id) }
+        let task = Task { await self.installEngine(info, with: manager, updating: updating) }
         engineInstalls[info.id] = task
         return await task.value
     }
 
-    private func installEngine(_ info: EngineInfo, with manager: EngineManager) async -> Engine? {
+    /// Downloads `info` in the background to take over from a retired engine, once per run (`engineUpdatesTried`): offline,
+    /// failing or stopped, nothing is said, and the spaces stay on the old engine until the next start.
+    func updateEngineInBackground(_ info: EngineInfo) {
+        guard engineUpdatesTried.insert(info.id).inserted, engineInstalls[info.id] == nil else { return }
+        Task { await ensureEngine(info, updating: true) }
+    }
+
+    /// The engine is downloading in the background to replace a retired one (Settings says why).
+    func isUpdating(_ info: EngineInfo) -> Bool { updatingEngines.contains(info.id) }
+
+    private func installEngine(_ info: EngineInfo, with manager: EngineManager, updating: Bool) async -> Engine? {
         await leftoversCleaning?.value
-        let activity = begin(Self.downloadTitle(info), "Starting", setup: true)
-        defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil }
+        // An update nobody asked for isn't "setup" to quit over: what came is kept, and it goes on at the next start.
+        let activity = begin(Self.downloadTitle(info), "Starting", setup: !updating,
+                             note: updating ? EngineMigration.updateNote(for: info) : nil)
+        defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil; updatingEngines.remove(info.id) }
         engineFailures[info.id] = nil
         stoppedEngines.remove(info.id)
         // What came stays on disk, so downloading again goes on from there.
@@ -457,12 +503,13 @@ final class AppModel {
             engineVersion += 1
             if info.kind == .crossover { await prepareD3DMetal() }     // D3DMetal only while Apple's toolkit is on
             if onboardingDone, !firstRunSpaces.isEmpty { resumeFirstRunSpaces() }     // spaces that waited for an engine
+            migrateEngines()                                        // spaces on a retired engine can move now
             return engine
         } catch is CancellationError {
             return nil
         } catch {
             engineFailures[info.id] = error
-            errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)"
+            if !updating { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
             return nil
         }
     }
@@ -574,10 +621,12 @@ final class AppModel {
 
     // MARK: Activities
 
-    func begin(_ title: String, _ message: String, progress: Double? = nil, setup: Bool = false, waitsIn: UUID? = nil) -> UUID {
+    func begin(_ title: String, _ message: String, progress: Double? = nil, setup: Bool = false, waitsIn: UUID? = nil,
+               note: String? = nil) -> UUID {
         var a = Activity(title: title, message: message, progress: progress)
         a.isSetup = setup
         a.waitsIn = waitsIn
+        a.note = note
         activities.append(a)
         return a.id
     }
@@ -1073,6 +1122,7 @@ final class AppModel {
                 d3dMetalWaiting = false
                 syncD3DMetal()
             }
+            migrateEngines(processes: all)                      // a space that has just gone quiet can move to the new engine
             noticeStoreGames(found)
             noticeWorkingGames(found)
             guardHelperWrappers(all)
@@ -1250,6 +1300,10 @@ final class AppModel {
     ///   shown), was not made, or failed (the error is shown).
     @discardableResult
     func launch(_ game: Game, skipping skipped: Set<PlayCheck>, retry: GraphicsRetryLaunch? = nil) async -> Bool {
+        // Until its program has started, the space's engine mustn't change under the launch (`migrateEngines`).
+        let startingIn = game.spaceID
+        launchesStarting[startingIn, default: 0] += 1
+        defer { Self.decrement(&launchesStarting, startingIn) }
         guard let paths, let space = space(game.spaceID),
               let engine = await ensureEngine(EngineCatalog.info(space.engineID) ?? EngineCatalog.wineStaging) else { return false }
         // A restart of Steam made for this launch is over when it is.

@@ -5,8 +5,9 @@ import GPlayerCore
 struct AutoLaunch {
     /// What ran (never `.auto`).
     let backend: GraphicsBackend
-    /// The engine it ran on, so what is learned belongs to it.
-    let engineID: String
+    /// The engine it ran on, so what is learned belongs to it. A space that moves to a newer revision of the same Wine takes
+    /// the record along (`migrateEngines`).
+    var engineID: String
     let startedAt: Date
     /// It is another try with other graphics: the game's Stop ends the tries while it starts.
     let retried: Bool

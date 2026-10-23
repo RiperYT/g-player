@@ -96,6 +96,8 @@ struct EngineSection: View {
                     } message: {
                         Text("It's in use: programs are running or installing in \(list(busySpaces)). Quit them or wait, then try again.")
                     }
+            } else if model.isUpdating(info) {
+                EngineUpdateStatus(info: info)
             } else {
                 let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
                 Button("Download (\(mb) MB)") { Task { _ = await model.ensureEngine(info) } }
@@ -136,6 +138,20 @@ struct EngineSection: View {
 
     private func list(_ names: [String]) -> String {
         names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.first ?? ""
+    }
+}
+
+/// An engine downloading in the background to replace an older revision of it: how far it is, and the sentence that says why.
+private struct EngineUpdateStatus: View {
+    @Environment(AppModel.self) private var model
+    let info: EngineInfo
+
+    var body: some View {
+        let download = model.download(of: info)
+        LabeledContent("Status") { Text(download?.message ?? "Starting").foregroundStyle(.secondary) }
+        if let progress = download?.progress { ProgressView(value: progress) }
+        Text(EngineMigration.updateNote(for: info)).font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
