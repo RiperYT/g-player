@@ -164,6 +164,30 @@ import Testing
         #expect(start(allowed, on: new, installed: [new]) == .init(space: b.id, from: old.id, to: new.id))
     }
 
+    @Test func aSwitchByHandFromTheOldRevisionToTheNewOneIsTheSameMoveAsTheAutomaticOne() {
+        let main = space("Main", on: old.id)
+        #expect(EngineMigration.switchBetweenRevisions(of: main, to: new) == .init(space: main.id, from: old.id, to: new.id))
+        // Any other switch is another Wine: nothing carries over.
+        #expect(EngineMigration.switchBetweenRevisions(of: main, to: staging) == nil)
+        #expect(EngineMigration.switchBetweenRevisions(of: main, to: EngineCatalog.gptk) == nil)
+        #expect(EngineMigration.switchBetweenRevisions(of: space("Now", on: new.id), to: new) == nil)
+        #expect(EngineMigration.switchBetweenRevisions(of: space("Now", on: new.id), to: old) == nil)         // back: not a revision's replacement
+        #expect(EngineMigration.switchBetweenRevisions(of: space("Staging", on: staging.id), to: new) == nil)
+        #expect(EngineMigration.switchBetweenRevisions(of: space("Odd", on: "wine-from-the-future"), to: new) == nil)
+    }
+
+    @Test func whatWasLearnedOnTheOldRevisionHoldsAfterASwitchByHand() throws {
+        let main = space("Main", on: old.id)
+        var game = Game(title: "Learned", spaceID: main.id)
+        game.autoGraphics = AutoGraphics(engineID: old.id, worked: .dxmt, failed: [.dxvk])
+        var state = LibraryState()
+        state.spaces = [main]; state.games = [game]
+        let move = try #require(EngineMigration.switchBetweenRevisions(of: main, to: new))
+        EngineMigration.apply(.init(switches: [move]), to: &state)
+        #expect(state.spaces[0].engineID == new.id)
+        #expect(state.games[0].autoGraphics?.current(on: new.id) == AutoGraphics(engineID: new.id, worked: .dxmt, failed: [.dxvk]))
+    }
+
     // MARK: In use
 
     func program(_ command: String, in space: Space, folder: String = "drive_c/windows/system32") -> WineProcess {

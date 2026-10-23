@@ -36,13 +36,14 @@ extension AppModel {
     /// Puts the spaces on their new engines, with what was learned about their games' graphics (`EngineMigration.apply`) and what
     /// the app remembers about their launches. Before the first move library.json is kept as it is
     /// (`LibraryStore.keepBeforeEngineUpdate`): an older G-Player would read the moved spaces as unknown. Moves nothing, and says
-    /// so, when that copy can't be made (the user is told once per run, and the next look tries again).
+    /// so, when that copy can't be made (the user is told once per run, and the next look tries again; always, for something
+    /// the user asked for).
     @discardableResult
-    func moveSpaces(_ switches: [EngineMigration.Plan.Switch]) -> Bool {
+    func moveSpaces(_ switches: [EngineMigration.Plan.Switch], userAsked: Bool = false) -> Bool {
         guard !switches.isEmpty, let paths else { return false }
         do { try LibraryStore(paths: paths).keepBeforeEngineUpdate() }
         catch {
-            if !engineBackupWarned {
+            if userAsked || !engineBackupWarned {
                 engineBackupWarned = true
                 errorMessage = "G-Player couldn't keep a copy of library.json before updating G-Player Wine, so your spaces stay on the old version for now. \(error.localizedDescription)"
             }

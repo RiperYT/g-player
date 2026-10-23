@@ -113,6 +113,14 @@ public enum EngineMigration {
         return plan(spaces: [space], installed: installed, busy: []).switches.first { $0.to == engine.id }
     }
 
+    /// The user switches `space` to `info` on its page. From a retired engine to its replacement it is the move the app makes by
+    /// itself (the same Wine, so what was learned about the games' graphics and the launch records go with the space). Nil for any
+    /// other switch: another Wine learns afresh.
+    public static func switchBetweenRevisions(of space: Space, to info: EngineInfo) -> Plan.Switch? {
+        guard space.engineID != info.id, EngineCatalog.isRevision(space.engineID, of: info) else { return nil }
+        return Plan.Switch(space: space.id, from: space.engineID, to: info.id)
+    }
+
     /// Puts the plan's spaces on their new engines, and what G-Player learned about their games' graphics with them: the
     /// replacement is the same Wine, so the learning still holds. A space that is no longer on the engine the plan saw (the
     /// user switched it meanwhile) is left as it is, and so is one G-Player may not change (the user said no meanwhile).
