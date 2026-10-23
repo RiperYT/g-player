@@ -319,3 +319,13 @@ import Testing
         #expect(EpicWay.legendary.detail.hasPrefix("Faster, through Legendary, an open-source Epic client not made by Epic"))
     }
 }
+
+@Suite struct EpicLauncherMoveTests {
+    /// Started on Wine Staging, Epic's launcher only ever showed its loading screen: the move is offered instead.
+    @Test func epicsLauncherOffersTheMoveOffGPlayerWine() {
+        #expect(AppPresets.epic.offersMoveBeforeStart(on: .wineStaging))
+        #expect(AppPresets.epic.offersMoveBeforeStart(on: .gptk))
+        #expect(!AppPresets.epic.offersMoveBeforeStart(on: .crossover))
+        #expect(!AppPresets.steam.offersMoveBeforeStart(on: .wineStaging))
+    }
+}

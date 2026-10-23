@@ -1401,6 +1401,12 @@ final class AppModel {
             ? EngineMigration.startNeedsConsent(found, installed: installedEngineIDs)
             : askBeforeNewEngine(for: found) { [weak self] in if let g = self?.game(game.id) { self?.play(g, skipping: skipped) } }
         if held { return false }
+        // Epic's launcher never gets past its loading screen off G-Player Wine: the move is offered instead of that start.
+        if game.kind == .app, retry == nil, let preset = AppPresets.preset(found.presetID),
+           preset.offersMoveBeforeStart(on: (EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging).kind) {
+            offerGPlayerWine(for: game.id, because: "\(preset.name) opens only on \(EngineCatalog.crossover.name).")
+            return false
+        }
         guard let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
         // The space as it is now: the engine that was just installed may be the replacement of the one it was on, and then the
         // launch, and what it records, belong to the engine it runs on.

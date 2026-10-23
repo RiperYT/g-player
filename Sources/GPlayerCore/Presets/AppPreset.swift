@@ -37,6 +37,10 @@ public struct AppPreset: Identifiable, Sendable, Hashable {
         public var backends: [GraphicsBackend] = []
     }
 
+    /// A start of the launcher on this engine kind is replaced by the offer to move its space to G-Player Wine: elsewhere it
+    /// never gets past its loading screen.
+    public func offersMoveBeforeStart(on engine: EngineInfo.Kind) -> Bool { needsGPlayerWine && engine != .crossover }
+
     /// The helpers to wrap before a start on this engine kind.
     public func helpersToWrap(on engine: EngineInfo.Kind) -> [String] {
         engineRecipes[engine]?.wrapsHelpers == false ? [] : chromiumHelpers

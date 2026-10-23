@@ -10,6 +10,8 @@ struct EngineMove: Identifiable {
     /// G-Player Wine (Wine 11.0) is older than what the space runs now (Wine Staging 11.18).
     let olderWine: Bool
     let downloadMB: Int64
+    /// Why the move is offered when it isn't the game's DirectX 12 ("Epic Games Launcher opens only on G-Player Wine.").
+    var reason: String? = nil
 }
 
 extension AppModel {
@@ -93,12 +95,13 @@ extension AppModel {
     var d3dMetalAvailable: Bool { useAppleToolkit && (d3dMetal != nil || D3DMetalStore.toolkitSource != nil) }
 
     /// Asks before moving the game's space to G-Player Wine (`moveToGPlayerWine`).
-    func offerGPlayerWine(for gameID: UUID) {
+    func offerGPlayerWine(for gameID: UUID, because reason: String? = nil) {
         guard let game = game(gameID), let space = space(game.spaceID) else { return }
         let info = EngineCatalog.info(space.engineID)
         let from = info?.displayName ?? space.engineID
         let mb = Int64(EngineCatalog.megabytes(downloadSize(of: EngineCatalog.crossover)))
-        engineMove = EngineMove(gameID: gameID, spaceName: space.name, fromEngine: from, olderWine: info?.kind == .wineStaging, downloadMB: mb)
+        engineMove = EngineMove(gameID: gameID, spaceName: space.name, fromEngine: from, olderWine: info?.kind == .wineStaging, downloadMB: mb,
+                                reason: reason)
     }
 
     /// Moves the game's whole space to G-Player Wine and starts the game: G-Player Wine downloads first (nothing changes
