@@ -162,23 +162,24 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(merged.games == [mine, steam, elsewhere])
     }
 
-    @Test func theListOfOwnedGamesIsKeptAndForgotten() throws {
+    @Test func theAccountAndTheListOfOwnedGamesAreKeptAndForgotten() throws {
         let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
-        #expect(EpicGames.loadList(in: paths).isEmpty)
-        let games = [EpicGame(appName: "SampleApp", title: "Sample Game", coverURL: URL(string: "https://cdn.example/t.jpg")),
-                     EpicGame(appName: "Other", title: "Other Game")]
-        try EpicGames.saveList(games, in: paths)
-        #expect(EpicGames.loadList(in: paths) == games)
-        EpicGames.forgetList(in: paths)
-        #expect(EpicGames.loadList(in: paths).isEmpty)
+        #expect(EpicGames.loadCache(in: paths) == EpicGames.Cache())
+        let cache = EpicGames.Cache(account: "Sample Player", games: [
+            EpicGame(appName: "SampleApp", title: "Sample Game", coverURL: URL(string: "https://cdn.example/t.jpg")),
+            EpicGame(appName: "Other", title: "Other Game")])
+        try EpicGames.saveCache(cache, in: paths)
+        #expect(EpicGames.loadCache(in: paths) == cache)
+        EpicGames.forgetCache(in: paths)
+        #expect(EpicGames.loadCache(in: paths) == EpicGames.Cache())
     }
 
-    @Test func theKeptListIsPrivateToTheUserFromItsFirstByte() throws {
+    @Test func theKeptCacheIsPrivateToTheUserFromItsFirstByte() throws {
         let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
-        try EpicGames.saveList([EpicGame(appName: "SampleApp", title: "Sample Game")], in: paths)
-        func mode() throws -> Int { (try FileManager.default.attributesOfItem(atPath: EpicGames.listFile(in: paths).path)[.posixPermissions] as? Int) ?? 0 }
+        try EpicGames.saveCache(EpicGames.Cache(account: "Sample Player", games: [EpicGame(appName: "SampleApp", title: "Sample Game")]), in: paths)
+        func mode() throws -> Int { (try FileManager.default.attributesOfItem(atPath: EpicGames.cacheFile(in: paths).path)[.posixPermissions] as? Int) ?? 0 }
         #expect(try mode() == 0o600)
-        try EpicGames.saveList([], in: paths)                                                // a second save keeps it private
+        try EpicGames.saveCache(EpicGames.Cache(), in: paths)                                // a second save keeps it private
         #expect(try mode() == 0o600)
         let left = try FileManager.default.contentsOfDirectory(atPath: paths.tools.path)
         #expect(left == ["epic-library.json"])                                                // no temporary file is left behind
@@ -193,13 +194,15 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(try FileManager.default.contentsOfDirectory(atPath: paths.tools.path) == ["epic-library.json"])
     }
 
-    @Test func aListThatCannotBeReadIsEmptyAndABadNameIsDropped() throws {
+    @Test func aCacheThatCannotBeReadIsEmptyAndABadNameIsDropped() throws {
         let paths = LibraryPaths(root: tmp.url.appendingPathComponent("Library"))
         try FileManager.default.createDirectory(at: paths.tools, withIntermediateDirectories: true)
-        try Data("not json".utf8).write(to: EpicGames.listFile(in: paths))
-        #expect(EpicGames.loadList(in: paths).isEmpty)
-        try Data(#"[{"appName": "--force", "title": "Bad"}, {"appName": "Fine", "title": "Fine"}]"#.utf8).write(to: EpicGames.listFile(in: paths))
-        #expect(EpicGames.loadList(in: paths).map(\.appName) == ["Fine"])
+        try Data("not json".utf8).write(to: EpicGames.cacheFile(in: paths))
+        #expect(EpicGames.loadCache(in: paths) == EpicGames.Cache())
+        try Data(#"{"account": "Sample Player", "games": [{"appName": "--force", "title": "Bad"}, {"appName": "Fine", "title": "Fine"}]}"#.utf8)
+            .write(to: EpicGames.cacheFile(in: paths))
+        let cache = EpicGames.loadCache(in: paths)
+        #expect(cache.account == "Sample Player" && cache.games.map(\.appName) == ["Fine"])
     }
 
     @Test func aCoverIsNamedAfterTheGameOnlyWhenTheNameIsLegendarys() {
@@ -427,5 +430,53 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         let note = try #require(EpicGames.note(for: .notRecorded, title: "Sample Game"))
         #expect(note.title == "Not installed" && note.detail.contains("Remove it from the library"))
         #expect(note.removal.contains("leaves the library") && note.removal.contains("no file is deleted"))
+    }
+}
+
+@Suite struct EpicInstallQuestionTests {
+    private let gigabytes: Int64 = 1_000_000_000
+
+    @Test func theQuestionSaysWhereTheGameGoesAndWhatItTakes() {
+        let details = EpicGames.installDetails(sizeBytes: 20 * gigabytes, availableBytes: 100 * gigabytes, spaceExists: true, engineDownloadBytes: nil)
+        #expect(details.lines == ["It takes about \((20 * gigabytes).formattedBytes) on disk.", "It goes into the “Epic Games” space."])
+        #expect(details.problem == nil)
+    }
+
+    @Test func aSpaceThatIsNotThereYetIsMadeFirstAndSaidSo() {
+        let details = EpicGames.installDetails(sizeBytes: nil, availableBytes: nil, spaceExists: false, engineDownloadBytes: nil)
+        #expect(details.lines == ["It goes into the “Epic Games” space, which G-Player makes first."])
+        #expect(details.problem == nil)                                                        // no size known: nothing to refuse for
+    }
+
+    @Test func gPlayerWineThatIsNotThereIsDownloadedFirstAndSaidSo() {
+        let details = EpicGames.installDetails(sizeBytes: nil, availableBytes: nil, spaceExists: false, engineDownloadBytes: 450_400_000)
+        #expect(details.lines.count == 2)
+        #expect(details.lines[1] == "G-Player Wine isn't installed yet, so G-Player downloads it first (about 450 MB).")
+    }
+
+    @Test func aDiskThatIsTooSmallIsAProblem() {
+        let details = EpicGames.installDetails(sizeBytes: 50 * gigabytes, availableBytes: 10 * gigabytes, spaceExists: true, engineDownloadBytes: nil)
+        #expect(details.problem == "It needs about \((50 * gigabytes).formattedBytes) free, and this disk has \((10 * gigabytes).formattedBytes). Free some space, then try again.")
+        #expect(EpicGames.installDetails(sizeBytes: 50 * gigabytes, availableBytes: nil, spaceExists: true, engineDownloadBytes: nil).problem == nil)
+    }
+
+    @Test func theSpaceIsMadeOnGPlayerWineNeverOnWineStaging() {
+        let staging = EngineCatalog.wineStaging
+        #expect(EpicGames.engineForSpace(installed: []).id == EngineCatalog.crossover.id)
+        #expect(EpicGames.engineForSpace(installed: [staging]).id == EngineCatalog.crossover.id)           // not what a new space gets
+        #expect(EngineCatalog.engineForNewSpace(installed: [staging]).id == staging.id)                    // (which would have been Staging)
+        #expect(EpicGames.engineForSpace(installed: [staging, EngineCatalog.crossover]).id == EngineCatalog.crossover.id)
+        // A G-Player Wine that is installed, even a retired revision, is used rather than downloading another.
+        #expect(EpicGames.engineForSpace(installed: [EngineCatalog.crossoverRevision1, staging]).id == EngineCatalog.crossoverRevision1.id)
+    }
+
+    @Test func aGameStartedOfflineSaysWhy() {
+        #expect(EpicGames.offlineNote(reason: "Epic Games can't be reached.") == "Started offline: Epic Games can't be reached.")
+        #expect(EpicGames.askingEpic == "Asking Epic for the launch parameters…")
+    }
+
+    @Test func theDownloadIsDescribedFromThePin() {
+        let text = Legendary.downloadSummary
+        #expect(text.contains("open-source") && text.contains("github.com") && text.contains(Legendary.download.approximateBytes.formattedBytes))
     }
 }

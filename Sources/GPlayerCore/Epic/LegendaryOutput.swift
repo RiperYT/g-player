@@ -200,4 +200,13 @@ public enum LegendaryOutput {
                                eglParameters: list("egl_parameters"),
                                environment: environment(from: object["environment"], allowing: allowed))
     }
+
+    // MARK: Info
+
+    /// What the game takes on disk once installed, in bytes, from `info <app> --json` (`manifest.disk_size`). Nil when Epic gave none.
+    public static func installSize(info output: String) -> Int64? {
+        guard let object = json(output) as? [String: Any], let manifest = object["manifest"] as? [String: Any],
+              let size = (manifest["disk_size"] as? NSNumber)?.int64Value, size > 0 else { return nil }
+        return size
+    }
 }

@@ -94,6 +94,10 @@ private let sampleInstalled = """
         #expect(LegendaryCommand.launch(appName: "SampleApp", wine: wine, offline: true) == online + ["--offline"])
     }
 
+    @Test func theInfoOfAGameIsAskedForWindows() {
+        #expect(LegendaryCommand.info(appName: "SampleApp") == ["-y", "info", "SampleApp", "--json", "--platform", "Windows"])
+    }
+
     @Test func uninstallKeepsTheFilesOnlyWhenAsked() {
         #expect(LegendaryCommand.uninstall(appName: "SampleApp") == ["-y", "uninstall", "SampleApp"])
         #expect(LegendaryCommand.uninstall(appName: "SampleApp", keepFiles: true) == ["-y", "uninstall", "SampleApp", "--keep-files"])
@@ -208,6 +212,13 @@ private let sampleInstalled = """
     @Test func addOnsAndGamesAnotherStoreInstallsAreNotOffered() throws {
         let names = try #require(LegendaryOutput.library(library)).map(\.appName)
         #expect(!names.contains("Pack") && !names.contains("Theirs") && !names.contains("ZetaPack"))
+    }
+
+    @Test func theInstallSizeIsTheManifestsDiskSize() {
+        #expect(LegendaryOutput.installSize(info: #"{"game": {}, "install": null, "manifest": {"disk_size": 21474836480, "download_size": 5}}"#) == 21_474_836_480)
+        #expect(LegendaryOutput.installSize(info: #"{"manifest": null}"#) == nil)
+        #expect(LegendaryOutput.installSize(info: #"{"manifest": {"disk_size": 0}}"#) == nil)
+        #expect(LegendaryOutput.installSize(info: "nope") == nil)
     }
 
     @Test func anAnswerThatIsNotAListGivesNothing() {
@@ -746,6 +757,17 @@ private let sampleInstalled = """
         let asked = Sizes()
         try await legendary.install("SampleApp", basePath: tmp.url.appendingPathComponent("base"), hasRoom: { asked.add($0); return nil }) { _ in }
         #expect(asked.all == [10 * 1_048_576])
+    }
+
+    @Test func theSizeOfAGameComesFromItsInfoAndIsNilWhenEpicCantSay() async throws {
+        let known = try stand(in: """
+        case "$2" in info) echo '{"game": {}, "manifest": {"disk_size": 5368709120, "download_size": 1}}' ;; esac
+        """)
+        #expect(await known.installSize(of: "SampleApp") == 5_368_709_120)
+        #expect(calls() == [["-y", "info", "SampleApp", "--json", "--platform", "Windows"]])
+        let unknown = try stand(in: "echo '[cli] ERROR: Could not find \"SampleApp\"' >&2; exit 1")
+        #expect(await unknown.installSize(of: "SampleApp") == nil)
+        #expect(await unknown.installSize(of: "--force") == nil)
     }
 
     @Test func anInstallForSomethingThatIsNotAnAppNameNeverRuns() async throws {

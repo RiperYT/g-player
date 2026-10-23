@@ -22,25 +22,75 @@ public enum EpicGames {
         LegendaryCommand.isAppName(appName) ? "epic-\(appName).jpg" : nil
     }
 
-    // MARK: The list of owned games, kept between runs
-
-    /// What Epic last said the account owns, so the page has it at the next start, offline too. It lives next to Legendary's
-    /// own files (`Tools`), apart from `library.json`: it is a copy of what Epic knows, not something the user made.
-    public static func listFile(in paths: LibraryPaths) -> URL { paths.tools.appendingPathComponent("epic-library.json") }
-
-    /// The kept list; empty when there is none or it can't be read. A name that isn't Legendary's is dropped.
-    public static func loadList(in paths: LibraryPaths) -> [EpicGame] {
-        guard let data = try? Data(contentsOf: listFile(in: paths)),
-              let games = try? JSONDecoder().decode([EpicGame].self, from: data) else { return [] }
-        return games.filter { LegendaryCommand.isAppName($0.appName) }
+    /// The engine of the Epic Games space: the installed G-Player Wine (the current revision, or a retired one that moves later), else
+    /// G-Player Wine itself, which then downloads. Never Wine Staging, which `EngineCatalog.engineForNewSpace` gives when that is
+    /// all there is: Epic's games are run on G-Player Wine.
+    public static func engineForSpace(installed: [EngineInfo]) -> EngineInfo {
+        EngineCatalog.installedGPlayerWine(in: installed) ?? EngineCatalog.defaultForNewSpaces
     }
 
-    public static func saveList(_ games: [EpicGame], in paths: LibraryPaths) throws {
-        try Files.writePrivately(JSONEncoder().encode(games), to: listFile(in: paths))
+    // MARK: Before an install
+
+    /// What the install question tells: where the game goes, what G-Player has to fetch first, how much room it takes.
+    public struct InstallDetails: Equatable, Sendable {
+        public let lines: [String]
+        /// Why it can't be installed (the disk is too small), or nil.
+        public let problem: String?
     }
 
-    /// Signing out takes the account's list with it.
-    public static func forgetList(in paths: LibraryPaths) { try? FileManager.default.removeItem(at: listFile(in: paths)) }
+    /// - Parameters:
+    ///   - sizeBytes: what the game takes once installed, from Legendary; nil when not known (yet).
+    ///   - availableBytes: free room on the disk, nil when it can't be told.
+    ///   - spaceExists: the Epic Games space is there; otherwise it is made first.
+    ///   - engineDownloadBytes: what G-Player Wine still has to download first, nil when it is installed.
+    public static func installDetails(sizeBytes: Int64?, availableBytes: Int64?, spaceExists: Bool,
+                                      engineDownloadBytes: Int64?) -> InstallDetails {
+        var lines: [String] = []
+        if let sizeBytes { lines.append("It takes about \(sizeBytes.formattedBytes) on disk.") }
+        lines.append(spaceExists ? "It goes into the “\(spaceName)” space."
+                                 : "It goes into the “\(spaceName)” space, which G-Player makes first.")
+        if let engineDownloadBytes {
+            lines.append("G-Player Wine isn't installed yet, so G-Player downloads it first (about \(EngineCatalog.megabytes(engineDownloadBytes)) MB).")
+        }
+        let problem = sizeBytes.flatMap { DiskSpace.problem(needing: $0, available: availableBytes, for: "It") }
+        return InstallDetails(lines: lines, problem: problem)
+    }
+
+    // MARK: Starting
+
+    /// What the game's tile says while Legendary is asked how to start it (a few seconds, and up to `Legendary.Limits` when Epic is slow).
+    public static let askingEpic = "Asking Epic for the launch parameters…"
+
+    /// The one line for a game that was started without Epic's login, since Epic couldn't be reached.
+    public static func offlineNote(reason: String) -> String { "Started offline: \(reason)" }
+
+    // MARK: What is kept between runs
+
+    /// What is kept on disk about the account, so the page has it at the next start, offline too: who was signed in (a look
+    /// that fails then doesn't make the page look signed out) and the games Epic said it owns. It lives next to Legendary's own
+    /// files (`Tools`), apart from `library.json`, readable by the user only: it is a copy of what Epic knows, not something the
+    /// user made.
+    public struct Cache: Codable, Equatable, Sendable {
+        public var account: String?
+        public var games: [EpicGame]
+        public init(account: String? = nil, games: [EpicGame] = []) { self.account = account; self.games = games }
+    }
+
+    public static func cacheFile(in paths: LibraryPaths) -> URL { paths.tools.appendingPathComponent("epic-library.json") }
+
+    /// What was kept; empty when there is nothing or it can't be read. A game with a name that isn't Legendary's is dropped.
+    public static func loadCache(in paths: LibraryPaths) -> Cache {
+        guard let data = try? Data(contentsOf: cacheFile(in: paths)), var cache = try? JSONDecoder().decode(Cache.self, from: data) else { return Cache() }
+        cache.games = cache.games.filter { LegendaryCommand.isAppName($0.appName) }
+        return cache
+    }
+
+    public static func saveCache(_ cache: Cache, in paths: LibraryPaths) throws {
+        try Files.writePrivately(JSONEncoder().encode(cache), to: cacheFile(in: paths))
+    }
+
+    /// Signing out takes the account's name and list with it.
+    public static func forgetCache(in paths: LibraryPaths) { try? FileManager.default.removeItem(at: cacheFile(in: paths)) }
 
     // MARK: What may happen at the same time
 

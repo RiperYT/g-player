@@ -35,10 +35,29 @@ public enum EpicSignIn {
         return nil
     }
 
+    /// True for an address on Epic's own domain, where the page is told the browser is the Epic Games Launcher. A sign-in with
+    /// Google or Apple, on their pages, gets the browser's own name.
+    public static func usesLauncherAgent(for url: URL?) -> Bool {
+        guard let url, url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else { return false }
+        return host == "epicgames.com" || host.hasSuffix(".epicgames.com")
+    }
+
+    /// The code of a navigation about to happen: only one of the page itself (`isMainFrame`; a frame inside a page, an ad or a
+    /// widget, is not where the user's sign-in ends) and only to `localhost` with a code. Nil otherwise.
+    public static func code(navigatingTo url: URL, isMainFrame: Bool) -> String? {
+        isMainFrame ? code(fromRedirect: url) : nil
+    }
+
+    /// The code from the text of a page that finished loading: only Epic's redirect page, only the page itself, never a page of
+    /// another address however much it looks like the answer.
+    public static func code(fromPage url: URL?, isMainFrame: Bool, text: String) -> String? {
+        isMainFrame && isRedirectPage(url) ? code(fromPageBody: text) : nil
+    }
+
     /// The code from an address on `localhost` with `?code=…`: where the redirect leads when the page isn't shown (Heroic
-    /// watches for it too). Nil for any other host.
+    /// watches for it too), over http or https. Nil for any other host or scheme.
     public static func code(fromRedirect url: URL) -> String? {
-        guard url.host?.lowercased() == "localhost",
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host?.lowercased() == "localhost",
               let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
               let code = items.first(where: { $0.name == "code" })?.value else { return nil }
         return plausible(code)

@@ -24,6 +24,11 @@ public enum LegendaryCommand {
 
     public static var installed: [String] { command(["list-installed", "--json"]) }
 
+    /// What Epic says about a game, among it how much room it takes once installed. Asks Epic.
+    public static func info(appName: String) -> [String] {
+        command(["info", appName, "--json", "--platform", platform])
+    }
+
     /// Installs a game under `basePath`. The two `--skip` flags keep it from asking: Legendary asks which language packs to get
     /// for the games that have them, and with `-y` it would install every add-on without being asked.
     public static func install(appName: String, basePath: URL) -> [String] {

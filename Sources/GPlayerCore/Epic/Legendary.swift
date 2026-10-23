@@ -18,6 +18,12 @@ public struct Legendary: Sendable {
         sha256: "d87978321dba9cb731fab40c72f0a30bed55baca8b5341ab21024c5733cd837e",
         approximateBytes: 15_275_984)
 
+    /// What the first sign-in downloads, in a few words for the user: its size and where from, taken from the pin so the words
+    /// can't drift from what is downloaded.
+    public static var downloadSummary: String {
+        "Legendary, an open-source program (\(download.approximateBytes.formattedBytes)), from \(download.url.host ?? "GitHub")"
+    }
+
     public let paths: LibraryPaths
     /// A stand-in program, for tests.
     private let override: URL?
@@ -34,6 +40,7 @@ public struct Legendary: Sendable {
         var library: TimeInterval = 5 * 60    // a big library the first time
         var uninstall: TimeInterval = 10 * 60
         var relink: TimeInterval = 60
+        var info: TimeInterval = 2 * 60
         var onlineLaunch: TimeInterval = 60   // login, a token, and the answer
         var offlineLaunch: TimeInterval = 30
     }
@@ -276,6 +283,13 @@ public struct Legendary: Sendable {
         let result = try await run(LegendaryCommand.installed, timeout: limits.quick)
         guard result.succeeded, let games = LegendaryOutput.installed(result.stdout) else { throw fail(result) }
         return games
+    }
+
+    /// What a game takes on disk once installed, from Epic. Nil when Epic can't say (the install checks its own room anyway).
+    public func installSize(of appName: String) async -> Int64? {
+        guard LegendaryCommand.isAppName(appName),
+              let result = try? await run(LegendaryCommand.info(appName: appName), timeout: limits.info), result.succeeded else { return nil }
+        return LegendaryOutput.installSize(info: result.stdout)
     }
 
     /// Installs a game into `basePath` (Legendary makes the game's own folder in it) and waits. `status` hears how far it is.
