@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.3] - 2026-10-23
 
 - **Game videos play on G-Player Wine.** Intros and cutscenes that go through Windows Media Foundation can play now.
   G-Player Wine comes with GStreamer for it: when G-Player installs G-Player Wine it also downloads GStreamer's official
@@ -43,6 +43,11 @@
   fixes later, can use it. You type the game's name, you see the whole text first, and you can copy it instead. It has no
   file paths, user name, logs or store IDs (the Steam app ID only if you tick the box), and settings with a path or your
   name in them show as hidden. G-Player sends nothing itself: nothing reaches GitHub until you submit the issue there.
+- **A game that starts Steam no longer asks to restart Steam again and again.** A Steam game had a minute to show up from
+  the moment you pressed Play, and a Steam that starts cold can take longer before it even starts the game: G-Player
+  said the game didn't open and offered other graphics, which restart Steam. A launch that starts Steam now gives it four
+  minutes. Steam's web helpers that stay behind after Steam has quit are closed, so quitting Steam for a restart no
+  longer waits a minute and fails, and a Steam started after it gets going.
 
 ## [0.4.2] - 2026-10-23
 
