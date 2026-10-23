@@ -92,6 +92,39 @@ public enum EpicGames {
     /// Signing out takes the account's name and list with it.
     public static func forgetCache(in paths: LibraryPaths) { try? FileManager.default.removeItem(at: cacheFile(in: paths)) }
 
+    // MARK: What the page shows
+
+    /// The account the page shows after a look at Legendary: what the look says when it could ask (nobody, when Legendary says
+    /// "not logged in"), and what it was before when it couldn't. A look that fails says nothing about being signed out.
+    public static func account(afterLook look: Result<LegendaryStatus, Error>, was previous: String?) -> String? {
+        switch look {
+        case .success(let status): status.account
+        case .failure: previous
+        }
+    }
+
+    /// The line for a look that failed.
+    public static func lookFailureLine(_ error: Error) -> String { "Couldn't reach Legendary: \(error.localizedDescription)" }
+
+    /// Which of the page's states is shown: the account and its games, the sign-in card, a wait, or only the failure.
+    public enum Page: Equatable, Sendable { case signedIn, signedOut, checking, failed }
+
+    public static func page(account: String?, looked: Bool, lookFailed: Bool) -> Page {
+        if account != nil { return .signedIn }                 // also with a failed look: what was known stays, with the failure above
+        if lookFailed { return .failed }                       // nothing known, and nothing can be said about it
+        return looked ? .signedOut : .checking
+    }
+
+    /// What the list of games shows.
+    public enum ListContent: Equatable, Sendable { case games, loading, empty, failureOnly }
+
+    /// A list that is there (kept from the last time) is shown whatever happened since: a failed fetch is a line above it.
+    public static func listContent(hasGames: Bool, fetched: Bool, fetchFailed: Bool) -> ListContent {
+        if hasGames { return .games }
+        if fetchFailed { return .failureOnly }
+        return fetched ? .empty : .loading
+    }
+
     // MARK: What may happen at the same time
 
     /// Why a game can't be uninstalled right now (for the button's help), or nil. A running game has its files open and a starting

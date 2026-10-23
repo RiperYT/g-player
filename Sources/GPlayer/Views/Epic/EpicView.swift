@@ -18,13 +18,11 @@ struct EpicView: View {
                 if let failure = model.epic.lookFailure {
                     EpicFailureLine(text: failure) { Task { await model.refreshEpic() } }
                 }
-                if let account = model.epic.account {
-                    EpicAccountRow(account: account)
-                    EpicGameList(search: search)
-                } else if !model.epic.looked {
-                    ProgressView().controlSize(.small)
-                } else if model.epic.lookFailure == nil {
-                    EpicSignedOut()
+                switch EpicGames.page(account: model.epic.account, looked: model.epic.looked, lookFailed: model.epic.lookFailure != nil) {
+                case .signedIn: EpicAccountRow(account: model.epic.account ?? ""); EpicGameList(search: search)
+                case .checking: ProgressView().controlSize(.small)
+                case .signedOut: EpicSignedOut()
+                case .failed: EmptyView()
                 }
             }
             .padding(Theme.pagePadding)
@@ -100,7 +98,9 @@ private struct EpicGameList: View {
         // A failed fetch is a line above the list that was there (the cached one), with its Play and Uninstall.
         VStack(alignment: .leading, spacing: 22) {
             if let failure = model.epic.refreshFailure { EpicListFailure(text: failure) }
-            if !model.epic.games.isEmpty {
+            switch EpicGames.listContent(hasGames: !model.epic.games.isEmpty, fetched: model.epic.fetched,
+                                         fetchFailed: model.epic.refreshFailure != nil) {
+            case .games:
                 if shown.isEmpty {
                     ContentUnavailableView.search(text: search)
                 } else {
@@ -108,13 +108,13 @@ private struct EpicGameList: View {
                     if !installed.isEmpty { EpicSection(title: "Installed", games: installed) }
                     if !others.isEmpty { EpicSection(title: "Not installed", games: others) }
                 }
-            } else if model.epic.refreshFailure == nil {
-                if !model.epic.fetched {
-                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Getting your games…").foregroundStyle(.secondary) }
-                } else {
-                    ContentUnavailableView("No games found", systemImage: "shippingbox",
-                                           description: Text("Epic lists no Windows games for this account. Refresh to ask again."))
-                }
+            case .loading:
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Getting your games…").foregroundStyle(.secondary) }
+            case .empty:
+                ContentUnavailableView("No games found", systemImage: "shippingbox",
+                                       description: Text("Epic lists no Windows games for this account. Refresh to ask again."))
+            case .failureOnly:
+                EmptyView()
             }
         }
     }

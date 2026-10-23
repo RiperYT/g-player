@@ -480,3 +480,35 @@ private func launchJSON(folder: String, game: String = "Bin/Sample.exe", paramet
         #expect(text.contains("open-source") && text.contains("github.com") && text.contains(Legendary.download.approximateBytes.formattedBytes))
     }
 }
+
+@Suite struct EpicPageTests {
+    private struct Boom: LocalizedError { var errorDescription: String? { "the file is gone" } }
+
+    @Test func aLookThatSaysNobodyIsSignedInIsTheOnlyWayToBeSignedOut() {
+        #expect(EpicGames.account(afterLook: .success(LegendaryStatus(account: nil)), was: "Sample Player") == nil)
+        #expect(EpicGames.account(afterLook: .success(LegendaryStatus(account: "Sample Player")), was: nil) == "Sample Player")
+        #expect(EpicGames.account(afterLook: .success(LegendaryStatus(account: "Other")), was: "Sample Player") == "Other")
+    }
+
+    @Test func aLookThatFailsKeepsWhoWasKnown() {
+        #expect(EpicGames.account(afterLook: .failure(Boom()), was: "Sample Player") == "Sample Player")
+        #expect(EpicGames.account(afterLook: .failure(Boom()), was: nil) == nil)
+        #expect(EpicGames.lookFailureLine(Boom()) == "Couldn't reach Legendary: the file is gone")
+    }
+
+    @Test func theSignedInPageStaysWhenALookFailsAndOnlyTheFailureShowsWhenNothingIsKnown() {
+        #expect(EpicGames.page(account: "Sample Player", looked: true, lookFailed: true) == .signedIn)
+        #expect(EpicGames.page(account: "Sample Player", looked: false, lookFailed: false) == .signedIn)       // from what was kept
+        #expect(EpicGames.page(account: nil, looked: true, lookFailed: true) == .failed)                       // not "sign in": nothing was learned
+        #expect(EpicGames.page(account: nil, looked: true, lookFailed: false) == .signedOut)
+        #expect(EpicGames.page(account: nil, looked: false, lookFailed: false) == .checking)
+    }
+
+    @Test func aListThatIsThereIsShownWhateverHappenedSince() {
+        #expect(EpicGames.listContent(hasGames: true, fetched: true, fetchFailed: true) == .games)           // with the failure above it
+        #expect(EpicGames.listContent(hasGames: true, fetched: false, fetchFailed: false) == .games)         // the kept one, while Epic is asked
+        #expect(EpicGames.listContent(hasGames: false, fetched: true, fetchFailed: true) == .failureOnly)
+        #expect(EpicGames.listContent(hasGames: false, fetched: false, fetchFailed: false) == .loading)
+        #expect(EpicGames.listContent(hasGames: false, fetched: true, fetchFailed: false) == .empty)
+    }
+}

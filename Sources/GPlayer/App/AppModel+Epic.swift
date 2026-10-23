@@ -96,7 +96,7 @@ extension AppModel {
         do {
             try await legendary.ensureInstalled()                         // the file is checked, and fetched again if it isn't the pinned one
             let status = try await legendary.status()
-            epic.account = status.account                                 // only Legendary saying "not logged in" means signed out
+            epic.account = EpicGames.account(afterLook: .success(status), was: epic.account)    // only "not logged in" means signed out
             if status.account == nil { epic.games = []; EpicGames.forgetCache(in: paths) } else { keepEpicCache() }
             let installed = try await legendary.installedGames()
             epic.installed = Dictionary(installed.map { ($0.appName, $0) }, uniquingKeysWith: { first, _ in first })
@@ -107,7 +107,8 @@ extension AppModel {
             // Nothing was learned, and nothing is said.
         } catch {
             // Nothing changes on the page but this line (and Try Again): the account and the games stay as they were.
-            epic.lookFailure = "Couldn't reach Legendary: \(error.localizedDescription)"
+            epic.account = EpicGames.account(afterLook: .failure(error), was: epic.account)
+            epic.lookFailure = EpicGames.lookFailureLine(error)
         }
         epic.looked = true
     }
