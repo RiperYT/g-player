@@ -1,15 +1,7 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.4] - 2026-10-24
 
-- **Epic's launcher stays signed in.** It signs its Epic Online Services token requests with an ECDSA key, which
-  G-Player Wine's Wine couldn't make: every request failed, the launcher went offline after a while, and a game started
-  then said it needs a signed-in launcher. G-Player puts Wine's own fix for it (ncrypt with ECDSA P-256) into G-Player
-  Wine 26.3.0-2, keeping the engine's files next to it.
-- **Epic's launcher can install games.** It waits for a file change notification before it installs, and G-Player Wine's
-  wineserver had none on a Mac: Install did nothing. G-Player puts a wineserver built with file change notifications
-  (libinotify) into G-Player Wine 26.3.0-2 by itself, keeping the engine's own one next to it. Quit G-Player and Epic's
-  launcher once after updating.
 - **Epic's own launcher opens on G-Player Wine.** The Epic Games Launcher no longer stops at its loading screen: it reaches
   Epic's sign-in page. G-Player starts it on G-Player Wine with Epic's own web helper (the Chromium helper wrapper made its
   network service crash again and again there) and on DXMT, also when you have added D3DMetal, whatever its library entry
@@ -30,6 +22,14 @@
   Wine, where it takes about 245 MB, and adds it to the launcher's space once; the launcher then starts with .NET on. Nothing else
   gets it: other apps and games start as before, and Wine Staging has none. In a bottle of another app it asks first, like
   every change G-Player makes there. A launcher that is already open keeps what it started with: quit it and open it again.
+- **Epic's launcher can install games.** It waits for a file change notification before it installs, and G-Player Wine's
+  wineserver had none on a Mac: Install did nothing. G-Player puts a wineserver built with file change notifications
+  (libinotify) into G-Player Wine 26.3.0-2 by itself, keeping the engine's own one next to it. Quit G-Player and Epic's
+  launcher once after updating.
+- **Epic's launcher stays signed in.** It signs its Epic Online Services token requests with an ECDSA key, which
+  G-Player Wine's Wine couldn't make: every request failed, the launcher went offline after a while, and a game started
+  then said it needs a signed-in launcher. G-Player puts Wine's own fix for it (ncrypt with ECDSA P-256) into G-Player
+  Wine 26.3.0-2, keeping the engine's files next to it.
 - **Epic games without Epic's launcher.** The card's second way, **Without the launcher**, opens the Epic Games page over Get
   Apps (with a back button). It signs you in on Epic's own page (with Epic, Google, Apple or whatever you use: G-Player never
   sees your password, and the window keeps nothing) and lists the games your account owns. **Install** puts a game into a space
@@ -49,7 +49,8 @@
 - **G-Player updates itself.** **G-Player › Check for Updates…** looks for a newer version and installs it, so you no
   longer download the disk image by hand. The second time G-Player opens it asks whether to check by itself (once a day);
   Settings › General turns that on or off. G-Player asks GitHub for the list of versions and sends nothing about your Mac,
-  and an update installs only if it is signed with G-Player's own update key.
+  and an update installs only if it is signed with G-Player's own update key. This version is the first that does it:
+  install 0.4.4 from its disk image once, and the next ones come by themselves.
 
 - Every engine install and update writes what it went through, and how it ended, to `Logs` in the library, so an update
   that failed in the background can be looked into later.
