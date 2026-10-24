@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>G-Player</title>
+    <item>
+      <title>G-Player 0.4.4</title>
+      <sparkle:version>136</sparkle:version>
+      <sparkle:shortVersionString>0.4.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/RiperYT/g-player/releases/tag/v0.4.4</sparkle:releaseNotesLink>
+      <pubDate>Sat, 24 Oct 2026 00:51:47 +0000</pubDate>
+      <enclosure url="https://github.com/RiperYT/g-player/releases/download/v0.4.4/G-Player-0.4.4.dmg" sparkle:edSignature="UYOHAoyso8TsF9KUv47lL52UWjv/2pGgp4dzQPzQYwii6oN+kHTZPFPY80tj0mhraReDyCMPB5MJGYuoHv/xCQ==" length="13335168" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
