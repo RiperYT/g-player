@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+ <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#151927"/><stop offset="1" stop-color="#080B12"/></linearGradient>
+  <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#66C9FF"/><stop offset=".52" stop-color="#6B7DFF"/><stop offset="1" stop-color="#AE6DFF"/></linearGradient>
+ </defs>
+ <rect width="1024" height="1024" rx="222" fill="url(#bg)"/>
+ <!-- Play silhouette is the central icon, with letter G recessed from its face -->
+ <path d="M292 190 Q260 173 260 221 L260 803 Q260 851 301 827 L800 543 Q847 516 800 489 Z" fill="url(#mark)"/>
+ <!-- Bold G: dark negative-space mark, deliberately offset left to fit triangle's taper -->
+ <path d="M580 375 A170 170 0 1 0 588 622 L588 525 L466 525" fill="none" stroke="#111525" stroke-width="76" stroke-linecap="square" stroke-linejoin="round"/>
+ </svg>
