@@ -260,11 +260,10 @@ public struct SpaceLoad: Sendable {
     /// What to tell the user after the space was stopped: what happened, and what usually causes it.
     public func message(spaceName: String) -> String {
         let what = explorers > Self.maxExplorers
-            ? "\(programs) Windows programs were running, \(explorers) of them Windows Explorer"
-            : "\(programs) Windows programs were running"
-        return "“\(spaceName)” was starting Windows programs without end: \(what). G-Player stopped everything in it "
-            + "to keep your Mac usable. A long folder path is the usual cause. Keep a space's path under "
-            + "\(PrefixPath.maxLength) characters."
+            ? String(localized: "\(programs) Windows programs were running, \(explorers) of them Windows Explorer")
+            : String(localized: "\(programs) Windows programs were running")
+        return String(localized: "“\(spaceName)” was starting Windows programs without end: \(what).") + " "
+            + String(localized: "G-Player stopped everything in it to keep your Mac usable. A long folder path is the usual cause. Keep a space's path under \(PrefixPath.maxLength) characters.")
     }
 }
 

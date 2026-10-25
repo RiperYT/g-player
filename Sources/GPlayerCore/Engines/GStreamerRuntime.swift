@@ -26,7 +26,7 @@ public enum GStreamerRuntime {
         let file = folder.appendingPathComponent(manifestName)
         guard FileManager.default.fileExists(atPath: file.path) else { return nil }
         guard let text = try? String(contentsOf: file, encoding: .utf8) else {
-            throw ShellError.failed("The engine's list of GStreamer files can't be read.")
+            throw ShellError.failed(String(localized: "The engine's list of GStreamer files can't be read."))
         }
         return try parse(text)
     }
@@ -39,13 +39,13 @@ public enum GStreamerRuntime {
         let head = lines.first?.split(separator: " ", omittingEmptySubsequences: true).map(String.init) ?? []
         guard head.count == 3, head[0] == "package", !head[1].contains("/"),
               head[2].count == 64, head[2].allSatisfy({ "0123456789abcdef".contains($0) }) else {
-            throw ShellError.failed("The engine's list of GStreamer files is damaged: it doesn't start with the package it needs.")
+            throw ShellError.failed(String(localized: "The engine's list of GStreamer files is damaged: it doesn't start with the package it needs."))
         }
         let files = Array(lines.dropFirst())
         for path in files where !isPlainRelative(path) {
-            throw ShellError.failed("The engine's list of GStreamer files is damaged: “\(path)” isn't a path inside the engine.")
+            throw ShellError.failed(String(localized: "The engine's list of GStreamer files is damaged: “\(path)” isn't a path inside the engine."))
         }
-        guard !files.isEmpty else { throw ShellError.failed("The engine's list of GStreamer files is empty.") }
+        guard !files.isEmpty else { throw ShellError.failed(String(localized: "The engine's list of GStreamer files is empty.")) }
         return Manifest(packageName: head[1], sha256: head[2], files: files)
     }
 
@@ -56,7 +56,7 @@ public enum GStreamerRuntime {
     /// The engine must want the package this G-Player knows (and pins): another one is a GStreamer it was never checked against.
     public static func check(_ manifest: Manifest, against pin: PinnedDownload) throws {
         guard manifest.packageName == pin.fileName, manifest.sha256 == pin.sha256 else {
-            throw ShellError.failed("This engine expects \(manifest.packageName), a GStreamer this version of G-Player doesn't know. Update G-Player, then try again.")
+            throw ShellError.failed(String(localized: "This engine expects \(manifest.packageName), a GStreamer this version of G-Player doesn't know. Update G-Player, then try again."))
         }
     }
 
@@ -72,7 +72,7 @@ public enum GStreamerRuntime {
         let inside = expanded.resolvingSymlinksInPath().path + "/"
         for path in manifest.files {
             guard let source = payloads.lazy.compactMap({ realFile($0.appendingPathComponent(path), inside: inside) }).first else {
-                throw ShellError.failed("GStreamer's package has no \(path), which G-Player Wine needs.")
+                throw ShellError.failed(String(localized: "GStreamer's package has no \(path), which G-Player Wine needs."))
             }
             let target = wineRoot.appendingPathComponent(path)
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)

@@ -86,7 +86,7 @@ public enum Shell {
         let script = "do shell script \"/usr/sbin/softwareupdate --install-rosetta --agree-to-license\" with administrator privileges"
         do { _ = try await runStoppable(tool("osascript"), ["-e", script], timeout: timeout) }
         catch is Supervised.TimedOut {
-            throw ShellError.failed("The Rosetta 2 install took longer than \(Int(timeout / 60)) minutes, so G-Player stopped waiting. Choose Install to try again.")
+            throw ShellError.failed(String(localized: "The Rosetta 2 install took longer than \(Int(timeout / 60)) minutes, so G-Player stopped waiting. Choose Install to try again."))
         }
     }
 

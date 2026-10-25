@@ -70,19 +70,19 @@ public enum ExecutableScanner {
         score += min(30, Int(size / 3_000_000))                     // bigger binaries tend to be the game
 
         if fm.fileExists(atPath: dir.appendingPathComponent("\(name)_Data").path) {
-            score += 60; hint = "Unity game"
+            score += 60; hint = String(localized: "Unity game")
         } else if lower.hasSuffix("-shipping") || lower.hasSuffix("-win64-shipping") {
-            score += 25; hint = "Unreal Engine game"
+            score += 25; hint = String(localized: "Unreal Engine game")
         } else if fm.fileExists(atPath: dir.appendingPathComponent("resources/app").path)
                     || fm.fileExists(atPath: dir.appendingPathComponent("resources/app.asar").path) {
-            score += 45; hint = "Electron game"
+            score += 45; hint = String(localized: "Electron game")
         } else if fm.fileExists(atPath: dir.appendingPathComponent("www/js").path)
                     || fm.fileExists(atPath: dir.appendingPathComponent("package.nw").path) {
-            score += 45; hint = "RPG Maker game"
+            score += 45; hint = String(localized: "RPG Maker game")
         }
         let simpleTitle = simplify(title)
         if !simpleTitle.isEmpty, simplify(name) == simpleTitle || simpleTitle.hasPrefix(simplify(name)) && name.count > 3 {
-            score += 35; hint = hint ?? "Same name as the game"
+            score += 35; hint = hint ?? String(localized: "Same name as the game")
         }
         if ["game", "start", "play", "launcher"].contains(lower) { score += 15 }
         if lower.contains("launcher") { score += 5 }

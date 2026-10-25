@@ -12,8 +12,8 @@ enum Supervised {
         var errorDescription: String? {
             let minutes = Int((seconds / 60).rounded())
             return minutes >= 1
-                ? "It took longer than \(minutes) minute\(minutes == 1 ? "" : "s"), so G-Player stopped it."
-                : "It took longer than \(Int(seconds.rounded())) seconds, so G-Player stopped it."
+                ? String(localized: "It took longer than \(minutes) minutes, so G-Player stopped it.")
+                : String(localized: "It took longer than \(Int(seconds.rounded())) seconds, so G-Player stopped it.")
         }
     }
 

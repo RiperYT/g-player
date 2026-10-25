@@ -186,7 +186,8 @@ struct EngineRows: View {
     }
 
     private func list(_ names: [String]) -> String {
-        names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.first ?? ""
+        guard names.count > 1, let last = names.last else { return names.first ?? "" }
+        return String(localized: "\(names.dropLast().joined(separator: ", ")) and \(last)", comment: "A list of names: “A, B and C”")
     }
 }
 
@@ -197,7 +198,7 @@ private struct EngineUpdateStatus: View {
 
     var body: some View {
         let download = model.download(of: info)
-        LabeledContent("Status") { Text(download?.message ?? "Starting").foregroundStyle(.secondary) }
+        LabeledContent("Status") { Text(download?.message ?? String(localized: "Starting")).foregroundStyle(.secondary) }
         if let progress = download?.progress { ProgressView(value: progress) }
         Text(EngineMigration.updateNote(for: info)).font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -254,7 +255,7 @@ struct AppleToolkitSection: View {
 
     private func chooseDownload() {
         let panel = NSOpenPanel()
-        panel.message = "Choose Apple's Game Porting Toolkit disk image, or an opened toolkit disk."
+        panel.message = String(localized: "Choose Apple's Game Porting Toolkit disk image, or an opened toolkit disk.")
         panel.allowedContentTypes = [.diskImage, .folder]
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
@@ -265,7 +266,7 @@ struct AppleToolkitSection: View {
 /// One numbered step of the toolkit how-to.
 private struct ToolkitStep: View {
     let number: Int
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {

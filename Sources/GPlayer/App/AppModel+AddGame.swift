@@ -45,10 +45,10 @@ extension AppModel {
     /// `CancellationError`. Whatever the installer was started from is deleted only after that, by the caller.
     func runInstaller(_ installer: URL, in space: Space, title: String, run: InstallerRun) async throws -> [ExecutableCandidate] {
         guard let paths else { throw CancellationError() }
-        let activity = begin("Installing “\(title)”", "Starting", waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
+        let activity = begin(String(localized: "Installing “\(title)”"), String(localized: "Starting"), waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
         defer { cancellers[activity] = nil; end(activity) }
-        setStop(activity, help: "Stop the installer. What it already installed stays.") { run.cancel() }
-        let queued = enqueue(in: space.id, holds: "the installer of “\(title)”") { () -> Result<[ExecutableCandidate], Error> in
+        setStop(activity, help: String(localized: "Stop the installer. What it already installed stays.")) { run.cancel() }
+        let queued = enqueue(in: space.id, holds: String(localized: "the installer of “\(title)”")) { () -> Result<[ExecutableCandidate], Error> in
             await self.runInstallerNow(installer, in: space, title: title, run: run, activity: activity, paths: paths)
         }
         // The queue's task isn't a child of this one, so cancelling this call has to reach it by the run.
@@ -72,12 +72,12 @@ extension AppModel {
         // The engine as it is now, in the installer's turn: unpacking the installer and waiting for the queue took time, and the
         // engine looked up when Add Game began may be another by now. (After `run.start()`: the caller waits for that.)
         guard let engine = await engineReady(for: space) else {
-            let reason = errorMessage ?? "\(EngineCatalog.info(space.engineID)?.name ?? "The engine") isn't available."
+            let reason = errorMessage ?? String(localized: "\(EngineCatalog.info(space.engineID)?.name ?? String(localized: "The engine")) isn't available.")
             errorMessage = nil                                      // told by the sheet instead, which goes back to its first step
             return .failure(ShellError.failed(reason))
         }
         if run.cancelled { return .failure(CancellationError()) }
-        progress(activity, nil, "Running \(installer.lastPathComponent)")
+        progress(activity, nil, String(localized: "Running \(installer.lastPathComponent)"))
         // Programs open in the space before the installer started aren't the installer's to stop.
         let wasBusy = await Self.isBusy(space)
         let before = await Task.detached(priority: .userInitiated) { ProgramSnapshot.take(of: space) }.value
@@ -106,7 +106,7 @@ extension AppModel {
             return .failure(CancellationError())
         }
         run.finish()
-        progress(activity, nil, "Looking for what it installed…")
+        progress(activity, nil, String(localized: "Looking for what it installed…"))
         let found = await Task.detached(priority: .userInitiated) { ProgramSnapshot.newPrograms(in: space, since: before) }.value
         return .success(found)
     }
@@ -119,7 +119,7 @@ extension AppModel {
     /// and no game files in it, so nothing the user put there meanwhile is lost.
     func discardEmptySpace(_ id: UUID) {
         guard let space = space(id), space.origin == .managed else { return }
-        enqueue(in: id, isInstall: false, holds: "“\(space.name)” to be removed") {
+        enqueue(in: id, isInstall: false, holds: String(localized: "“\(space.name)” to be removed")) {
             guard let space = self.space(id), self.state.games(in: space).isEmpty, SpaceManager.holdsNoGames(space) else { return }
             self.pendingComponents[id] = nil
             // Its Wine server may still be winding down after the components' installers: it goes first.

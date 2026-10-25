@@ -109,7 +109,7 @@ struct CartridgeLabel: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(running ? Color.green : space.color).frame(width: 5, height: 5)
-            Text(running ? "RUNNING" : "\(space.name) · \(engineName)")
+            Text(running ? "Running" : "\(space.name) · \(engineName)")
                 .font(Theme.label).tracking(0.6).lineLimit(1)
             Spacer(minLength: 0)
         }

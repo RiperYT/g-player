@@ -6,10 +6,10 @@ public enum PEArchitecture: String, Codable, Sendable, Hashable {
 
     public var displayName: String {
         switch self {
-        case .x86: "32-bit"
-        case .x64: "64-bit"
+        case .x86: String(localized: "32-bit")
+        case .x64: String(localized: "64-bit")
         case .arm64: "ARM64"
-        case .other: "Unknown"
+        case .other: String(localized: "Unknown")
         }
     }
 }
@@ -73,7 +73,7 @@ public enum PEInfo {
     /// The warning for a program that starts as 32-bit, or nil.
     public static func compatibilityNote(for details: PEDetails) -> String? {
         details.runsAs32Bit
-            ? "This is a 32-bit Windows program. If it uses DirectX 10 or 11, keep a profile with DXVK (Recommended): Wine's own renderer can't give those on a Mac."
+            ? String(localized: "This is a 32-bit Windows program. If it uses DirectX 10 or 11, keep a profile with DXVK (Recommended): Wine's own renderer can't give those on a Mac.")
             : nil
     }
 

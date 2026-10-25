@@ -19,16 +19,24 @@ public enum RuntimeCatalog {
     private static let vc = "Microsoft Visual C++ Redistributable license"
     private static let directX = "Microsoft DirectX End-User Runtime license"
     /// One download (directx_Jun2010_redist.exe, 100 MB) serves all of these.
-    private static let sharedDirectX = "Shares one 100 MB DirectX download with the other DirectX components."
+    private static let sharedDirectX = String(localized: "Shares one 100 MB DirectX download with the other DirectX components.")
 
-    private static func component(_ id: String, _ name: String, _ summary: String, _ bytes: Int64?,
-                                  base: Bool = false, license: String) -> RuntimeComponent {
-        RuntimeComponent(id: id, name: name, summary: summary, approximateBytes: bytes, isBase: base, license: license)
+    private static func component(_ id: String, _ name: String.LocalizationValue, _ summary: String.LocalizationValue,
+                                  _ bytes: Int64?, base: Bool = false, license: String) -> RuntimeComponent {
+        RuntimeComponent(id: id, name: String(localized: name), summary: String(localized: summary), approximateBytes: bytes,
+                         isBase: base, license: license)
+    }
+
+    /// A component named after a product (Visual C++, .NET, PhysX…): the name isn't translated.
+    private static func component(_ id: String, verbatim name: String, _ summary: String.LocalizationValue,
+                                  _ bytes: Int64?, base: Bool = false, license: String) -> RuntimeComponent {
+        RuntimeComponent(id: id, name: name, summary: String(localized: summary), approximateBytes: bytes,
+                         isBase: base, license: license)
     }
 
     /// Base set first, then the on-demand set. G-Player installs the base set itself; the rest goes through winetricks.
     public static let all: [RuntimeComponent] = [
-        component("vcrun2022", "Visual C++ 2015–2022", "The runtime most games need. 32- and 64-bit. Also stands in for the 2015, 2017 and 2019 runtimes.",
+        component("vcrun2022", verbatim: "Visual C++ 2015–2022", "The runtime most games need. 32- and 64-bit. Also stands in for the 2015, 2017 and 2019 runtimes.",
                   39_600_000, base: true, license: vc),
         component("d3dcompiler_47", "DirectX shader compiler", "Compiles shaders for DirectX 11 games.", 8_000_000, base: true,
                   license: "Microsoft DirectX shader compiler license"),
@@ -38,17 +46,17 @@ public enum RuntimeCatalog {
         component("d3dcompiler_43", "DirectX shader compiler 43", "For games built with the 2010 DirectX kit. \(sharedDirectX)", 100_300_000, license: directX),
         component("xact", "XACT audio", "The sound engine of many XNA and DirectX games. \(sharedDirectX)", 100_300_000, license: directX),
         component("xinput", "Xbox controller input", "Controller support for older games. \(sharedDirectX)", 100_300_000, license: directX),
-        component("dotnet48", ".NET Framework 4.8", "For games and launchers built on .NET. Installs .NET 4.0 first. Large and slow.", 123_200_000,
+        component("dotnet48", verbatim: ".NET Framework 4.8", "For games and launchers built on .NET. Installs .NET 4.0 first. Large and slow.", 123_200_000,
                   license: "Microsoft .NET Framework license"),
-        component("physx", "NVIDIA PhysX", "Physics for games that ask for the PhysX runtime.", 29_400_000,
+        component("physx", verbatim: "NVIDIA PhysX", "Physics for games that ask for the PhysX runtime.", 29_400_000,
                   license: "NVIDIA PhysX System Software license"),
-        component("xna40", "XNA Framework 4.0", "For games built with XNA. Installs .NET 4.0 too.", 57_500_000,
+        component("xna40", verbatim: "XNA Framework 4.0", "For games built with XNA. Installs .NET 4.0 too.", 57_500_000,
                   license: "Microsoft XNA Framework Redistributable license"),
-        component("openal", "OpenAL", "3D audio library some games need.", 600_000, license: "Creative Labs OpenAL installer license"),
-        component("mfc140", "Visual C++ 2015 MFC", "For programs built with Visual C++ 2015 and MFC.", 29_800_000, license: vc),
-        component("vcrun2013", "Visual C++ 2013", "For games built with Visual Studio 2013.", 13_700_000, license: vc),
-        component("vcrun2010", "Visual C++ 2010", "For games built with Visual Studio 2010.", 10_800_000, license: vc),
-        component("vcrun2008", "Visual C++ 2008", "For games built with Visual Studio 2008.", 9_700_000, license: vc),
+        component("openal", verbatim: "OpenAL", "3D audio library some games need.", 600_000, license: "Creative Labs OpenAL installer license"),
+        component("mfc140", verbatim: "Visual C++ 2015 MFC", "For programs built with Visual C++ 2015 and MFC.", 29_800_000, license: vc),
+        component("vcrun2013", verbatim: "Visual C++ 2013", "For games built with Visual Studio 2013.", 13_700_000, license: vc),
+        component("vcrun2010", verbatim: "Visual C++ 2010", "For games built with Visual Studio 2010.", 10_800_000, license: vc),
+        component("vcrun2008", verbatim: "Visual C++ 2008", "For games built with Visual Studio 2008.", 9_700_000, license: vc),
         component("corefonts", "Microsoft core fonts", "Arial, Times New Roman, Verdana and friends.", 3_900_000,
                   license: "Microsoft core fonts EULA"),
         component("cjkfonts", "CJK fonts", "Chinese, Japanese and Korean text.", 107_500_000,
@@ -130,15 +138,16 @@ public enum RuntimeCatalog {
     ///  - `crypt32`, `gdiplus`, `msxml3`, `ole32`, `oleaut32`, `usp10` replace Windows' own DLLs with ones taken out of a
     ///    Windows service pack, a 0.5 to 0.9 GB download;
     ///  - `allfonts` installs every font winetricks has.
+    /// Said in "Needs …, which G-Player can't install yet.": each name fits after "Needs".
     static let unsupportedNames: [String: String] = [
-        "dgvoodoo2": "DirectX wrapper dgVoodoo 2", "xliveless": "xliveless", "eossdk": "Epic Online Services",
-        "segoe_script": "the Segoe Script font", "dotnetdesktop10": ".NET Desktop 10", "ubisoftconnect": "Ubisoft Connect",
+        "dgvoodoo2": String(localized: "DirectX wrapper dgVoodoo 2", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"), "xliveless": "xliveless", "eossdk": "Epic Online Services",
+        "segoe_script": String(localized: "the Segoe Script font", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"), "dotnetdesktop10": ".NET Desktop 10", "ubisoftconnect": "Ubisoft Connect",
         "dotnet20": ".NET 2.0", "dotnet20sp2": ".NET 2.0 SP2", "dotnet30": ".NET 3.0", "dotnet35": ".NET 3.5",
         "dotnet35sp1": ".NET 3.5 SP1", "dotnet40": ".NET 4.0", "dotnet45": ".NET 4.5", "dotnet462": ".NET 4.6.2",
-        "xna31": "XNA Framework 3.1", "mdx": "Managed DirectX", "d3dcompiler_46": "DirectX shader compiler 46",
-        "icodecs": "Intel video codecs", "msxml3": "Microsoft XML 3", "gdiplus": "GDI+", "crypt32": "the Windows crypto library",
-        "ole32": "the Windows OLE library", "oleaut32": "the Windows OLE automation library",
-        "usp10": "the Windows text layout library", "allfonts": "every Windows font",
+        "xna31": "XNA Framework 3.1", "mdx": "Managed DirectX", "d3dcompiler_46": String(localized: "DirectX shader compiler 46", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"),
+        "icodecs": String(localized: "Intel video codecs", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"), "msxml3": "Microsoft XML 3", "gdiplus": "GDI+", "crypt32": String(localized: "the Windows crypto library", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"),
+        "ole32": String(localized: "the Windows OLE library", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"), "oleaut32": String(localized: "the Windows OLE automation library", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"),
+        "usp10": String(localized: "the Windows text layout library", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"), "allfonts": String(localized: "every Windows font", comment: "Follows “Needs” in “Needs …, which G-Player can't install yet.”"),
     ]
 
     /// True for ids G-Player can install: the catalog's components (and the ids they stand in for), and the winetricks

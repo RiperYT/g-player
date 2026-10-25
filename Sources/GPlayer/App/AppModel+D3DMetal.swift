@@ -104,6 +104,21 @@ extension AppModel {
                                 reason: reason)
     }
 
+    /// What the "Move this space to G-Player Wine?" question says, in whole sentences (each is translated on its own).
+    func engineMoveMessage(_ move: EngineMove) -> String {
+        let target = EngineCatalog.crossover.displayName
+        var parts: [String] = []
+        if let reason = move.reason { parts.append(reason) }
+        parts.append(move.olderWine
+            ? String(localized: "Every program in “\(move.spaceName)” will run on \(target) instead of \(move.fromEngine), an older Wine than the space has now; the space's files are updated for it on the first start. Steam closes first if it's open.")
+            : String(localized: "Every program in “\(move.spaceName)” will run on \(target) instead of \(move.fromEngine); the space's files are updated for it on the first start. Steam closes first if it's open."))
+        if move.downloadMB > 0 { parts.append(String(localized: "G-Player Wine downloads first (about \(move.downloadMB) MB).")) }
+        if move.olderWine {
+            parts.append(String(localized: "To move it back, turn on “Choose the Wine engine for each space” in Settings › Advanced."))
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// Moves the game's whole space to G-Player Wine and starts the game: G-Player Wine downloads first (nothing changes
     /// if that fails), D3DMetal goes in, Steam quits, and only then does the space switch. An outside space needs the
     /// user's yes to changes, since its prefix gets updated for the other Wine.
@@ -112,7 +127,7 @@ extension AppModel {
               !EngineCatalog.isRevision(space.engineID, of: EngineCatalog.crossover), !movingSpaces.contains(space.id) else { return }
         if !space.mayChange {
             guard space.allowsChanges == nil else {
-                errorMessage = "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first."
+                errorMessage = String(localized: "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first.")
                 return
             }
             askToChange(space) { [weak self] allowed in if allowed { self?.moveToGPlayerWine(gameID) } }
@@ -126,8 +141,8 @@ extension AppModel {
             guard readyBackends(of: gplayerWine).contains(.d3dmetal) else {
                 if errorMessage == nil {
                     errorMessage = d3dMetalWaiting
-                        ? "D3DMetal goes into G-Player Wine once the programs open on it quit. Close them and try again."
-                        : "D3DMetal isn't in G-Player Wine yet. Choose your Game Porting Toolkit download in Settings › Engines."
+                        ? String(localized: "D3DMetal goes into G-Player Wine once the programs open on it quit. Close them and try again.")
+                        : String(localized: "D3DMetal isn't in G-Player Wine yet. Choose your Game Porting Toolkit download in Settings › Engines.")
                 }
                 return
             }
@@ -136,13 +151,13 @@ extension AppModel {
             if await Self.isSteamRunning(in: space) {
                 let quit = await quitSteam(in: space)
                 guard quit.gone else {
-                    errorMessage = "Steam didn't quit, so “\(space.name)” stays on its engine for now. Quit Steam and try again."
+                    errorMessage = String(localized: "Steam didn't quit, so “\(space.name)” stays on its engine for now. Quit Steam and try again.")
                     return
                 }
                 spaceEmpty = quit == .spaceEmpty
             }
             if !spaceEmpty, let old = engine(for: space), !(await WineLauncher.waitForAll(engine: old, space: space, timeout: 30)) {
-                errorMessage = "Programs in “\(space.name)” are still open, so it stays on its engine for now. Close them and try again."
+                errorMessage = String(localized: "Programs in “\(space.name)” are still open, so it stays on its engine for now. Close them and try again.")
                 return
             }
             guard var current = self.space(space.id) else { return }

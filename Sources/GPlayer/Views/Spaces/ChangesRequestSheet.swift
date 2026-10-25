@@ -12,11 +12,17 @@ struct ChangesRequestSheet: View {
     var body: some View {
         let space = model.space(request.spaceID)
         VStack(alignment: .leading, spacing: 14) {
-            Text("Allow G-Player to change “\(space?.name ?? "this space")”?").font(.headline)
+            Text("Allow G-Player to change “\(space?.name ?? String(localized: "this space"))”?").font(.headline)
             VStack(alignment: .leading, spacing: 8) {
                 Text("To help games run, G-Player would like to add some Windows files to this space and change a few of its settings. Your games and saves aren't touched.")
-                Text("This space\(space?.originNote.map { " (\($0))" } ?? "") belongs to another app, and G-Player uses it where it is, so it asks first.")
-                    .foregroundStyle(.secondary)
+                Group {
+                    if let note = space?.originNote {
+                        Text("This space (\(note)) belongs to another app, and G-Player uses it where it is, so it asks first.")
+                    } else {
+                        Text("This space belongs to another app, and G-Player uses it where it is, so it asks first.")
+                    }
+                }
+                .foregroundStyle(.secondary)
             }
             .fixedSize(horizontal: false, vertical: true)
             DisclosureGroup("Details", isExpanded: $showDetails) {

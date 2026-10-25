@@ -60,7 +60,7 @@ struct SpaceView: View {
         } message: {
             Text(space.origin == .managed
                  ? "Its games leave the library. Moving to Trash also removes everything installed in it."
-                 : "Its files stay where they are (\(space.originNote ?? "on this Mac")).")
+                 : "Its files stay where they are (\(space.originNote ?? String(localized: "on this Mac"))).")
         }
         .alert(switchTitle, isPresented: Binding(get: { pendingEngine != nil }, set: { if !$0 { pendingEngine = nil } })) {
             Button("Move") { if let target = pendingEngine.flatMap(EngineCatalog.info) { model.switchEngine(of: space, to: target) }; pendingEngine = nil }
@@ -75,7 +75,7 @@ struct SpaceView: View {
     private var switchBlocked: Bool { programsRunning || model.hasRunningGames(in: space) }
 
     private var switchTitle: String {
-        pendingEngine.flatMap(EngineCatalog.info).map { EngineSwitch.title(space: space.name, to: $0) } ?? "Move this space?"
+        pendingEngine.flatMap(EngineCatalog.info).map { EngineSwitch.title(space: space.name, to: $0) } ?? String(localized: "Move this space?")
     }
 
     private var switchMessage: String {
@@ -108,7 +108,7 @@ struct SpaceView: View {
         return g
     }
 
-    private var removeTitle: String { "Remove “\(space.name)”?" }
+    private var removeTitle: LocalizedStringKey { "Remove “\(space.name)”?" }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -131,7 +131,7 @@ struct SpaceView: View {
                     }
                     .fixedSize()
                 }
-                Text(size.map { "\($0.formattedBytes) on disk" } ?? "Measuring…").font(.callout).foregroundStyle(.secondary)
+                Text(size.map { String(localized: "\($0.formattedBytes) on disk") } ?? String(localized: "Measuring…")).font(.callout).foregroundStyle(.secondary)
             }
             HStack(spacing: 8) {
                 Button { runProgram() } label: { Label("Run Program…", systemImage: "play.rectangle") }
@@ -267,7 +267,7 @@ private struct EngineMoveNote: View {
         HStack(spacing: 12) {
             Image(systemName: "info.circle").foregroundStyle(.secondary).font(.title3)
             VStack(alignment: .leading, spacing: 2) {
-                Text(info?.kind == .gptk ? "This space runs on Apple's Game Porting Toolkit" : "This space runs on \(info?.shortName ?? "an older engine")")
+                Text(info?.kind == .gptk ? "This space runs on Apple's Game Porting Toolkit" : "This space runs on \(info?.shortName ?? String(localized: "an older engine"))")
                     .font(.callout.weight(.semibold))
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -280,8 +280,9 @@ private struct EngineMoveNote: View {
 
     private var detail: String {
         if let reason = EngineSwitch.launcherMoveDetail(presetID: space.presetID) { return reason }
-        let newer = "New spaces use G-Player Wine, which plays game videos and can use Apple's D3DMetal. Moving asks first."
-        return info?.kind == .gptk ? "It keeps running while the toolkit is installed and turned on in Settings. " + newer : newer
+        let newer = String(localized: "New spaces use G-Player Wine, which plays game videos and can use Apple's D3DMetal. Moving asks first.")
+        return info?.kind == .gptk
+            ? String(localized: "It keeps running while the toolkit is installed and turned on in Settings.") + " " + newer : newer
     }
 }
 
@@ -312,7 +313,7 @@ private struct HiddenOnlyNote: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: "eye.slash").font(.title2).frame(width: 36)
-            Text("\(count) hidden \(count == 1 ? "game" : "games") in this space").font(.headline)
+            Text("\(count) hidden games in this space").font(.headline)
             Spacer()
             Button("Show Hidden") { model.selection = .hidden }
         }

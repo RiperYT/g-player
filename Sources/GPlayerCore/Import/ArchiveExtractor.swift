@@ -31,8 +31,8 @@ public enum ArchiveExtractor {
         catch { try? fm.removeItem(at: temp); throw error }
         guard result.succeeded else {
             try? fm.removeItem(at: temp)
-            let reason = result.stderr.split(separator: "\n").first.map(String.init) ?? "unknown error"
-            throw ShellError.failed("Couldn't unpack \(archive.lastPathComponent): \(reason)")
+            let reason = result.stderr.split(separator: String(localized: "\n")).first.map(String.init) ?? String(localized: "unknown error")
+            throw ShellError.failed(String(localized: "Couldn't unpack \(archive.lastPathComponent): \(reason)"))
         }
         let visible = ((try? fm.contentsOfDirectory(at: temp, includingPropertiesForKeys: nil)) ?? [])
             .filter { !$0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent != "__MACOSX" }

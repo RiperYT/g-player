@@ -91,7 +91,7 @@ public enum AppPresets {
 
     public static let steam = AppPreset(
         id: "steam", name: "Steam",
-        summary: "Valve's store and launcher. Your Steam games show up in the library on their own.",
+        summary: String(localized: "Valve's store and launcher. Your Steam games show up in the library on their own."),
         symbol: "cloud", experimental: false,
         installerURL: URL(string: "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe")!,
         installerFileName: "SteamSetup.exe", installerArguments: ["/S"],
@@ -103,8 +103,8 @@ public enum AppPresets {
 
     public static let epic = AppPreset(
         id: "epic", name: "Epic Games Launcher",
-        summary: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account. Its first start adds Wine Mono (.NET) for "
-            + "Epic Online Services: a \(WineMono.sizeLabel(EngineCatalog.wineMono10_4_1)) download, about \(WineMono.installedSizeLabel(EngineCatalog.wineMono10_4_1)) on disk.",
+        summary: String(localized: "Epic's own launcher. Runs on G-Player Wine; sign in with your Epic account.") + " "
+            + String(localized: "Its first start adds Wine Mono (.NET) for Epic Online Services: a \(WineMono.sizeLabel(EngineCatalog.wineMono10_4_1)) download, about \(WineMono.installedSizeLabel(EngineCatalog.wineMono10_4_1)) on disk."),
         symbol: "shippingbox", experimental: false,
         installerURL: URL(string: "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi")!,
         installerFileName: "EpicGamesLauncherInstaller.msi", installerArguments: ["/qn"],
@@ -125,7 +125,7 @@ public enum AppPresets {
 
     public static let gog = AppPreset(
         id: "gog", name: "GOG Galaxy",
-        summary: "GOG's launcher. Games it installs appear under Found programs in its space.",
+        summary: String(localized: "GOG's launcher. Games it installs appear under Found programs in its space."),
         symbol: "circle.hexagongrid", experimental: true,
         installerURL: URL(string: "https://webinstallers.gog-statics.com/download/GOG_Galaxy_2.0.exe")!,
         installerFileName: "GOG_Galaxy_2.0.exe", installerArguments: [],
@@ -135,7 +135,7 @@ public enum AppPresets {
 
     public static let ubisoft = AppPreset(
         id: "ubisoft", name: "Ubisoft Connect",
-        summary: "Ubisoft's launcher for its own games.",
+        summary: String(localized: "Ubisoft's launcher for its own games."),
         symbol: "hurricane", experimental: true,
         installerURL: URL(string: "https://static3.cdn.ubi.com/orbit/launcher_installer/UbisoftConnectInstaller.exe")!,
         installerFileName: "UbisoftConnectInstaller.exe", installerArguments: ["/S"],

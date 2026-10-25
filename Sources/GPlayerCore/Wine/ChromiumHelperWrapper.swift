@@ -61,7 +61,7 @@ public enum ChromiumHelperWrapper {
     private static func wrapperData(_ given: Data?) throws -> Data {
         guard let wrapper = given ?? wrapperURL.flatMap({ FileManager.default.contents(atPath: $0.path) }),
               isWrapper(wrapper) else {
-            throw ShellError.failed("The Chromium helper wrapper is missing from G-Player.")
+            throw ShellError.failed(String(localized: "The Chromium helper wrapper is missing from G-Player."))
         }
         return wrapper
     }
@@ -104,7 +104,7 @@ public enum ChromiumHelperWrapper {
         }
         if isWrapper(current) {
             guard let saved = fm.contents(atPath: real.path), !saved.isEmpty, !isWrapper(saved) else {
-                throw ShellError.failed("The original \(helper.lastPathComponent) is missing. Repair the app to download it again.")
+                throw ShellError.failed(String(localized: "The original \(helper.lastPathComponent) is missing. Repair the app to download it again."))
             }
             if current == wrapper { return false }
             try wrapper.write(to: helper, options: .atomic)

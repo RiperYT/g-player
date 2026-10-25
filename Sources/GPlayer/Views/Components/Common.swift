@@ -4,8 +4,8 @@ import SwiftUI
 
 /// The big dashed target shown when a list is empty: drop a game here.
 struct DropZone: View {
-    let title: String
-    let message: String
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
     var targeted = false
     var actions: AnyView? = nil
 
@@ -123,27 +123,27 @@ enum Panels {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
-        panel.message = "Choose a game folder, an archive (zip, rar, 7z) or an installer (.exe, .msi)."
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "Choose a game folder, an archive (zip, rar, 7z) or an installer (.exe, .msi).")
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    @MainActor static func chooseFolder(message: String, start: URL? = nil) -> URL? {
+    @MainActor static func chooseFolder(message: LocalizedStringResource, start: URL? = nil) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.prompt = "Choose"
-        panel.message = message
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: message)
         panel.directoryURL = start
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    @MainActor static func chooseFile(message: String, start: URL?, types: [String]) -> URL? {
+    @MainActor static func chooseFile(message: LocalizedStringResource, start: URL?, types: [String]) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
-        panel.message = message
+        panel.message = String(localized: message)
         panel.directoryURL = start
         panel.allowedContentTypes = types.compactMap { .init(filenameExtension: $0) }
         return panel.runModal() == .OK ? panel.url : nil
@@ -154,8 +154,8 @@ extension Double {
     /// 3h 20m, 45m, under a minute.
     var playtime: String {
         let minutes = Int(self / 60)
-        if minutes < 1 { return "Under a minute" }
-        if minutes < 60 { return "\(minutes)m" }
-        return "\(minutes / 60)h \(minutes % 60)m"
+        if minutes < 1 { return String(localized: "Under a minute") }
+        if minutes < 60 { return String(localized: "\(minutes)m", comment: "Minutes of play time, e.g. 45m") }
+        return String(localized: "\(minutes / 60)h \(minutes % 60)m", comment: "Hours and minutes of play time, e.g. 3h 20m")
     }
 }

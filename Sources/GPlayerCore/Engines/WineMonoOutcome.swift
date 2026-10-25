@@ -99,24 +99,24 @@ extension WineMono {
         case .ready, .notAllowed, .stopped:
             return nil
         case .spaceBusy:
-            return Note(title: ".NET isn't added yet",
-                        text: "Quit \(program) and open it again to add .NET (needed for \(purpose)).")
+            return Note(title: String(localized: ".NET isn't added yet"),
+                        text: String(localized: "Quit \(program) and open it again to add .NET (needed for \(purpose))."))
         case .tooLong(let length):
-            return Note(title: "Wine Mono's path is too long",
-                        text: "Wine loads Wine Mono only from a path under 260 characters, and this library's is \(length). Move the library folder closer to the top of a disk, such as your home folder, then open \(program) again.")
+            return Note(title: String(localized: "Wine Mono's path is too long"),
+                        text: String(localized: "Wine loads Wine Mono only from a path under 260 characters, and this library's is \(length). Move the library folder closer to the top of a disk, such as your home folder, then open \(program) again."))
         case .waiting(let failure), .failed(let failure):
             if failure.offline {
-                return Note(title: "Couldn't add .NET",
-                            text: "Wine Mono (.NET, needed for \(purpose)) couldn't be downloaded: this Mac isn't online. \(program) starts without it, and G-Player tries again when you open it later.")
+                return Note(title: String(localized: "Couldn't add .NET"),
+                            text: String(localized: "Wine Mono (.NET, needed for \(purpose)) couldn't be downloaded: this Mac isn't online. \(program) starts without it, and G-Player tries again when you open it later."))
             }
-            return Note(title: "Couldn't add .NET",
-                        text: "Wine Mono (.NET, needed for \(purpose)) wasn't added. \(sentence(failure.reason)) \(program) starts without it, and G-Player tries again in a few days.")
+            return Note(title: String(localized: "Couldn't add .NET"),
+                        text: String(localized: "Wine Mono (.NET, needed for \(purpose)) wasn't added. \(sentence(failure.reason)) \(program) starts without it, and G-Player tries again in a few days."))
         }
     }
 
     /// What a space that G-Player may not change loses for a program that needs .NET, for the notes that say the space is kept as it is.
     public static func refusedLine(program: String, purpose: String) -> String {
-        "Without .NET (Wine Mono), \(program) can't set up \(purpose)."
+        String(localized: "Without .NET (Wine Mono), \(program) can't set up \(purpose).")
     }
 
     /// Whether the note is shown now, or has been before in this run: what is said in answer to something the user just did (a
@@ -134,7 +134,7 @@ extension WineMono {
     /// `consequence` says what happens next ("Epic Games Launcher starts without .NET.").
     public static func alert(for outcome: Outcome, space: String, consequence: String) -> String? {
         guard case .failed(let failure) = outcome, !failure.offline else { return nil }
-        return "Couldn't set up Wine Mono in “\(space)”: \(sentence(failure.reason)) \(consequence)"
+        return String(localized: "Couldn't set up Wine Mono in “\(space)”: \(sentence(failure.reason)) \(consequence)")
     }
 
     /// `text` ended with a full stop, unless it ends with a mark already.
@@ -146,6 +146,6 @@ extension WineMono {
 
     /// The room Wine Mono takes unpacked, for the card that says what the first start adds: "245 MB".
     public static func installedSizeLabel(_ package: WineMonoPackage) -> String {
-        "\(EngineCatalog.megabytes(package.installedBytes)) MB"
+        String(localized: "\(EngineCatalog.megabytes(package.installedBytes)) MB")
     }
 }

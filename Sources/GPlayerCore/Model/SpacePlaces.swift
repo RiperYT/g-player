@@ -13,7 +13,7 @@ public struct SpacePlace: Hashable, Identifiable, Sendable {
     public var id: Kind { kind }
 
     /// What the sidebar shows: "Documents (Mac)" when the folder lives on the Mac.
-    public var label: String { linksToMac ? "\(title) (Mac)" : title }
+    public var label: String { linksToMac ? String(localized: "\(title) (Mac)") : title }
 }
 
 public enum SpacePlaces {
@@ -21,7 +21,7 @@ public enum SpacePlaces {
     public static func find(in space: Space, userName: String = NSUserName()) -> [SpacePlace] {
         let c = space.driveC
         var candidates: [(SpacePlace.Kind, String, URL?)] = [
-            (.drive, "C: Drive", c),
+            (.drive, String(localized: "C: Drive"), c),
             (.games, "Games", c.appendingPathComponent("Games", isDirectory: true)),
             (.programFiles, "Program Files", c.appendingPathComponent("Program Files", isDirectory: true)),
             (.programFilesX86, "Program Files (x86)", c.appendingPathComponent("Program Files (x86)", isDirectory: true)),
@@ -30,7 +30,7 @@ public enum SpacePlaces {
         candidates += [
             (.documents, "Documents", user?.appendingPathComponent("Documents", isDirectory: true)),
             (.appData, "AppData", user?.appendingPathComponent("AppData", isDirectory: true)),
-            (.spaceFolder, "Space Folder", space.url),
+            (.spaceFolder, String(localized: "Space Folder"), space.url),
         ]
         let root = space.url.resolvingSymlinksInPath()
         return candidates.compactMap { kind, title, url in

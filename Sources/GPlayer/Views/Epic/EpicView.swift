@@ -123,7 +123,7 @@ private struct EpicGameList: View {
 }
 
 private struct EpicSection: View {
-    let title: String
+    let title: LocalizedStringKey
     let games: [EpicGame]
 
     var body: some View {
@@ -193,11 +193,16 @@ private struct EpicGameRow: View {
     }
 
     private func subtitle(_ entry: Game?) -> String {
-        if model.epic.installing == game.appName { return "Installing…" }
-        guard let entry else { return "Not installed" }
-        if model.isPreparing(entry) { return model.epic.startStatus[entry.id] ?? "Starting…" }
-        if model.isRunning(entry) { return model.epic.startNotes[entry.id].map { "Running · \($0.prefix(1).lowercased() + $0.dropFirst())" } ?? "Running" }
-        return model.epic.installed[game.appName].map { $0.installSize > 0 ? "Installed · \($0.installSize.formattedBytes)" : "Installed" } ?? "Installed"
+        if model.epic.installing == game.appName { return String(localized: "Installing…") }
+        guard let entry else { return String(localized: "Not installed") }
+        if model.isPreparing(entry) { return model.epic.startStatus[entry.id] ?? String(localized: "Starting…") }
+        if model.isRunning(entry) {
+            return model.epic.startNotes[entry.id].map { String(localized: "Running · \($0.prefix(1).lowercased() + $0.dropFirst())") }
+                ?? String(localized: "Running")
+        }
+        return model.epic.installed[game.appName].map {
+            $0.installSize > 0 ? String(localized: "Installed · \($0.installSize.formattedBytes)") : String(localized: "Installed")
+        } ?? String(localized: "Installed")
     }
 
     @ViewBuilder private var installButton: some View {
@@ -207,7 +212,7 @@ private struct EpicGameRow: View {
             Button("Install…") { model.askToInstallEpicGame(game) }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.epic.isOccupied)
-                .help(model.epic.busy.map { "Wait for “\($0)” to finish. Epic installs one at a time." } ?? "Download and install")
+                .help(model.epic.busy.map { String(localized: "Wait for “\($0)” to finish. Epic installs one at a time.") } ?? String(localized: "Download and install"))
         }
     }
 

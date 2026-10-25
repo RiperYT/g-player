@@ -15,8 +15,12 @@ public enum FirstRunSetup {
     /// installed. With a Wine Staging that an earlier version installed, it says what is still to download (G-Player Wine
     /// takes its libraries from it), so the figure never looks like the whole.
     public static func engineSizes(installed: [EngineInfo]) -> String? {
-        guard let download = downloadLabel(installed: installed) else { return nil }
-        return "\(download), and G-Player Wine needs about \(diskLabel(installed: installed)) on this disk. G-Player checks every file before it uses it."
+        let left = EngineCatalog.firstRunBytes(installed: installed)
+        guard left > 0 else { return nil }
+        let mb = EngineCatalog.megabytes(left), disk = diskLabel(installed: installed)
+        return left == EngineCatalog.firstRunBytes(installed: [])
+            ? String(localized: "The download is about \(mb) MB, and G-Player Wine needs about \(disk) on this disk. G-Player checks every file before it uses it.")
+            : String(localized: "\(mb) MB is still to download, and G-Player Wine needs about \(disk) on this disk. G-Player checks every file before it uses it.")
     }
 
     /// What Continue says on the location step, which starts the downloads. Nil when nothing is left to download.
@@ -25,16 +29,8 @@ public enum FirstRunSetup {
         guard left > 0 else { return nil }
         let mb = EngineCatalog.megabytes(left)
         return left == EngineCatalog.firstRunBytes(installed: [])
-            ? "Continue downloads about \(mb) MB and needs about \(diskLabel(installed: installed)) on this disk."
-            : "Continue downloads \(mb) MB more and needs about \(diskLabel(installed: installed)) on this disk."
-    }
-
-    /// "The download is about 640 MB" before anything is installed, "446 MB is still to download" with Wine Staging's libraries there.
-    private static func downloadLabel(installed: [EngineInfo]) -> String? {
-        let left = EngineCatalog.firstRunBytes(installed: installed)
-        guard left > 0 else { return nil }
-        let mb = EngineCatalog.megabytes(left)
-        return left == EngineCatalog.firstRunBytes(installed: []) ? "The download is about \(mb) MB" : "\(mb) MB is still to download"
+            ? String(localized: "Continue downloads about \(mb) MB and needs about \(diskLabel(installed: installed)) on this disk.")
+            : String(localized: "Continue downloads \(mb) MB more and needs about \(diskLabel(installed: installed)) on this disk.")
     }
 
     /// What the empty library says while the first run works: G-Player Wine downloading (with what is left to download),
@@ -48,30 +44,31 @@ public enum FirstRunSetup {
         if downloading {
             let missing = EngineCatalog.firstRunInstalls.filter { engine in !installed.contains { $0.id == engine.id } }
             let mb = EngineCatalog.megabytes(EngineCatalog.firstRunBytes(installed: installed))
-            let text = missing.first.map { "G-Player is downloading \($0.name), about \(mb) MB." } ?? "G-Player Wine is almost ready."
-            return spaces.isEmpty ? text : text + " Then it sets up \(spaces)."
+            let text = missing.first.map { String(localized: "G-Player is downloading \($0.name), about \(mb) MB.") }
+                ?? String(localized: "G-Player Wine is almost ready.")
+            return spaces.isEmpty ? text : text + " " + String(localized: "Then it sets up \(spaces).")
         }
         guard !pendingSpaces.isEmpty, EngineCatalog.firstRunEngine(installed: installed) != nil else { return nil }
         let steam = pendingSpaces.contains("steam"), main = pendingSpaces.contains("main")
-        let slow = " Steam downloads its own files too, so this takes a few minutes."
-        if main && steam { return "G-Player is getting Windows ready for Main and installing Steam." + slow }
-        if steam { return "G-Player is installing Steam." + slow }
-        return "G-Player is getting Windows ready for Main. This takes about a minute."
+        let slow = String(localized: "Steam downloads its own files too, so this takes a few minutes.")
+        if main && steam { return String(localized: "G-Player is getting Windows ready for Main and installing Steam.") + " " + slow }
+        if steam { return String(localized: "G-Player is installing Steam.") + " " + slow }
+        return String(localized: "G-Player is getting Windows ready for Main. This takes about a minute.")
     }
 
     /// The note for a first run that waits because the user stopped a download: what is on hold and how it goes on. Nothing is
     /// made on an engine the user didn't want.
     public static func pausedNote(pendingSpaces: [String]) -> (title: String, text: String) {
         let names = spaceNames(pendingSpaces)
-        return ("Setup is on hold",
-                "You stopped the download, so setting up \(names.isEmpty ? "the first spaces" : names) is on hold. It goes on once G-Player Wine is "
-                + "installed: download it in Settings › Engines, or it starts again the next time G-Player opens.")
+        return (String(localized: "Setup is on hold"),
+                String(localized: "You stopped the download, so setting up \(names.isEmpty ? String(localized: "the first spaces") : names) is on hold.")
+                + " " + String(localized: "It goes on once G-Player Wine is installed: download it in Settings › Engines, or it starts again the next time G-Player opens."))
     }
 
     /// "Main and Steam", for the spaces the first run still has to make.
     private static func spaceNames(_ keys: [String]) -> String {
         let names = keys.compactMap { ["main": "Main", "steam": "Steam"][$0] }
-        return names.joined(separator: " and ")
+        return CompatResolver.list(names)
     }
 
     /// The one-time note for someone who updated: G-Player Wine is new, and spaces they have keep what they run on. It
@@ -87,8 +84,8 @@ public enum FirstRunSetup {
         var apps: [String] = []
         for f in found where f.isAnotherAppsBottle && !apps.contains(f.originNote) { apps.append(f.originNote) }
         guard !apps.isEmpty else { return nil }
-        let names = apps.joined(separator: " or ")
-        return "G-Player Wine updates a \(names) bottle's files the first time it starts there, and \(names) may not open the bottle afterwards. Make a copy first if you still use it there."
+        let names = apps.count == 2 ? String(localized: "\(apps[0]) or \(apps[1])") : apps.joined(separator: ", ")
+        return String(localized: "G-Player Wine updates a \(names) bottle's files the first time it starts there, and \(names) may not open the bottle afterwards. Make a copy first if you still use it there.")
     }
 }
 

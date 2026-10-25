@@ -51,7 +51,7 @@ struct PresetCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(preset.name).font(.headline)
-                    if preset.experimental { CardBadge(text: "Experimental", tint: .orange) }
+                    if preset.experimental { CardBadge(text: String(localized: "Experimental"), tint: .orange) }
                 }
                 Text(preset.summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 PresetButtons(preset: preset).padding(.top, 4)

@@ -89,7 +89,7 @@ public enum EngineCatalog {
         name: "Wine Staging",
         version: "11.18",
         kind: .wineStaging,
-        summary: "Open-source Wine with DXVK. Runs Steam and most DirectX 9–11 games.",
+        summary: String(localized: "Open-source Wine with DXVK. Runs Steam and most DirectX 9–11 games."),
         backends: [.dxvk, .wined3d],
         downloads: [
             PinnedDownload(
@@ -117,7 +117,7 @@ public enum EngineCatalog {
         name: "G-Player Wine",
         version: "11.0",
         kind: .crossover,
-        summary: "Wine 11 built from CodeWeavers' CrossOver source. Runs Steam and DirectX 9–11 games like Wine Staging, with DXVK or DXMT, and DirectX 12 through Apple's D3DMetal when you add it from your own toolkit.",
+        summary: String(localized: "Wine 11 built from CodeWeavers' CrossOver source. Runs Steam and DirectX 9–11 games like Wine Staging, with DXVK or DXMT, and DirectX 12 through Apple's D3DMetal when you add it from your own toolkit."),
         // DXVK is what Steam and games without a better choice run with; 64-bit DirectX 10–12 games take D3DMetal once
         // it is copied in (`CompatResolver`).
         backends: [.dxvk, .d3dmetal, .dxmt, .wined3d],
@@ -205,9 +205,9 @@ public enum EngineCatalog {
     public static let gptk = EngineInfo(
         id: "gptk",
         name: "Game Porting Toolkit",
-        version: "installed by you",
+        version: String(localized: "installed by you"),
         kind: .gptk,
-        summary: "Apple's D3DMetal for DirectX 11 and 12 games, from a toolkit you installed yourself.",
+        summary: String(localized: "Apple's D3DMetal for DirectX 11 and 12 games, from a toolkit you installed yourself."),
         backends: [.d3dmetal, .wined3d],
         downloads: [])
 

@@ -15,19 +15,19 @@ public enum LaunchProfile: String, Codable, CaseIterable, Sendable, Identifiable
 
     public var title: String {
         switch self {
-        case .recommended: "Recommended"
-        case .compatible: "Compatible"
-        case .fast: "Fast"
-        case .custom: "Custom"
+        case .recommended: String(localized: "Recommended")
+        case .compatible: String(localized: "Compatible")
+        case .fast: String(localized: "Fast")
+        case .custom: String(localized: "Custom")
         }
     }
 
     public var summary: String {
         switch self {
-        case .recommended: "Known fixes for this game and the best graphics for its engine. If the game doesn't start, G-Player tries other graphics by itself."
-        case .compatible: "Slower, but starts more games. Uses Wine's own graphics and never switches by itself. Try it when a game won't open."
-        case .fast: "The quickest graphics this space has."
-        case .custom: "Graphics you choose under Advanced. G-Player never switches them."
+        case .recommended: String(localized: "Known fixes for this game and the best graphics for its engine. If the game doesn't start, G-Player tries other graphics by itself.")
+        case .compatible: String(localized: "Slower, but starts more games. Uses Wine's own graphics and never switches by itself. Try it when a game won't open.")
+        case .fast: String(localized: "The quickest graphics this space has.")
+        case .custom: String(localized: "Graphics you choose under Advanced. G-Player never switches them.")
         }
     }
 
@@ -59,9 +59,9 @@ public enum WindowMode: String, Codable, CaseIterable, Sendable, Identifiable {
     public var id: String { rawValue }
     public var title: String {
         switch self {
-        case .automatic: "As the game decides"
-        case .fullscreen: "Fullscreen"
-        case .windowed: "In a window"
+        case .automatic: String(localized: "As the game decides")
+        case .fullscreen: String(localized: "Fullscreen")
+        case .windowed: String(localized: "In a window")
         }
     }
 }

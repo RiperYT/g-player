@@ -84,6 +84,16 @@ public struct WorkedReport: Sendable, Equatable {
         game.kind == .game && (game.autoGraphics?.worked != nil || game.secondsPlayed >= GraphicsRetry.secondsToWork)
     }
 
+    /// `PEArchitecture.displayName` in English: the report is English whatever the app's language.
+    private static func englishName(_ architecture: PEArchitecture) -> String {
+        switch architecture {
+        case .x86: "32-bit"
+        case .x64: "64-bit"
+        case .arm64: "ARM64"
+        case .other: "Unknown"
+        }
+    }
+
     /// The graphics that worked, never Automatic: what Automatic learned on this engine when it did, else what a launch uses
     /// now (`planned`, the profile's pick), resolved on the engine.
     public static func workedBackend(of game: Game, on engine: EngineInfo, planned: GraphicsBackend) -> GraphicsBackend {
@@ -101,9 +111,10 @@ public struct WorkedReport: Sendable, Equatable {
         if let chip = machine.chip { lines.append("Mac: \(chip)") }
         lines.append("Engine: \(engine.displayName)")
         lines.append("Engine ID: \(engine.id)")
-        lines.append("Graphics backend: \(Self.workedBackend(of: game, on: engine, planned: planned).displayName)")
+        let backend = Self.workedBackend(of: game, on: engine, planned: planned)
+        lines.append("Graphics backend: \(backend == .auto ? "Automatic" : backend.displayName)")      // English: the others are product names
         let options = game.launchOptions
-        lines.append("Profile: \(options.profile.effective(on: engine).title)")
+        lines.append("Profile: \(options.profile.effective(on: engine).rawValue.capitalized)")
         var switches: [String] = []
         switch options.windowMode {
         case .windowed: switches.append("windowed")
@@ -131,7 +142,7 @@ public struct WorkedReport: Sendable, Equatable {
         if let a = game.analysis {
             if let name = a.engineName { lines.append("Game engine: \(name)") }
             if let graphics = a.graphicsLabel { lines.append("Game graphics: \(graphics)") }
-            let program = [a.architecture?.displayName, a.isDotNet ? ".NET" : nil].compactMap { $0 }
+            let program = [a.architecture.map(Self.englishName), a.isDotNet ? ".NET" : nil].compactMap { $0 }
             if !program.isEmpty { lines.append("Game program: " + program.joined(separator: ", ")) }
         }
         switch game.source {

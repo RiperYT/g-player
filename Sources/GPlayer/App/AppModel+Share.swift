@@ -33,7 +33,7 @@ extension AppModel {
         let submission = issue.submission
         if submission.needsPasting { copyToClipboard(issue.markdown) }
         if !NSWorkspace.shared.open(submission.url) {
-            errorMessage = "Couldn't open the browser. Choose Copy, then paste the text into a new issue at github.com/\(WorkedIssue.repository)."
+            errorMessage = String(localized: "Couldn't open the browser. Choose Copy, then paste the text into a new issue at github.com/\(WorkedIssue.repository).")
         }
     }
 

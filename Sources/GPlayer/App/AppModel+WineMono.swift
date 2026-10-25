@@ -68,12 +68,12 @@ extension AppModel {
             }
         }
         guard !registered else { return .ready }
-        let activity = begin(WineMono.registerTitle, "Adding .NET to “\(space.name)”", setup: true)
+        let activity = begin(WineMono.registerTitle, String(localized: "Adding .NET to “\(space.name)”"), setup: true)
         registeringMono.insert(space.id)
         stoppedMono.remove(space.id)
         defer { registeringMono.remove(space.id); stoppedMono.remove(space.id); end(activity); cancellers[activity] = nil }
         let work = Task.detached { try await WineMono.register(package, engine: engine, space: space, logsFolder: paths.logs) }
-        setStop(activity, help: "Stop setting up Wine Mono. What is being started goes on without .NET.") { work.cancel() }
+        setStop(activity, help: String(localized: "Stop setting up Wine Mono. What is being started goes on without .NET.")) { work.cancel() }
         do {
             try await work.value
             WineMono.forgetFailure(in: space)
@@ -95,7 +95,7 @@ extension AppModel {
     /// the sidebar that can be stopped. Asked again while it downloads (two launches in two spaces), it waits for that download.
     func ensureWineMono(in engine: Engine, purpose: String) async -> WineMonoFetch {
         guard engine.info.mono != nil, let manager = engineManager else {
-            return .failed(ShellError.failed("G-Player doesn't know a Wine Mono for \(engine.info.name)."))
+            return .failed(ShellError.failed(String(localized: "G-Player doesn't know a Wine Mono for \(engine.info.name).")))
         }
         if engine.hasWineMono { return .ready }
         if let running = monoInstalls[engine.info.id] { return await running.value }
@@ -106,7 +106,7 @@ extension AppModel {
 
     private func downloadWineMono(into engine: Engine, purpose: String, with manager: EngineManager) async -> WineMonoFetch {
         await leftoversCleaning?.value
-        let activity = begin(WineMono.downloadTitle, "Starting", setup: true, note: "\(purpose) needs .NET")
+        let activity = begin(WineMono.downloadTitle, String(localized: "Starting"), setup: true, note: String(localized: "\(purpose) needs .NET"))
         defer { end(activity); cancellers[activity] = nil; monoInstalls[engine.info.id] = nil }
         let log = InstallLog(title: "Install Wine Mono \(engine.info.mono?.version ?? "") for \(engine.info.id)")
         let logs = manager.paths.logs
@@ -117,7 +117,7 @@ extension AppModel {
             }
         }
         // What came stays on disk, so downloading again goes on from there.
-        setStop(activity, help: "Stop downloading Wine Mono. What came is kept, and the download goes on from there next time.") { work.cancel() }
+        setStop(activity, help: String(localized: "Stop downloading Wine Mono. What came is kept, and the download goes on from there next time.")) { work.cancel() }
         do {
             try await work.value
             log.write(outcome: "Ready", to: logs)

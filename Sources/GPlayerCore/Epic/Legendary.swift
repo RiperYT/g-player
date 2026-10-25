@@ -21,7 +21,7 @@ public struct Legendary: Sendable {
     /// What the first sign-in downloads, in a few words for the user: its size and where from, taken from the pin so the words
     /// can't drift from what is downloaded.
     public static var downloadSummary: String {
-        "Legendary, an open-source program (\(download.approximateBytes.formattedBytes)), from \(download.url.host ?? "GitHub")"
+        String(localized: "Legendary, an open-source program (\(download.approximateBytes.formattedBytes)), from \(download.url.host ?? "GitHub")")
     }
 
     public let paths: LibraryPaths
@@ -134,11 +134,11 @@ public struct Legendary: Sendable {
     /// for another program. Hashing 15 MB takes a few hundredths of a second, next to the seconds Legendary takes to start.
     func verified() throws {
         guard FileManager.default.isExecutableFile(atPath: executable.path) else {
-            throw ShellError.failed("Legendary isn't on this Mac. Refresh Epic Games to download it again.")
+            throw ShellError.failed(String(localized: "Legendary isn't on this Mac. Refresh Epic Games to download it again."))
         }
         guard let checksum else { return }
         guard (try? Files.sha256(of: executable)) == checksum else {
-            throw ShellError.failed("The Legendary file on this Mac isn't the one G-Player expects, so G-Player didn't run it. Refresh Epic Games to download it again.")
+            throw ShellError.failed(String(localized: "The Legendary file on this Mac isn't the one G-Player expects, so G-Player didn't run it. Refresh Epic Games to download it again."))
         }
     }
 
@@ -254,12 +254,12 @@ public struct Legendary: Sendable {
     /// Signs in with the code Epic's page gave and returns who is signed in. Legendary exits with 0 when the code is refused,
     /// so what counts is that its status shows an account afterwards.
     public func signIn(code: String) async throws -> LegendaryStatus {
-        guard EpicSignIn.plausible(code) != nil else { throw ShellError.failed("That isn't a code from Epic's sign-in page.") }
+        guard EpicSignIn.plausible(code) != nil else { throw ShellError.failed(String(localized: "That isn't a code from Epic's sign-in page.")) }
         let result = try await run(LegendaryCommand.signIn(code: code), timeout: limits.signIn)
         let status = try await status()
         guard status.isSignedIn else {
             if LegendaryFailure.kind(stderr: result.stderr) == .network { throw fail(result) }
-            throw ShellError.failed("Epic didn't accept the sign-in. Try again.")
+            throw ShellError.failed(String(localized: "Epic didn't accept the sign-in. Try again."))
         }
         return status
     }
@@ -301,7 +301,7 @@ public struct Legendary: Sendable {
     /// installed: Legendary exits with 0 after some failures.
     public func install(_ appName: String, basePath: URL, log: URL? = nil, hasRoom: @escaping @Sendable (Int64) -> String? = { _ in nil },
                         status: @escaping @Sendable (LegendaryInstallStatus) -> Void) async throws {
-        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
+        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed(String(localized: "“\(appName)” isn't a name Epic gives a game.")) }
         try FileManager.default.createDirectory(at: basePath, withIntermediateDirectories: true)
         let current = StatusBox()
         let lacking = Reason()
@@ -317,7 +317,7 @@ public struct Legendary: Sendable {
         guard let installed = (try? await installedGames())?.first(where: { $0.appName == appName }) else { throw fail(result) }
         // Legendary's record says it is there; the program has to be, too.
         guard let program = installed.executableURL, FileManager.default.fileExists(atPath: program.path) else {
-            throw ShellError.failed("Legendary says “\(installed.title)” is installed, but its program isn't in \(installed.installPath). Try installing it again.")
+            throw ShellError.failed(String(localized: "Legendary says “\(installed.title)” is installed, but its program isn't in \(installed.installPath). Try installing it again."))
         }
         // TODO: a game's prerequisites (Visual C++, DirectX): on a Mac Legendary only records them (`prereq_info`).
     }
@@ -325,7 +325,7 @@ public struct Legendary: Sendable {
     /// Removes a game and its files, or with `keepFiles` only Legendary's record of it. Legendary exits with 0 when it can't, so
     /// the game must be gone from its list.
     public func uninstall(_ appName: String, keepFiles: Bool = false) async throws {
-        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
+        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed(String(localized: "“\(appName)” isn't a name Epic gives a game.")) }
         let result = try await run(LegendaryCommand.uninstall(appName: appName, keepFiles: keepFiles), timeout: limits.uninstall)
         guard try await !installedGames().contains(where: { $0.appName == appName }) else { throw fail(result) }
     }
@@ -334,7 +334,7 @@ public struct Legendary: Sendable {
     /// where the files are. Legendary exits with 0 when it can't, so the record must say the new place, and the program must be
     /// there, afterwards.
     public func relink(_ appName: String, to base: URL) async throws {
-        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
+        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed(String(localized: "“\(appName)” isn't a name Epic gives a game.")) }
         let result = try await run(LegendaryCommand.relink(appName: appName, basePath: base), timeout: limits.relink)
         guard let record = try await installedGames().first(where: { $0.appName == appName }),
               Self.samePath(record.installPath, base.appendingPathComponent(URL(fileURLWithPath: record.installPath).lastPathComponent).path),
@@ -354,15 +354,15 @@ public struct Legendary: Sendable {
     /// (a signed-out account, a game whose files moved), since a game started without its login for such a reason would only fail
     /// later and more confusingly.
     public func launchParameters(for appName: String, wine: URL) async throws -> LaunchAnswer {
-        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed("“\(appName)” isn't a name Epic gives a game.") }
+        guard LegendaryCommand.isAppName(appName) else { throw ShellError.failed(String(localized: "“\(appName)” isn't a name Epic gives a game.")) }
         let why: String
         do {
             let online = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: false), timeout: limits.onlineLaunch)
             if online.succeeded, let launch = LegendaryOutput.launch(online.stdout) { return LaunchAnswer(launch: launch, offlineBecause: nil) }
             guard LegendaryFailure.kind(stderr: online.stderr) == .network else { throw fail(online) }
-            why = "Epic Games can't be reached."
+            why = String(localized: "Epic Games can't be reached.")
         } catch is Supervised.TimedOut {
-            why = "Epic Games didn't answer in time."
+            why = String(localized: "Epic Games didn't answer in time.")
         }
         let offline = try await run(LegendaryCommand.launch(appName: appName, wine: wine, offline: true), timeout: limits.offlineLaunch)
         guard offline.succeeded, let launch = LegendaryOutput.launch(offline.stdout) else { throw fail(offline) }

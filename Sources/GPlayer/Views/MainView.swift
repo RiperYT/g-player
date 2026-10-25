@@ -39,7 +39,7 @@ struct MainView: View {
             Button("Close Steam and Install") { model.quitSteamThenInstall(request) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text("Windows installers need the space to themselves. G-Player closes Steam, installs \(model.componentsLabel(request.components)), then starts \(model.game(request.gameID)?.title ?? "the game") again, which opens Steam with it.")
+            Text("Windows installers need the space to themselves. G-Player closes Steam, installs \(model.componentsLabel(request.components)), then starts \(model.game(request.gameID)?.title ?? String(localized: "the game")) again, which opens Steam with it.")
         }
         .alert("This game may not run", isPresented: Binding(get: { model.blockedLaunch != nil },
                                                              set: { if !$0 { model.blockedLaunch = nil } }),
@@ -74,7 +74,7 @@ struct MainView: View {
             Button("Move and Play") { model.moveToGPlayerWine(move.gameID) }
             Button("Cancel", role: .cancel) {}
         } message: { move in
-            Text("\(move.reason.map { $0 + " " } ?? "")Every program in “\(move.spaceName)” will run on \(EngineCatalog.crossover.displayName) instead of \(move.fromEngine)\(move.olderWine ? ", an older Wine than the space has now" : ""); the space's files are updated for it on the first start. Steam closes first if it's open.\(move.downloadMB > 0 ? " G-Player Wine downloads first (about \(move.downloadMB) MB)." : "")\(move.olderWine ? " To move it back, turn on “Choose the Wine engine for each space” in Settings › Advanced." : "")")
+            Text(model.engineMoveMessage(move))
         }
         .alert("Steam is already running", isPresented: Binding(get: { model.steamRestart != nil },
                                                                 set: { if !$0 { model.steamRestart = nil } }),
@@ -85,7 +85,7 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? "this game")'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
+            Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? String(localized: "this game"))'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
         }
         .sheet(isPresented: Binding(get: { model.changesRequest != nil }, set: { _ in })) {
             if let request = model.changesRequest { ChangesRequestSheet(request: request) }
@@ -132,7 +132,7 @@ struct Sidebar: View {
                         Text(space.name).lineLimit(1)
                         Spacer()
                         let count = model.visibleGames(in: space).count
-                        if count > 0 { Text("\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit() }
+                        if count > 0 { Text(verbatim: "\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit() }
                     }
                     .tag(SidebarItem.space(space.id))
                     .contextMenu {
@@ -163,7 +163,7 @@ private struct HiddenRow: View {
         HStack {
             Label("Hidden", systemImage: "eye.slash")
             Spacer()
-            Text("\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            Text(verbatim: "\(count)").font(.caption).foregroundStyle(.tertiary).monospacedDigit()
         }
     }
 }

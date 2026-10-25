@@ -59,7 +59,7 @@ extension AppModel {
         if space.allowsChanges == nil {
             askToChange(space) { allowed in if allowed { retry() } }
         } else {
-            errorMessage = "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first."
+            errorMessage = String(localized: "G-Player doesn't change “\(space.name)”: you said so. Allow changes in the space's settings first.")
         }
         return true
     }
@@ -76,7 +76,7 @@ extension AppModel {
         catch {
             if userAsked || !engineBackupWarned {
                 engineBackupWarned = true
-                errorMessage = "G-Player couldn't keep a copy of library.json before updating G-Player Wine, so your spaces stay on the old version for now. \(error.localizedDescription)"
+                errorMessage = String(localized: "G-Player couldn't keep a copy of library.json before updating G-Player Wine, so your spaces stay on the old version for now. \(error.localizedDescription)")
             }
             return false
         }

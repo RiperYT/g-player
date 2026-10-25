@@ -81,9 +81,9 @@ public enum LaunchPlanner {
         case missingExecutable(String), launcherMissing(String), epicFilesMissing(String)
         public var errorDescription: String? {
             switch self {
-            case .missingExecutable(let t): "\(t) has no program to start. Choose one in its settings."
-            case .epicFilesMissing(let t): "\(t)'s files aren't where Epic Games installed them. Open \(EpicGames.libraryPlace) to repair or remove it."
-            case .launcherMissing(let n): "\(n) isn't installed in this space yet."
+            case .missingExecutable(let t): String(localized: "\(t) has no program to start. Choose one in its settings.")
+            case .epicFilesMissing(let t): String(localized: "\(t)'s files aren't where Epic Games installed them. Open \(EpicGames.libraryPlace) to repair or remove it.")
+            case .launcherMissing(let n): String(localized: "\(n) isn't installed in this space yet.")
             }
         }
     }

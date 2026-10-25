@@ -20,7 +20,7 @@ extension AppModel {
         guard let current = self.space(space.id), current.engineID != info.id, !movingSpaces.contains(current.id) else { return }
         if !current.mayChange {
             guard current.allowsChanges == nil else {
-                errorMessage = "G-Player doesn't change “\(current.name)”: you said so. Allow changes in the space's settings first."
+                errorMessage = String(localized: "G-Player doesn't change “\(current.name)”: you said so. Allow changes in the space's settings first.")
                 return
             }
             askToChange(current) { [weak self] allowed in if allowed { self?.switchEngine(of: current, to: info) } }

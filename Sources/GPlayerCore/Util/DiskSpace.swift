@@ -19,8 +19,8 @@ public enum DiskSpace {
     /// Nil when `available` covers `needed` (or isn't known), else why not, for the user.
     public static func problem(needing needed: Int64, available: Int64?, for what: String) -> String? {
         guard let available, needed > 0, available < needed else { return nil }
-        return "\(what) needs about \(needed.formattedBytes) free, and this disk has \(available.formattedBytes). "
-            + "Free some space, then try again."
+        return String(localized: "\(what) needs about \(needed.formattedBytes) free, and this disk has \(available.formattedBytes). Free some space, then try again.",
+                      comment: "What is about to be done, as a phrase (“Installing G-Player Wine”, “Adding “Game””), comes first")
     }
 
     /// True when both places are on the same disk (a move there is a rename, and a copy can be a clone).

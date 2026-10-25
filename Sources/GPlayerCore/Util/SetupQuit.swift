@@ -29,10 +29,10 @@ public enum SetupQuit {
             title.prefix(1).lowercased() + title.dropFirst()
         }
         switch phrases.count {
-        case 0: return "setting up"
+        case 0: return String(localized: "setting up")
         case 1: return phrases[0]
-        case 2: return "\(phrases[0]) and \(phrases[1])"
-        default: return "\(phrases[0]), \(phrases[1]) and \(phrases.count - 2) more"
+        case 2: return String(localized: "\(phrases[0]) and \(phrases[1])")
+        default: return String(localized: "\(phrases[0]), \(phrases[1]) and \(phrases.count - 2) more")
         }
     }
 
@@ -40,11 +40,11 @@ public enum SetupQuit {
     public static func question(titles: [String], outcome: Outcome) -> (title: String, detail: String) {
         let tail: String
         switch outcome {
-        case .resumes: tail = "Setup continues the next time G-Player opens."
-        case .continuesInWelcome: tail = "The download stops now. What came is kept, and it goes on from there when you continue the welcome steps again."
-        case .stops: tail = "The setup stops now, and you can start it again later."
+        case .resumes: tail = String(localized: "Setup continues the next time G-Player opens.")
+        case .continuesInWelcome: tail = String(localized: "The download stops now. What came is kept, and it goes on from there when you continue the welcome steps again.")
+        case .stops: tail = String(localized: "The setup stops now, and you can start it again later.")
         }
-        return ("G-Player is still setting up (\(summary(of: titles))).", "Quit anyway? \(tail)")
+        return (String(localized: "G-Player is still setting up (\(summary(of: titles)))."), String(localized: "Quit anyway? \(tail)"))
     }
 
     // MARK: Who asked

@@ -124,7 +124,7 @@ public enum EngineMigration {
 
     /// What the offer says, in one plain sentence.
     public static func moveOffer(to info: EngineInfo) -> String {
-        "A newer \(info.name) is ready. Moving this bottle to it updates Wine's files in it once."
+        String(localized: "A newer \(info.name) is ready. Moving this bottle to it updates Wine's files in it once.")
     }
 
     /// A start in the space would run the replacement of its retired engine, which isn't installed (`ensureEngine` then installs
@@ -159,19 +159,19 @@ public enum EngineMigration {
 
     /// What says why a replacement is downloading in the background, and what comes of it.
     public static func updateNote(for info: EngineInfo) -> String {
-        "Updating \(info.name) (adds video playback in games). Your games keep working meanwhile. "
-            + "Spaces switch over by themselves once nothing runs in them, and the old version is then removed."
+        String(localized: "Updating \(info.name) (adds video playback in games). Your games keep working meanwhile.") + " "
+            + String(localized: "Spaces switch over by themselves once nothing runs in them, and the old version is then removed.")
     }
 
     /// `updateNote` short enough for the sidebar's activity panel.
     public static func shortUpdateNote(for info: EngineInfo) -> String {
-        "Adds video playback in games. Your games keep working meanwhile."
+        String(localized: "Adds video playback in games. Your games keep working meanwhile.")
     }
 
     /// The one line for a background update that failed, in Settings › Engines and in the sidebar: what failed, why in a few
     /// words, and that it is tried again.
     public static func updateFailure(for info: EngineInfo, reason: String) -> String {
-        "Couldn't update \(info.name): \(shortReason(reason)). G-Player tries again next time it opens."
+        String(localized: "Couldn't update \(info.name): \(shortReason(reason)). G-Player tries again next time it opens.")
     }
 
     /// An error's text in a few words: its first sentence, without the full stop, starting in lower case unless that would
@@ -180,7 +180,7 @@ public enum EngineMigration {
         var reason = text.split(whereSeparator: \.isNewline).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
         if let stop = reason.range(of: ". ") { reason = String(reason[..<stop.lowerBound]) }
         while reason.hasSuffix(".") || reason.hasSuffix(":") { reason.removeLast() }
-        guard !reason.isEmpty else { return "something went wrong" }
+        guard !reason.isEmpty else { return String(localized: "something went wrong") }
         let letters = Array(reason)
         if letters.count > 1, letters[0].isUppercase, letters[1].isLowercase { reason = letters[0].lowercased() + String(reason.dropFirst()) }
         guard reason.count > limit else { return reason }

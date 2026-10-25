@@ -22,7 +22,7 @@ public struct ProgramSnapshot: Sendable {
                   !ExecutableScanner.isHelper(target.lastPathComponent),
                   seen.insert(target.standardizedFileURL.path).inserted else { continue }
             results.append(ExecutableCandidate(url: target, size: Files.size(of: target), score: 1000,
-                                               hint: "Shortcut “\(shortcut.name)”"))
+                                               hint: String(localized: "Shortcut “\(shortcut.name)”")))
         }
         let newExes = after.executables.subtracting(before.executables)
         let rated = ExecutableScanner.scan(space.driveC, maxDepth: 7)

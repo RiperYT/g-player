@@ -125,7 +125,7 @@ private struct AutomaticGraphicsRow: View {
     var body: some View {
         if let choice = model.graphicsChoice(for: game) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Label("Graphics: " + choice.summary, systemImage: "display")
+                Label("Graphics: \(choice.summary)", systemImage: "display")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -153,7 +153,7 @@ private struct OptionToggles: View {
             Toggle("Sharper on Retina displays", isOn: bind(\.retina))
             Toggle("Show frame rate", isOn: bind(\.showFrameRate))
             if fixCount > 0 {
-                Toggle("Use \(fixCount == 1 ? "the known fix" : "\(fixCount) known fixes") for this game", isOn: bind(\.useKnownFixes))
+                Toggle(fixCount == 1 ? "Use the known fix for this game" : "Use \(fixCount) known fixes for this game", isOn: bind(\.useKnownFixes))
             }
         }
         .font(.callout)
