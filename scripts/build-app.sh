@@ -33,6 +33,8 @@ cp -R Sources/GPlayerCore/Resources/. "$APP/Contents/Resources/"
 [ -f build/AppIcon.icns ] || swift scripts/make-icon.swift build/AppIcon.icns
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp LICENSE NOTICE "$APP/Contents/Resources/"
+# Translations (Localization/<language>.lproj); the languages are also listed in scripts/Info.plist.
+for lproj in Localization/*.lproj; do ditto "$lproj" "$APP/Contents/Resources/$(basename "$lproj")"; done
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" scripts/Info.plist > "$APP/Contents/Info.plist"
 [ -z "$SPARKLE_KEY" ] || plutil -insert SUPublicEDKey -string "$SPARKLE_KEY" "$APP/Contents/Info.plist"
 

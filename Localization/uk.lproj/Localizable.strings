@@ -1,0 +1,2 @@
+/* Ukrainian. Keys are the English text from the code; values are the translation.
+   Plural forms (keys with a count) are in Localizable.stringsdict. Check with scripts/l10n.sh. */
