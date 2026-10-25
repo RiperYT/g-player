@@ -150,10 +150,10 @@ public struct Winetricks: Sendable {
     /// One line of winetricks output as a short status, or nil when it isn't worth showing.
     static func progressMessage(forLine line: String, verb: String) -> String? {
         if line.hasPrefix("Downloading "), let url = line.dropFirst("Downloading ".count).split(separator: " ").first {
-            return String(localized: "Downloading \(url.split(separator: "/").last.map(String.init) ?? String(localized: "files"))")
+            return String(localized: "Downloading \(url.split(separator: "/").last.map(String.init) ?? String(localized: "files", comment: "Inside “Downloading …”"))")
         }
-        if line.hasPrefix(String(localized: "Executing wine ")) || line.hasPrefix(String(localized: "Executing arch ")) { return String(localized: "Installing \(verb)") }
-        if line.hasPrefix(String(localized: "Executing cabextract ")) { return String(localized: "Unpacking \(verb)") }
+        if line.hasPrefix("Executing wine ") || line.hasPrefix("Executing arch ") { return String(localized: "Installing \(verb)") }
+        if line.hasPrefix("Executing cabextract ") { return String(localized: "Unpacking \(verb)") }
         return nil
     }
 

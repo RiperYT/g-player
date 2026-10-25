@@ -149,7 +149,7 @@ public enum WineMono {
 
     /// "Wine Mono, 40 MB", for the line that says what is being fetched.
     public static func sizeLabel(_ package: WineMonoPackage) -> String {
-        String(localized: "\(EngineCatalog.megabytes(package.download.approximateBytes)) MB")
+        String(localized: "\(EngineCatalog.megabytes(package.download.approximateBytes)) MB", comment: "A size in megabytes")
     }
 
     // MARK: Registering

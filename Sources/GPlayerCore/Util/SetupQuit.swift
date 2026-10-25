@@ -29,7 +29,7 @@ public enum SetupQuit {
             title.prefix(1).lowercased() + title.dropFirst()
         }
         switch phrases.count {
-        case 0: return String(localized: "setting up")
+        case 0: return String(localized: "setting up", comment: "Inside “G-Player is still setting up (…).” when no title is known")
         case 1: return phrases[0]
         case 2: return String(localized: "\(phrases[0]) and \(phrases[1])")
         default: return String(localized: "\(phrases[0]), \(phrases[1]) and \(phrases.count - 2) more")

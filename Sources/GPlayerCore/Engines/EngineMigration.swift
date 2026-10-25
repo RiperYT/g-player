@@ -180,7 +180,7 @@ public enum EngineMigration {
         var reason = text.split(whereSeparator: \.isNewline).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
         if let stop = reason.range(of: ". ") { reason = String(reason[..<stop.lowerBound]) }
         while reason.hasSuffix(".") || reason.hasSuffix(":") { reason.removeLast() }
-        guard !reason.isEmpty else { return String(localized: "something went wrong") }
+        guard !reason.isEmpty else { return String(localized: "something went wrong", comment: "Inside “Couldn’t update …: …. G-Player tries again next time it opens.”") }
         let letters = Array(reason)
         if letters.count > 1, letters[0].isUppercase, letters[1].isLowercase { reason = letters[0].lowercased() + String(reason.dropFirst()) }
         guard reason.count > limit else { return reason }

@@ -37,7 +37,7 @@ struct FoundEnvironmentList: View {
         if f.presetID == "steam" { parts.append("Steam") }
         parts += f.games.map(\.title)
         let engine = EngineCatalog.info(f.suggestedEngineID)?.name ?? f.suggestedEngineID
-        let runs = String(localized: "runs on \(engine)")
+        let runs = String(localized: "runs on \(engine)", comment: "Ends a line like “Steam, Game · runs on G-Player Wine”")
         return parts.isEmpty ? runs : "\(parts.joined(separator: ", ")) · \(runs)"
     }
 }

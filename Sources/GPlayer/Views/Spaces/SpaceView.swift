@@ -60,7 +60,7 @@ struct SpaceView: View {
         } message: {
             Text(space.origin == .managed
                  ? "Its games leave the library. Moving to Trash also removes everything installed in it."
-                 : "Its files stay where they are (\(space.originNote ?? String(localized: "on this Mac"))).")
+                 : "Its files stay where they are (\(space.originNote ?? String(localized: "on this Mac", comment: "Inside “Its files stay where they are (…).”"))).")
         }
         .alert(switchTitle, isPresented: Binding(get: { pendingEngine != nil }, set: { if !$0 { pendingEngine = nil } })) {
             Button("Move") { if let target = pendingEngine.flatMap(EngineCatalog.info) { model.switchEngine(of: space, to: target) }; pendingEngine = nil }
@@ -267,7 +267,7 @@ private struct EngineMoveNote: View {
         HStack(spacing: 12) {
             Image(systemName: "info.circle").foregroundStyle(.secondary).font(.title3)
             VStack(alignment: .leading, spacing: 2) {
-                Text(info?.kind == .gptk ? "This space runs on Apple's Game Porting Toolkit" : "This space runs on \(info?.shortName ?? String(localized: "an older engine"))")
+                Text(info?.kind == .gptk ? "This space runs on Apple's Game Porting Toolkit" : "This space runs on \(info?.shortName ?? String(localized: "an older engine", comment: "Inside “This space runs on …”"))")
                     .font(.callout.weight(.semibold))
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -366,7 +366,7 @@ struct NewSpaceSheet: View {
             }
             .formStyle(.grouped).scrollDisabled(true).frame(height: model.choosesEngines ? 120 : 64)
             if model.choosesEngines {
-                Text("\(engine.displayName). \(engine.summary)").font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: "\(engine.displayName). \(engine.summary)").font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {

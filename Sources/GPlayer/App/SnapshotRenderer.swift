@@ -89,12 +89,12 @@ enum SnapshotRenderer {
             Shot(name: "main-library-setting-up-spaces", size: mainSize, firstRunSpaces: ["main", "steam"]) { box in
                 box.finishedOnboarding()
                 box.installEngine(EngineCatalog.crossover)
-                _ = box.model.begin("Creating “Main”", "Setting up Windows. This takes about a minute the first time.")
+                _ = box.model.begin(String(localized: "Creating “\("Main")”"), String(localized: "Setting up Windows. This takes about a minute the first time."))
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
             Shot(name: "main-library-updating-engine", size: mainSize) { box in
                 box.libraryWithGames()
-                _ = box.model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 120 of 446 MB", progress: 0.27,
+                _ = box.model.begin(AppModel.downloadTitle(EngineCatalog.crossover), DownloadResume.message(received: 120_000_000, total: 446_000_000), progress: 0.27,
                                     note: EngineMigration.shortUpdateNote(for: EngineCatalog.crossover))
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
@@ -143,7 +143,7 @@ enum SnapshotRenderer {
             // Wine Mono on its way into the engine, the first time Epic's launcher starts.
             Shot(name: "main-library-downloading-wine-mono", size: mainSize) { box in
                 box.libraryWithGames()
-                _ = box.model.begin(WineMono.downloadTitle, "Downloading 12 of 40 MB", progress: 0.3, setup: true)
+                _ = box.model.begin(WineMono.downloadTitle, DownloadResume.message(received: 12_000_000, total: 40_000_000), progress: 0.3, setup: true)
                 return AnyView(MainWindow(detail: LibraryView(filter: .all)).environment(box.model))
             },
             Shot(name: "main-library-notes", size: mainSize) { box in
@@ -372,13 +372,13 @@ enum SnapshotRenderer {
         /// G-Player Wine on its way, nothing else installed: the engine step a minute into the first run.
         func downloadingEngines() {
             model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
-            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 268 of 639 MB", progress: 0.42)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), DownloadResume.message(received: 268_000_000, total: 639_000_000), progress: 0.42)
         }
 
         /// Nothing installed yet, G-Player Wine just started: the first minute of the first run.
         func downloadingFirstEngine() {
             model.libraryRoot = root.appendingPathComponent("G-Player", isDirectory: true)
-            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), "Downloading 115 of 639 MB", progress: 0.18)
+            _ = model.begin(AppModel.downloadTitle(EngineCatalog.crossover), DownloadResume.message(received: 115_000_000, total: 639_000_000), progress: 0.18)
         }
 
         /// Spaces on both engines, a few games, and what the library says to someone who just updated and just got Steam.
@@ -421,10 +421,10 @@ enum SnapshotRenderer {
             model.mutate { $0.spaces.append(space); $0.games.append(game) }
             // With Try Other Graphics on offer the log named the graphics; without it, nothing left to try.
             model.diagnoses[game.id] = [tryOthers
-                ? Diagnosis(kind: .graphics, title: "Graphics didn't start", detail: "The game couldn't create its graphics device.",
-                            remedy: .useProfile(.compatible))
-                : Diagnosis(kind: .crash, title: "The game closed right away", detail: "It quit after 3 seconds without saying why.",
-                            remedy: .none)]
+                ? Diagnosis(kind: .graphics, title: String(localized: "Graphics didn't start"),
+                            detail: String(localized: "The game couldn't create its graphics device."), remedy: .useProfile(.compatible))
+                : Diagnosis(kind: .crash, title: String(localized: "The game closed right away"),
+                            detail: String(localized: "It quit after \(3) seconds without saying why."), remedy: .none)]
             if tryOthers {
                 model.failedAutoLaunches[game.id] = AutoLaunch(backend: .dxvk, engineID: space.engineID, startedAt: Date(), retried: false)
             }

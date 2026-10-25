@@ -142,7 +142,7 @@ struct AddGameSheet: View {
     private var message: String {
         switch installer?.phase {
         case .queued:
-            let holder = targetSpace.flatMap { model.queueHolder(in: $0.id) } ?? String(localized: "other work in this space")
+            let holder = targetSpace.flatMap { model.queueHolder(in: $0.id) } ?? String(localized: "other work in this space", comment: "Inside “Waiting for …”")
             return String(localized: "Waiting for \(holder)…", comment: "What the space's queue is busy with follows, e.g. “the installer of “Game””")
         case .finishing:
             return String(localized: "Looking for what it installed…")
@@ -287,7 +287,7 @@ struct AddGameSheet: View {
             // From here Add Game counts as work in the space: its engine isn't switched or deleted under the steps below.
             model.beginAddGame(in: space.id)
             defer { model.endAddGame(in: space.id) }
-            if model.engine(for: space) == nil { workMessage = String(localized: "Downloading \(EngineCatalog.info(space.engineID)?.name ?? String(localized: "the engine"))…") }
+            if model.engine(for: space) == nil { workMessage = String(localized: "Downloading \(EngineCatalog.info(space.engineID)?.name ?? String(localized: "the engine", comment: "Inside “Downloading …”"))…") }
             guard await model.engineReady(for: space) != nil else { step = .details; return }       // checked now, looked up again to start
             try Task.checkCancellation()
             targetSpace = space

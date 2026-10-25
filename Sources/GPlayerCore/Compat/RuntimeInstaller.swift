@@ -225,7 +225,7 @@ public struct RuntimeInstaller: Sendable {
             await WineLauncher.waitForAll(engine: engine, space: space, timeout: Self.settleTimeout)
             try Task.checkCancellation()
             guard Self.acceptedSetupStatus.contains(status) else {
-                throw ShellError.failed(String(localized: "\(setup.file.fileName) stopped with code \(status). Details: \(log.file?.lastPathComponent ?? String(localized: "the Logs folder"))"))
+                throw ShellError.failed(String(localized: "\(setup.file.fileName) stopped with code \(status). Details: \(log.file?.lastPathComponent ?? String(localized: "the Logs folder", comment: "Inside “Details: …”"))"))
             }
         }
 

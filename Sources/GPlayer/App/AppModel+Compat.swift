@@ -279,7 +279,7 @@ extension AppModel {
     func installComponents(_ ids: [String], in space: Space, engine: Engine? = nil, reason: String,
                            retryFailed: Bool = false) async -> ComponentInstall {
         guard self.space(space.id)?.mayChange ?? space.mayChange else { return .notAllowed }
-        return await enqueue(in: space.id, holds: String(localized: "Windows components \(reason)")) {
+        return await enqueue(in: space.id, holds: String(localized: "Windows components \(reason)", comment: "Follows “Waiting for” in the sidebar: “Waiting for Windows components for “Game”…”")) {
             await self.installNow(ids, in: space, engine: engine, reason: reason, retryFailed: retryFailed)
         }.value
     }
@@ -305,7 +305,7 @@ extension AppModel {
         var resolved = engine
         if resolved == nil { resolved = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
         guard let engine = resolved else { return .done }
-        let activity = begin(String(localized: "Installing Windows components \(reason)"), componentsLabel(missing), setup: true)
+        let activity = begin(String(localized: "Installing Windows components \(reason)", comment: "The end is a phrase like “for “Game”” or “in “Main””"), componentsLabel(missing), setup: true)
         activeInstalls[space.id, default: 0] += 1
         defer { Self.decrement(&activeInstalls, space.id) }
         let work = Task.detached {
@@ -323,7 +323,7 @@ extension AppModel {
             // Launches waiting for these start without them instead of installing them again.
             skippedComponents[space.id, default: []].formUnion(missing)
         } catch {
-            errorMessage = String(localized: "Couldn't install everything \(reason): \(error.localizedDescription)")
+            errorMessage = String(localized: "Couldn't install everything \(reason): \(error.localizedDescription)", comment: "The first placeholder is a phrase like “for “Game”” or “in “Main””")
         }
         pendingComponents[space.id]?.subtract(ids)
         if result == .done { clearWaitingNotes(in: space) }
@@ -347,7 +347,7 @@ extension AppModel {
             guard let space = space(id) else { continue }
             Task {
                 guard !(await Self.isBusy(space)) else { return }
-                await installComponents(Array(ids), in: space, reason: String(localized: "in “\(space.name)”"))
+                await installComponents(Array(ids), in: space, reason: String(localized: "in “\(space.name)”", comment: "Ends “Installing Windows components …”: where they are installed"))
             }
         }
     }
@@ -386,7 +386,7 @@ extension AppModel {
     /// Installs components the user asked for, then starts the game again.
     func installThenPlay(_ ids: [String], game: Game, in space: Space) async {
         skippedComponents[space.id]?.subtract(ids)
-        let result = await installComponents(ids, in: space, reason: String(localized: "for \(game.title)"), retryFailed: true)
+        let result = await installComponents(ids, in: space, reason: String(localized: "for \(game.title)", comment: "Ends “Installing Windows components …”: what they are for"), retryFailed: true)
         // Stop means stop: the game doesn't start (and doesn't install the same components again).
         guard result != .cancelled else { return }
         if result == .waiting {

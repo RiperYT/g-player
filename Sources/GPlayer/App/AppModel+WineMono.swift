@@ -106,7 +106,7 @@ extension AppModel {
 
     private func downloadWineMono(into engine: Engine, purpose: String, with manager: EngineManager) async -> WineMonoFetch {
         await leftoversCleaning?.value
-        let activity = begin(WineMono.downloadTitle, String(localized: "Starting"), setup: true, note: String(localized: "\(purpose) needs .NET"))
+        let activity = begin(WineMono.downloadTitle, String(localized: "Starting"), setup: true, note: String(localized: "\(purpose) needs .NET", comment: "The sidebar note under the download; the placeholder says what for, e.g. “Epic Online Services”"))
         defer { end(activity); cancellers[activity] = nil; monoInstalls[engine.info.id] = nil }
         let log = InstallLog(title: "Install Wine Mono \(engine.info.mono?.version ?? "") for \(engine.info.id)")
         let logs = manager.paths.logs

@@ -39,7 +39,7 @@ struct MainView: View {
             Button("Close Steam and Install") { model.quitSteamThenInstall(request) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text("Windows installers need the space to themselves. G-Player closes Steam, installs \(model.componentsLabel(request.components)), then starts \(model.game(request.gameID)?.title ?? String(localized: "the game")) again, which opens Steam with it.")
+            Text("Windows installers need the space to themselves. G-Player closes Steam, installs \(model.componentsLabel(request.components)), then starts \(model.game(request.gameID)?.title ?? String(localized: "the game", comment: "Inside “…then starts … again”: the game that is waiting")) again, which opens Steam with it.")
         }
         .alert("This game may not run", isPresented: Binding(get: { model.blockedLaunch != nil },
                                                              set: { if !$0 { model.blockedLaunch = nil } }),
@@ -85,7 +85,7 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? String(localized: "this game"))'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
+            Text("Steam starts games with the settings it had when it opened, so \(model.game(request.gameID)?.title ?? String(localized: "this game", comment: "Inside “so …’s profile and fixes only reach it”"))'s profile and fixes only reach it after a restart. Restarting quits Steam first, which pauses its downloads and closes other games it runs. Play Anyway starts the game with Steam's current settings.")
         }
         .sheet(isPresented: Binding(get: { model.changesRequest != nil }, set: { _ in })) {
             if let request = model.changesRequest { ChangesRequestSheet(request: request) }

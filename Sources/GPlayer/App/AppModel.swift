@@ -440,8 +440,8 @@ final class AppModel {
     /// What an engine picker adds after an engine's name: recommended, and whether it needs a download (with its
     /// size). `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
     func engineNote(_ info: EngineInfo, listsInstalled: Bool = false) -> String {
-        var notes = info.isRecommended ? [String(localized: "recommended")] : []
-        if isInstalled(info) { if listsInstalled { notes.append(String(localized: "installed")) } }
+        var notes = info.isRecommended ? [String(localized: "recommended", comment: "After an engine’s name in a picker: “G-Player Wine · recommended, 640 MB to download”")] : []
+        if isInstalled(info) { if listsInstalled { notes.append(String(localized: "installed", comment: "After an engine’s name in a picker: “Wine Staging 11.18 · installed”")) } }
         else {
             let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)))
             notes.append(String(localized: "\(mb) MB to download"))
@@ -718,7 +718,7 @@ final class AppModel {
     /// with ("Waiting for the installer of “Game”…").
     func message(of activity: Activity) -> String {
         guard let space = activity.waitsIn, !activity.stopping else { return activity.message }
-        let holder = queueHolder(in: space) ?? String(localized: "other work in this space")
+        let holder = queueHolder(in: space) ?? String(localized: "other work in this space", comment: "Inside “Waiting for …”")
         return String(localized: "Waiting for \(holder)…", comment: "What the space's queue is busy with follows, e.g. “the installer of “Game””")
     }
 
@@ -825,7 +825,7 @@ final class AppModel {
         if chosen == nil, wanted.id == EngineCatalog.defaultForNewSpaces.id,
            let staging = engineManager?.engine(EngineCatalog.wineStaging) {
             errorMessage = (errorMessage ?? String(localized: "\(wanted.name) wasn't installed."))
-                + String(localized: "\n\n“\(name)” uses \(staging.info.name) instead. You can move it to \(wanted.name) from its page once that is installed.")
+                + "\n\n" + String(localized: "“\(name)” uses \(staging.info.name) instead. You can move it to \(wanted.name) from its page once that is installed.")
             chosen = staging
         }
         guard let engine = chosen else { return nil }
@@ -839,8 +839,8 @@ final class AppModel {
             mutate { $0.spaces.append(space) }
             // Queued now, so a store setup that follows waits for these installers.
             let base = CompatResolver.baseComponents
-            enqueue(in: space.id, holds: String(localized: "Windows components for “\(name)”")) {
-                await self.installNow(base, in: space, engine: engine, reason: String(localized: "for “\(name)”"), retryFailed: false)
+            enqueue(in: space.id, holds: String(localized: "Windows components for “\(name)”", comment: "Follows “Waiting for” in the sidebar: “Waiting for Windows components for “Main”…”")) {
+                await self.installNow(base, in: space, engine: engine, reason: String(localized: "for “\(name)”", comment: "Ends “Installing Windows components …”: what they are for"), retryFailed: false)
             }
             return space
         } catch {
@@ -933,7 +933,7 @@ final class AppModel {
         let help = String(localized: "Stop setting up \(preset.name). You can set it up again later.")
         setStop(activity, help: help) { [weak self] in self?.end(activity) }    // while waiting, Stop drops the setup
         // After the space's base components: Steam's first start stops every program in the space.
-        await enqueue(in: space.id, holds: String(localized: "\(preset.name) to finish setting up")) {
+        await enqueue(in: space.id, holds: String(localized: "\(preset.name) to finish setting up", comment: "Follows “Waiting for” in the sidebar: “Waiting for Steam to finish setting up…”")) {
             self.startedWaiting(activity)
             // Stopped while waiting (the activity is gone), or set up by an earlier press of the same button.
             guard self.activities.contains(where: { $0.id == activity && !$0.stopping }),
@@ -948,7 +948,7 @@ final class AppModel {
             if let monoPlan {
                 // No program exists yet to start without .NET: the installer runs, and the launcher's first start tries again.
                 let outcome = await self.prepareWineMono(
-                    monoPlan, engine: engine, in: space, program: preset.name, purpose: preset.dotNetReason ?? String(localized: "this app"),
+                    monoPlan, engine: engine, in: space, program: preset.name, purpose: preset.dotNetReason ?? String(localized: "this app", comment: "What .NET is needed for, in “… needs .NET”"),
                     consequence: String(localized: "The installer of \(preset.name) runs without .NET, and its first start tries again."))
                 if case .stopped(everything: true) = outcome { return }
                 dotNet = outcome == .ready
@@ -1529,7 +1529,7 @@ final class AppModel {
             }
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
-            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "“\(current.title)” to start")) {
+            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "“\(current.title)” to start", comment: "Follows “Waiting for” in the sidebar: “Waiting for “Game” to start…”")) {
                 await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry, replan: replan)
             }.value
             let program = try started.get()
@@ -1584,7 +1584,7 @@ final class AppModel {
         if self.space(space.id)?.mayChange == true {
             let wanted = plan.components.filter { !(skippedComponents[space.id]?.contains($0) ?? false) }
             if !wanted.isEmpty {
-                switch await installNow(wanted, in: space, engine: engine, reason: String(localized: "for \(game.title)"), retryFailed: false) {
+                switch await installNow(wanted, in: space, engine: engine, reason: String(localized: "for \(game.title)", comment: "Ends “Installing Windows components …”: what they are for"), retryFailed: false) {
                 case .waiting:
                     diagnoses[game.id] = [Diagnosis(kind: .missingComponent, title: Self.componentsLaterTitle,
                         detail: String(localized: "Another program is open in “\(space.name)”, so the game started without \(componentsLabel(wanted)). G-Player installs them once everything in the space has quit."),
@@ -1606,7 +1606,7 @@ final class AppModel {
                     let preset = AppPresets.preset(space.presetID)
                     let outcome = await prepareWineMono(
                         mono, engine: engine, in: space, program: preset?.name ?? game.title,
-                        purpose: preset?.dotNetReason ?? String(localized: "this program"), consequence: String(localized: "\(game.title) starts without .NET."))
+                        purpose: preset?.dotNetReason ?? String(localized: "this program", comment: "What .NET is needed for, in “… needs .NET”"), consequence: String(localized: "\(game.title) starts without .NET."))
                     if case .stopped(everything: true) = outcome { return .failure(CancellationError()) }
                     monoReady = outcome == .ready
                 }
@@ -1700,7 +1700,7 @@ final class AppModel {
     /// What Stop does for this entry, for its tooltip.
     func stopHelp(_ game: Game) -> String {
         if case .steam = game.source, game.kind == .game { return String(localized: "Quits the game. Steam stays open.") }
-        let name = space(game.spaceID)?.name ?? String(localized: "its space")
+        let name = space(game.spaceID)?.name ?? String(localized: "its space", comment: "Inside “Quits everything running in “…”.”")
         return String(localized: "Quits everything running in “\(name)”.")
     }
 
@@ -1733,7 +1733,7 @@ final class AppModel {
             // Starts after the installs queued in the space, as a launch does: an installer started next to Windows components
             // being installed fails (error 1618, another installation is in progress).
             let verbose = verboseLogs
-            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "\(file.lastPathComponent) to start")) { () -> Result<RunningProgram, Error> in
+            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "\(file.lastPathComponent) to start", comment: "Follows “Waiting for” in the sidebar")) { () -> Result<RunningProgram, Error> in
                 Result {
                     try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: file),
                                            workingDirectory: file.deletingLastPathComponent(), backend: .auto,

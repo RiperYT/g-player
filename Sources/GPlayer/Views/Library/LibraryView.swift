@@ -115,7 +115,7 @@ struct LibraryToolbar: ToolbarContent {
                 .help("Look for games Steam or Epic installed")
             Button { model.openAddGame() } label: { Label("Add Game", systemImage: "plus") }
                 .disabled(model.addGameBlock != nil)
-                .help(model.addGameBlock?.message ?? "Add a game folder, archive or installer")
+                .help(model.addGameBlock?.message ?? String(localized: "Add a game folder, archive or installer"))
         }
     }
 }

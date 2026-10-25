@@ -197,7 +197,7 @@ private struct EpicGameRow: View {
         guard let entry else { return String(localized: "Not installed") }
         if model.isPreparing(entry) { return model.epic.startStatus[entry.id] ?? String(localized: "Starting…") }
         if model.isRunning(entry) {
-            return model.epic.startNotes[entry.id].map { String(localized: "Running · \($0.prefix(1).lowercased() + $0.dropFirst())") }
+            return model.epic.startNotes[entry.id].map { String(localized: "Running · \($0.prefix(1).lowercased() + $0.dropFirst())", comment: "The placeholder is a note whose first letter is lower-cased, e.g. “started offline: …”") }
                 ?? String(localized: "Running")
         }
         return model.epic.installed[game.appName].map {

@@ -294,7 +294,7 @@ public enum CompatResolver {
             if touched {
                 plan.appliedFixIDs.append(fix.id)
                 let summary = applied.joined(separator: ". ") + "."
-                plan.notes.append(CompatNote(.applied, String(localized: "Known fix for \(fix.title ?? String(localized: "this game"))"),
+                plan.notes.append(CompatNote(.applied, String(localized: "Known fix for \(fix.title ?? String(localized: "this game", comment: "Inside “Known fix for …”"))"),
                                              fix.verifiedOnMac ? summary : summary + " " + String(localized: "From Linux players, not yet checked on a Mac.")))
             }
         }
@@ -364,7 +364,7 @@ public enum CompatResolver {
 
     /// How a note names a component or setting G-Player can't install.
     static func plainName(_ id: String) -> String {
-        id.contains("=") ? String(localized: "the \(id) setting") : RuntimeCatalog.plainName(id)
+        id.contains("=") ? String(localized: "the \(id) setting", comment: "Inside “Needs …, which G-Player can’t install yet.”") : RuntimeCatalog.plainName(id)
     }
 
     /// "a", "a and b", "a, b and c".

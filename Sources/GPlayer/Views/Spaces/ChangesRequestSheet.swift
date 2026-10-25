@@ -12,7 +12,7 @@ struct ChangesRequestSheet: View {
     var body: some View {
         let space = model.space(request.spaceID)
         VStack(alignment: .leading, spacing: 14) {
-            Text("Allow G-Player to change “\(space?.name ?? String(localized: "this space"))”?").font(.headline)
+            Text("Allow G-Player to change “\(space?.name ?? String(localized: "this space", comment: "Inside “Allow G-Player to change “…”?”"))”?").font(.headline)
             VStack(alignment: .leading, spacing: 8) {
                 Text("To help games run, G-Player would like to add some Windows files to this space and change a few of its settings. Your games and saves aren't touched.")
                 Group {

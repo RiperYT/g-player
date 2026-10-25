@@ -109,7 +109,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        let name = dataTask.originalRequest?.url?.lastPathComponent ?? String(localized: "the file")
+        let name = dataTask.originalRequest?.url?.lastPathComponent ?? String(localized: "the file", comment: "Inside “The server answered 404 for …”")
         let length = response.expectedContentLength > 0 ? response.expectedContentLength : nil
         let http = response as? HTTPURLResponse
         // A file: URL has no status or ranges: its answer is the whole file.

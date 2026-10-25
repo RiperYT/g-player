@@ -270,7 +270,7 @@ private struct ToolkitStep: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
+            Text(verbatim: "\(number)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
                 .frame(width: 20, height: 20).background(.quaternary, in: Circle())
             Text(text).fixedSize(horizontal: false, vertical: true)
         }

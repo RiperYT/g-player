@@ -146,6 +146,6 @@ extension WineMono {
 
     /// The room Wine Mono takes unpacked, for the card that says what the first start adds: "245 MB".
     public static func installedSizeLabel(_ package: WineMonoPackage) -> String {
-        String(localized: "\(EngineCatalog.megabytes(package.installedBytes)) MB")
+        String(localized: "\(EngineCatalog.megabytes(package.installedBytes)) MB", comment: "A size in megabytes")
     }
 }

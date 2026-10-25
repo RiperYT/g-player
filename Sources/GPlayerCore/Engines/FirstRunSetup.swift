@@ -61,7 +61,7 @@ public enum FirstRunSetup {
     public static func pausedNote(pendingSpaces: [String]) -> (title: String, text: String) {
         let names = spaceNames(pendingSpaces)
         return (String(localized: "Setup is on hold"),
-                String(localized: "You stopped the download, so setting up \(names.isEmpty ? String(localized: "the first spaces") : names) is on hold.")
+                String(localized: "You stopped the download, so setting up \(names.isEmpty ? String(localized: "the first spaces", comment: "Inside “…setting up … is on hold”") : names) is on hold.")
                 + " " + String(localized: "It goes on once G-Player Wine is installed: download it in Settings › Engines, or it starts again the next time G-Player opens."))
     }
 
@@ -84,7 +84,7 @@ public enum FirstRunSetup {
         var apps: [String] = []
         for f in found where f.isAnotherAppsBottle && !apps.contains(f.originNote) { apps.append(f.originNote) }
         guard !apps.isEmpty else { return nil }
-        let names = apps.count == 2 ? String(localized: "\(apps[0]) or \(apps[1])") : apps.joined(separator: ", ")
+        let names = apps.count == 2 ? String(localized: "\(apps[0]) or \(apps[1])", comment: "Two app names: “CrossOver or Whisky”") : apps.joined(separator: ", ")
         return String(localized: "G-Player Wine updates a \(names) bottle's files the first time it starts there, and \(names) may not open the bottle afterwards. Make a copy first if you still use it there.")
     }
 }
