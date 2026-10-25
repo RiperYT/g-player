@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.5] - 2026-10-25
 
 - **G-Player speaks Ukrainian.** With macOS set to Ukrainian, the whole app is in Ukrainian: library, spaces, Get Apps,
   Settings, menus, alerts and the messages G-Player shows when something goes wrong. English stays the main language and is
