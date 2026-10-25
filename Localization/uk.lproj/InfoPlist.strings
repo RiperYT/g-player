@@ -1,4 +1,4 @@
 /* Keys are the Info.plist keys; for document types the key is the type's CFBundleTypeName. */
-"Windows game or installer" = "Windows game or installer";
-"Game folder" = "Game folder";
-"NSHumanReadableCopyright" = "G-Player contributors. Apache License 2.0.";
+"Windows game or installer" = "Гра або інсталятор для Windows";
+"Game folder" = "Тека з грою";
+"NSHumanReadableCopyright" = "Автори G-Player. Ліцензія Apache 2.0.";

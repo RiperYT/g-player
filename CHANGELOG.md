@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+- **G-Player speaks Ukrainian.** With macOS set to Ukrainian, the whole app is in Ukrainian: library, spaces, Get Apps,
+  Settings, menus, alerts and the messages G-Player shows when something goes wrong. English stays the main language and is
+  what every other Mac gets. Reports for **Share What Worked…** and the logs stay in English. Translators: see
+  `Localization/README.md`; `make l10n` lists what isn't translated yet.
+- **A new icon:** a play mark with the letter G.
+- **Get Apps offers Steam and Epic.** GOG Galaxy and Ubisoft Connect were never checked from start to finish on Apple Silicon,
+  so they are no longer offered. A space you set up for one keeps working as before.
+
 ## [0.4.4] - 2026-10-24
 
 - **Epic's own launcher opens on G-Player Wine.** The Epic Games Launcher no longer stops at its loading screen: it reaches
