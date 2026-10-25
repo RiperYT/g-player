@@ -30,8 +30,8 @@ ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"          # ditto k
 rm -rf "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/XPCServices"
 # Everything in GPlayerCore/Resources (wrapper, fix database, detection rules, licenses) goes into the bundle.
 cp -R Sources/GPlayerCore/Resources/. "$APP/Contents/Resources/"
-# Drawn again when the drawing changed since.
-[ build/AppIcon.icns -nt scripts/make-icon.swift ] || swift scripts/make-icon.swift build/AppIcon.icns
+# Drawn again when the drawing code or the shape it draws is newer than the icon.
+[ build/AppIcon.icns -nt scripts/make-icon.swift ] && [ build/AppIcon.icns -nt scripts/app-icon.svg ] || swift scripts/make-icon.swift build/AppIcon.icns
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp LICENSE NOTICE "$APP/Contents/Resources/"
 # Translations (Localization/<language>.lproj); the languages are also listed in scripts/Info.plist.

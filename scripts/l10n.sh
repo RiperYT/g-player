@@ -8,23 +8,34 @@
 # and so on. The translation is Localization/uk.lproj/Localizable.strings, plus Localizable.stringsdict for the keys that
 # have a count which changes their words (1 game, 2 games): English plural rules are in en.lproj/Localizable.stringsdict, and
 # those keys need one, few, many and other in Ukrainian. See Localization/README.md.
+#
+# Exit status: 1 when a key is missing, a translation doesn't match its key (placeholders, plural forms), or an English
+# plural rule is left for a key that is no longer in the code; 0 otherwise (stale translations are only listed).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MISSING_JSON=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --missing-json) MISSING_JSON="${2:?--missing-json needs a file}"; shift 2 ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
-OUT="${L10N_TMP:-${TMPDIR:-/tmp}/g-player-l10n}"
+# Each run has a folder of its own for what it reads and writes (L10N_TMP names one, and keeps it), so two runs don't mix them.
+if [ -n "${L10N_TMP:-}" ]; then OUT="$L10N_TMP"; mkdir -p "$OUT"
+else OUT="$(mktemp -d "${TMPDIR:-/tmp}/g-player-l10n.XXXXXX")"; fi
 DATA="$OUT/stringsdata"
 rm -rf "$DATA"; mkdir -p "$DATA"
 # A scratch path of its own keeps this build apart from `swift build`. Everything it built is thrown away first, since a
 # file that isn't recompiled writes no .stringsdata; the packages it downloaded (Sparkle) stay.
 SCRATCH=.build/l10n
+# The scratch path is one for all runs: a second run waits for the first.
+LOCK="$SCRATCH.lock"
+mkdir -p .build
+for _ in $(seq 1 600); do mkdir "$LOCK" 2>/dev/null && break || sleep 1; done
+[ -d "$LOCK" ] || { echo "another scripts/l10n.sh has run for ten minutes: remove $LOCK if it is left over" >&2; exit 1; }
+trap 'rmdir "$LOCK" 2>/dev/null; [ -z "${L10N_TMP:-}" ] && rm -rf "$OUT"' EXIT
 rm -rf "$SCRATCH"/*-apple-macosx "$SCRATCH"/debug "$SCRATCH"/release "$SCRATCH"/build.db "$SCRATCH"/*.lock
 swift build --product GPlayer --scratch-path "$SCRATCH" \
   -Xswiftc -emit-localized-strings -Xswiftc -emit-localized-strings-path -Xswiftc "$DATA" >"$OUT/build.log" 2>&1 \

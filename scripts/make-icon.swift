@@ -101,4 +101,8 @@ p.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 p.arguments = ["-c", "icns", iconset.path, "-o", output]
 try! p.run(); p.waitUntilExit()
 try? fm.removeItem(at: iconset)
+guard p.terminationStatus == 0, fm.fileExists(atPath: output) else {
+    FileHandle.standardError.write(Data("iconutil failed (status \(p.terminationStatus)): no icon was made\n".utf8))
+    exit(1)
+}
 print("icon: \(output)")
