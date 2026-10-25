@@ -11,7 +11,7 @@ extension WineMono {
         public var date: Date
         /// The Mac couldn't reach the server (no connection, a timeout): nothing was wrong with Wine Mono.
         public var offline: Bool
-        /// What went wrong, as the error said it.
+        /// What went wrong, as the error said it. Kept as it was said, in the language of that moment: it is not translated again.
         public var reason: String
 
         public init(version: String, date: Date, offline: Bool, reason: String) {

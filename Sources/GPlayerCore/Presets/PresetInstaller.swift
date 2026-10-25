@@ -30,7 +30,7 @@ public struct PresetInstaller: Sendable {
         try Task.checkCancellation()
         guard preset.isInstalled(in: space) else {
             let looked = preset.executables.map { "C:\\" + $0.replacingOccurrences(of: "/", with: "\\") }.joined(separator: ", ")
-            throw ShellError.failed(String(localized: "The \(preset.name) installer finished (code \(status)), but \(preset.name) isn't in \(looked). The installer's log is in \(paths.logs.path)."))
+            throw ShellError.said("The \(preset.name) installer finished (code \(String(status))), but \(preset.name) isn't in \(looked). The installer's log is in \(paths.logs.path).")
         }
         if preset.id == "steam" { try await finishSteamSetup(space: space, engine: engine, progress: progress) }
         progress(1, String(localized: "\(preset.name) is ready"))
@@ -53,7 +53,7 @@ public struct PresetInstaller: Sendable {
             while !SteamLibrary.isClientReady(in: space), Date() < deadline {
                 try await Task.sleep(for: .seconds(3))
                 if !program.isRunning && !SteamLibrary.isClientReady(in: space) {
-                    throw ShellError.failed(String(localized: "Steam quit before it finished downloading. Open it from the library to continue."))
+                    throw ShellError.said("Steam quit before it finished downloading. Open it from the library to continue.")
                 }
             }
             try await Task.sleep(for: .seconds(8))      // let it finish writing the new files
@@ -64,7 +64,7 @@ public struct PresetInstaller: Sendable {
         }
         await WineLauncher.killAll(engine: engine, space: space)
         guard SteamLibrary.isClientReady(in: space) else {
-            throw ShellError.failed(String(localized: "Steam didn't finish downloading in 20 minutes. Open it from the library to continue."))
+            throw ShellError.said("Steam didn't finish downloading in 20 minutes. Open it from the library to continue.")
         }
     }
 }

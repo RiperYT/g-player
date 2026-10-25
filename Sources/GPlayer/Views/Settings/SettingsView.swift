@@ -137,7 +137,7 @@ struct EngineRows: View {
     var body: some View {
         Group {
             if showsSummary { Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-            LabeledContent("Version", value: info.basedOn ?? info.version)
+            LabeledContent("Version", value: info.basedOnLabel ?? info.versionLabel)
             LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
             if model.isInstalled(info) {
                 LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }

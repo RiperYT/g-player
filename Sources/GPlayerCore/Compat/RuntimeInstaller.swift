@@ -122,11 +122,11 @@ public struct RuntimeInstaller: Sendable {
                         progress: @escaping @Sendable (Double?, String) -> Void) async throws {
         let wanted = ids.map(RuntimeCatalog.canonicalID)
         for id in wanted where !RuntimeCatalog.isInstallable(id) {
-            throw ShellError.failed(String(localized: "\(RuntimeCatalog.plainName(id)) isn't a component G-Player can install."))
+            throw ShellError.said("\(RuntimeCatalog.plainName(id)) isn't a component G-Player can install.")
         }
         let todo = missing(Self.installOrder(wanted), in: space, retryFailed: true)
         guard !todo.isEmpty else { return }
-        guard space.exists else { throw ShellError.failed(String(localized: "\(space.name) isn't ready: Wine hasn't created its Windows folder yet.")) }
+        guard space.exists else { throw ShellError.said("\(space.name) isn't ready: Wine hasn't created its Windows folder yet.") }
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
 
         var failures: [(name: String, reason: String)] = []
@@ -225,19 +225,19 @@ public struct RuntimeInstaller: Sendable {
             await WineLauncher.waitForAll(engine: engine, space: space, timeout: Self.settleTimeout)
             try Task.checkCancellation()
             guard Self.acceptedSetupStatus.contains(status) else {
-                throw ShellError.failed(String(localized: "\(setup.file.fileName) stopped with code \(status). Details: \(log.file?.lastPathComponent ?? String(localized: "the Logs folder", comment: "Inside “Details: …”"))"))
+                throw ShellError.said("\(setup.file.fileName) stopped with code \(String(status)). Details: \(log.file?.lastPathComponent ?? String(localized: "the Logs folder", comment: "Inside “Details: …”"))")
             }
         }
 
         guard Self.hasNativeFiles(spec, in: space) else {
-            throw ShellError.failed(String(localized: "The installer finished, but Wine still uses its own copies of the files."))
+            throw ShellError.said("The installer finished, but Wine still uses its own copies of the files.")
         }
     }
 
     /// Takes `replacement.names` out of the setup program's cabinet and puts them into `folder`, over Wine's own copies.
     private func replaceBuiltins(_ replacement: RuntimeCatalog.NativeRuntime.Replacement, from setup: URL, into folder: URL) async throws {
         guard let shims = CoreResources.url("shims") else {
-            throw ShellError.failed(String(localized: "G-Player's helper scripts are missing. Reinstall G-Player."))
+            throw ShellError.said("G-Player's helper scripts are missing. Reinstall G-Player.")
         }
         let cabextract = shims.appendingPathComponent("cabextract")
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("gplayer-unpack-\(UUID().uuidString)", isDirectory: true)
@@ -248,14 +248,14 @@ public struct RuntimeInstaller: Sendable {
         let outer = try await Shell.run(cabextract, ["-q", "-d", work.path, setup.path, "-F", replacement.container])
         let container = work.appendingPathComponent(replacement.container)
         guard outer.succeeded, FileManager.default.fileExists(atPath: container.path) else {
-            throw ShellError.failed(String(localized: "Couldn't open \(setup.lastPathComponent). \(outer.stderr.suffix(200))"))
+            throw ShellError.said("Couldn't open \(setup.lastPathComponent). \(outer.stderr.suffix(200))")
         }
         for name in replacement.names {
             let inner = work.appendingPathComponent("dll", isDirectory: true)
             let unpacked = try await Shell.run(cabextract, ["-q", "-d", inner.path, container.path, "-F", name + replacement.suffix])
             let file = inner.appendingPathComponent(name + replacement.suffix)
             guard unpacked.succeeded, FileManager.default.fileExists(atPath: file.path) else {
-                throw ShellError.failed(String(localized: "\(name) isn't in \(setup.lastPathComponent). \(unpacked.stderr.suffix(200))"))
+                throw ShellError.said("\(name) isn't in \(setup.lastPathComponent). \(unpacked.stderr.suffix(200))")
             }
             try Self.put(file, as: name, in: folder)
         }
@@ -271,7 +271,7 @@ public struct RuntimeInstaller: Sendable {
         defer { try? FileManager.default.removeItem(at: file) }
         let result = try await WineLauncher.runTool(engine: engine, space: space, ["regedit", "/S", "C:\\windows\\temp\\" + name])
         guard result.succeeded else {
-            throw ShellError.failed(String(localized: "Wine couldn't write the DLL overrides. \(result.stderr.suffix(300))"))
+            throw ShellError.said("Wine couldn't write the DLL overrides. \(result.stderr.suffix(300))")
         }
     }
 
@@ -294,7 +294,7 @@ public struct RuntimeInstaller: Sendable {
         try await FileDownloader.download(item.url, to: part, progress: progress)
         guard try Files.sha256(of: part) == item.sha256 else {
             try? fm.removeItem(at: part)
-            throw ShellError.failed(String(localized: "\(item.fileName) doesn't match its checksum. The publisher may have replaced the file, so G-Player didn't use it. Nothing was installed from it."))
+            throw ShellError.said("\(item.fileName) doesn't match its checksum. The publisher may have replaced the file, so G-Player didn't use it. Nothing was installed from it.")
         }
         try? fm.removeItem(at: file)
         try fm.moveItem(at: part, to: file)

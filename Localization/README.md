@@ -29,8 +29,11 @@ English is the source language: the keys in the code are the English text. Ukrai
 - keys `uk.lproj` has that the code no longer has (stale),
 - translations whose placeholders differ from the key's, and plural entries without all forms (mismatched).
 
-It exits with 1 on missing or mismatched. `scripts/l10n.sh --missing-json <file>` writes the missing keys with the
-source lines (`files`), the translator comment and, for plural keys, the English forms.
+It exits with 1 on missing or mismatched keys, and on an English plural rule left for a key the code no longer has.
+Stale translations are only listed.
+
+`scripts/l10n.sh --missing-json <file>` writes the missing keys with the source lines (`files`), the translator comment and,
+for plural keys, the English forms.
 
 To see a screen in Ukrainian without the real library: `G-Player.app/Contents/MacOS/GPlayer --render-onboarding <folder>
 -AppleLanguages '(uk)'`.

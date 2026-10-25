@@ -66,8 +66,16 @@ public struct Engine: Sendable, Hashable {
 /// Finds, downloads and removes engines.
 public struct EngineManager: Sendable {
     public let paths: LibraryPaths
+    /// Gets what an install says about its progress, in English whatever the app's language: for its log (`InstallLog`).
+    public var log: (@Sendable (String) -> Void)?
 
     public init(paths: LibraryPaths) { self.paths = paths }
+
+    /// A progress message as text for the screen; its English goes to `log`.
+    func say(_ message: LocalizedStringResource) -> String {
+        log?(message.english)
+        return String(localized: message)
+    }
 
     public static let gptkApp = URL(fileURLWithPath: "/Applications/Game Porting Toolkit.app")
 
@@ -130,7 +138,16 @@ public struct EngineManager: Sendable {
         guard !infos.isEmpty else { return nil }
         let names = CompatResolver.list(infos.map(\.name))
         return DiskSpace.problem(needing: diskNeeded(installing: infos), available: DiskSpace.available(at: paths.root),
-                                 for: String(localized: "Installing \(names)"))
+                                 for: "Installing \(names)")
+    }
+
+    /// `diskProblem` as an error to throw, with its English for the install's log.
+    func diskError(installing infos: [EngineInfo]) -> ShellError? {
+        guard let text = diskProblem(installing: infos) else { return nil }
+        let names = infos.map(\.name).joined(separator: " and ")
+        let english = DiskSpace.problem(needing: diskNeeded(installing: infos), available: DiskSpace.available(at: paths.root),
+                                        for: "Installing \(names)", english: true) ?? text
+        return .translated(text, english: english)
     }
 
     /// The free space installing `infos` needs now (`EngineCatalog.diskBytes`). One engine whose files an earlier try left in
@@ -152,9 +169,9 @@ public struct EngineManager: Sendable {
     /// counts the room they take.
     public func install(_ info: EngineInfo, progress: @escaping @Sendable (Double, String) -> Void) async throws -> Engine {
         guard !info.downloads.isEmpty else {
-            throw ShellError.failed(String(localized: "G-Player doesn't download \(info.name). Install it yourself from Apple if its license fits your use."))
+            throw ShellError.said("G-Player doesn't download \(info.name). Install it yourself from Apple if its license fits your use.")
         }
-        if let problem = diskProblem(installing: [info]) { throw ShellError.failed(problem) }
+        if let problem = diskError(installing: [info]) { throw problem }
         try paths.createFolders()
         let target = folder(for: info)
         let staging = paths.engines.appendingPathComponent(".\(info.id)-\(UUID().uuidString.prefix(8))", isDirectory: true)
@@ -184,11 +201,11 @@ public struct EngineManager: Sendable {
                 let base = done
                 try await fetch(item, to: file) { received, note in
                     let fraction = totalBytes > 0 ? Double(base + received) / Double(totalBytes) : 0
-                    progress(min(0.95, fraction), note ?? DownloadResume.message(received: base + received, total: totalBytes))
+                    progress(min(0.95, fraction), note ?? say(DownloadResume.resource(received: base + received, total: totalBytes)))
                 }
             }
             done += item.approximateBytes
-            progress(min(0.97, totalBytes > 0 ? Double(done) / Double(totalBytes) : 0.97), String(localized: "Unpacking \(item.fileName)"))
+            progress(min(0.97, totalBytes > 0 ? Double(done) / Double(totalBytes) : 0.97), say("Unpacking \(item.fileName)"))
             switch item.role {
             case .engine: try await unpack(file, into: staging, isDXVK: false)
             case .dxvk: try await unpack(file, into: staging, isDXVK: true)
@@ -197,7 +214,7 @@ public struct EngineManager: Sendable {
                 try await unpack(file, into: unpacked, isDXVK: false)
                 let lib = (try? FileManager.default.contentsOfDirectory(at: unpacked, includingPropertiesForKeys: nil))?
                     .first { $0.pathExtension == "app" }?.appendingPathComponent("Contents/Resources/wine/lib")
-                guard let lib else { throw ShellError.failed(String(localized: "\(item.fileName) doesn't hold Wine's libraries.")) }
+                guard let lib else { throw ShellError.said("\(item.fileName) doesn't hold Wine's libraries.") }
                 try copyRuntimeLibraries(from: lib, into: staging.appendingPathComponent("wine/lib"))
                 try? FileManager.default.removeItem(at: unpacked)
             case .gstreamer:
@@ -212,8 +229,8 @@ public struct EngineManager: Sendable {
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: staging, to: target)
         try? FileManager.default.removeItem(at: downloadFolder(for: info))
-        progress(1, String(localized: "Ready"))
-        guard let engine = engine(info) else { throw ShellError.failed(String(localized: "\(info.name) was unpacked but can't be found.")) }
+        progress(1, say("Ready"))
+        guard let engine = engine(info) else { throw ShellError.said("\(info.name) was unpacked but can't be found.") }
         EngineFixes.apply(to: engine)
         return engine
     }
@@ -242,14 +259,14 @@ public struct EngineManager: Sendable {
                                                            delays: delays) else { throw error }
                 if !grew { failures += 1 }
                 glued = true
-                report(Files.size(of: partial), String(localized: "The connection dropped. Trying again…"))
+                report(Files.size(of: partial), say("The connection dropped. Trying again…"))
                 try await Task.sleep(for: .seconds(wait))
                 continue
             }
-            report(item.approximateBytes, String(localized: "Checking \(item.fileName)"))
+            report(item.approximateBytes, say("Checking \(item.fileName)"))
             if try Files.sha256(of: file) == item.sha256 { return }
             try? FileManager.default.removeItem(at: file)
-            guard glued else { throw ShellError.failed(String(localized: "\(item.fileName) didn't match its checksum. Try again.")) }
+            guard glued else { throw ShellError.said("\(item.fileName) didn't match its checksum. Try again.") }
             glued = false                                       // a part that went stale: once more, from the start
         }
     }
@@ -301,7 +318,7 @@ public struct EngineManager: Sendable {
             try fm.copyItem(at: item, to: dest)                 // symlinks (libfoo.dylib -> libfoo.1.dylib) stay links
         }
         for needed in Self.runtimeLibraries where !fm.fileExists(atPath: target.appendingPathComponent(needed).path) {
-            throw ShellError.failed(String(localized: "Wine Staging's libraries lack \(needed), which G-Player Wine needs."))
+            throw ShellError.said("Wine Staging's libraries lack \(needed), which G-Player Wine needs.")
         }
     }
 
@@ -315,7 +332,7 @@ public struct EngineManager: Sendable {
         let expanded = wineRoot.deletingLastPathComponent().appendingPathComponent("gstreamer-unpack", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: expanded) }
         let r = try await Shell.runStoppable(Shell.tool("pkgutil"), ["--expand-full", package.path, expanded.path])
-        guard r.succeeded else { throw ShellError.failed(String(localized: "Couldn't unpack \(package.lastPathComponent): \(r.stderr)")) }
+        guard r.succeeded else { throw ShellError.said("Couldn't unpack \(package.lastPathComponent): \(r.stderr)") }
         try GStreamerRuntime.copyFiles(of: manifest, from: expanded, into: wineRoot)
     }
 
@@ -323,7 +340,7 @@ public struct EngineManager: Sendable {
         let dest = isDXVK ? folder.appendingPathComponent("dxvk-unpack") : folder
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         let r = try await Shell.runStoppable(Shell.tool("tar"), ["-xf", archive.path, "-C", dest.path])
-        guard r.succeeded else { throw ShellError.failed(String(localized: "Couldn't unpack \(archive.lastPathComponent): \(r.stderr)")) }
+        guard r.succeeded else { throw ShellError.said("Couldn't unpack \(archive.lastPathComponent): \(r.stderr)") }
         if isDXVK {
             // The archive holds one top folder with x64/ and x32/.
             let inner = (try? FileManager.default.contentsOfDirectory(at: dest, includingPropertiesForKeys: nil))?

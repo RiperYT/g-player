@@ -1,6 +1,6 @@
 /* G-Player, Ukrainian. Keys are the English text in the code; see Localization/README.md. */
 
-"%@ (Legendary code %d)" = "%@ (код Legendary %d)";
+"%@ (Legendary code %@)" = "%@ (код Legendary %@)";
 "%@ (Mac)" = "%@ (Mac)";
 "%@ and %@" = "%@ і %@";
 "%@ didn't match its checksum. Try again." = "%@ не збігається з контрольною сумою. Спробуйте ще раз.";
@@ -33,7 +33,7 @@
 "%@ or %@" = "%@ або %@";
 "%@ so far" = "Уже %@";
 "%@ starts without .NET." = "%@ запуститься без .NET.";
-"%@ stopped with code %d. Details: %@" = "%@ завершився з кодом %d. Подробиці: %@";
+"%@ stopped with code %@. Details: %@" = "%@ завершився з кодом %@. Подробиці: %@";
 "%@ to finish setting up" = "завершення налаштування %@";
 "%@ to start" = "запуск %@";
 "%@ was removed while Wine Mono was being added to it." = "%@ видалено, поки до нього додавався Wine Mono.";
@@ -408,7 +408,7 @@
 "Legendary isn't on this Mac. Refresh Epic Games to download it again." = "Legendary немає на цьому Mac. Оновіть Epic Games, щоб завантажити його знову.";
 "Legendary keeps your sign-in token in your G-Player library folder. A library on an exFAT, network or iCloud disk can't keep it private." = "Legendary зберігає ваш токен входу в папці бібліотеки G-Player. Якщо бібліотека на диску exFAT, мережевому диску чи в iCloud, токен там не захищений від сторонніх.";
 "Legendary says “%@” is installed, but its program isn't in %@. Try installing it again." = "Legendary каже, що «%@» встановлено, але програми гри немає в %@. Спробуйте встановити її ще раз.";
-"Legendary stopped with code %d." = "Legendary завершився з кодом %d.";
+"Legendary stopped with code %@." = "Legendary завершився з кодом %@.";
 "Legendary's record of “%@” points at its old place, but its files are in this library's Epic Games space. Repair points the record at them." = "Запис Legendary про «%@» вказує на старе місце, але файли гри лежать у просторі Epic Games цієї бібліотеки. «Відновити» спрямує запис на них.";
 "Legendary, an open-source program (%@), from %@" = "Legendary — програма з відкритим кодом (%@), з %@";
 "Library" = "Бібліотека";
@@ -640,7 +640,7 @@
 "Task Manager" = "Диспетчер завдань";
 "That doesn't contain D3DMetal. Choose Apple's Game Porting Toolkit download or the toolkit you installed." = "Тут немає D3DMetal. Виберіть завантажений із сайту Apple Game Porting Toolkit або інструментарій, який ви встановили.";
 "That isn't a code from Epic's sign-in page." = "Це не код зі сторінки входу Epic.";
-"The %@ installer finished (code %d), but %@ isn't in %@. The installer's log is in %@." = "Інсталятор %@ завершив роботу (код %d), але %@ не знайдено в %@. Журнал інсталятора: %@.";
+"The %@ installer finished (code %@), but %@ isn't in %@. The installer's log is in %@." = "Інсталятор %@ завершив роботу (код %@), але %@ не знайдено в %@. Журнал інсталятора: %@.";
 "The Chromium helper wrapper is missing from G-Player." = "У G-Player бракує обгортки для допоміжного процесу Chromium.";
 "The Installer Is Done" = "Інсталятор завершив роботу";
 "The Legendary file on this Mac isn't the one G-Player expects, so G-Player didn't run it. Refresh Epic Games to download it again." = "Файл Legendary на цьому Mac не той, якого очікує G-Player, тому G-Player його не запустив. Оновіть Epic Games, щоб завантажити його знову.";
@@ -665,6 +665,7 @@
 "The game is copied into the space's C: drive, under Games. Nothing is installed." = "Гру буде скопійовано на диск C: простору, у папку Games. Нічого не встановлюється.";
 "The game is starting. Wait for it, then quit it." = "Гра запускається. Дочекайтеся запуску, а тоді закрийте її.";
 "The game needs %@, which isn't in this space." = "Грі потрібно %@, а в цьому просторі цього немає.";
+"The game starts through %@, which G-Player doesn't offer. Install it into the same space with Run Program…" = "Гра запускається через %@, якого G-Player не пропонує. Встановіть його в той самий простір через «Запустити програму…»";
 "The game starts through %@. Install it into the same space from Get Apps." = "Гра запускається через %@. Встановіть його в той самий простір із розділу «Лаунчери».";
 "The game's files use them." = "Їх використовують файли гри.";
 "The games and spaces of the library that was here aren't in it, and their files aren't deleted." = "Ігор і просторів бібліотеки, що була тут, у ній не буде, а їхні файли не видаляться.";
@@ -672,7 +673,7 @@
 "The installer of %@ runs without .NET, and its first start tries again." = "Інсталятор %@ працюватиме без .NET, а під час першого запуску лаунчера буде ще одна спроба.";
 "The installer opens inside the space. Install as you would on Windows, then G-Player finds what it installed." = "Інсталятор відкриється в просторі. Встановіть гру, як у Windows, а G-Player потім знайде, що встановилося.";
 "The installer starts when %@ is done. Two installers at once would fail." = "Інсталятор запуститься, коли завершиться поточна справа: %@. Два інсталятори одночасно не запрацюють.";
-"The installer stopped (code %d) without installing a program." = "Інсталятор зупинився (код %d), так нічого й не встановивши.";
+"The installer stopped (code %@) without installing a program." = "Інсталятор зупинився (код %@), так нічого й не встановивши.";
 "The original %@ is missing. Repair the app to download it again." = "Немає оригінального %@. Відновіть програму, щоб завантажити його знову.";
 "The previous copy of the library is kept next to the new one as library.json.before-empty-… so it can still be brought back." = "Попередня копія бібліотеки зберігається поруч із новою як library.json.before-empty-…, тож її ще можна повернути.";
 "The quickest graphics this space has." = "Найшвидша графіка, яка є в цьому просторі.";
@@ -766,13 +767,14 @@
 "Windows paths stop at 260 characters, and Wine runs programs from inside a space, so a longer path makes Wine fail to start programs and keep trying until the Mac runs out of processes." = "Шляхи Windows обмежені 260 символами, а Wine запускає програми зсередини простору, тож через довший шлях Wine не може запустити програми і пробує знову й знову, поки на Mac не скінчаться процеси.";
 "Windows version %@" = "Версія Windows: %@";
 "Wine 11 built from CodeWeavers' CrossOver source. Runs Steam and DirectX 9–11 games like Wine Staging, with DXVK or DXMT, and DirectX 12 through Apple's D3DMetal when you add it from your own toolkit." = "Wine 11, зібраний із вихідного коду CrossOver від CodeWeavers. Запускає Steam та ігри на DirectX 9–11, як і Wine Staging, із DXVK або DXMT, а DirectX 12 — через D3DMetal від Apple, якщо ви додасте його зі свого Game Porting Toolkit.";
+"Wine 11 from CrossOver 26.3" = "Wine 11 з CrossOver 26.3";
 "Wine Configuration" = "Налаштування Wine";
 "Wine DLL settings for %@" = "Налаштування DLL у Wine для %@";
 "Wine Mono (.NET, needed for %@) couldn't be downloaded: this Mac isn't online. %@ starts without it, and G-Player tries again when you open it later." = "Не вдалося завантажити Wine Mono (.NET, потрібен для %@): цей Mac не в мережі. %@ запуститься без нього, а G-Player спробує ще раз, коли ви відкриєте його наступного разу.";
 "Wine Mono (.NET, needed for %@) wasn't added. %@ %@ starts without it, and G-Player tries again in a few days." = "Wine Mono (.NET, потрібен для %@) не додано. %@ %@ запуститься без нього, а G-Player спробує ще раз за кілька днів.";
 "Wine Mono isn't in %@ yet." = "У %@ ще немає Wine Mono.";
 "Wine Mono's path is too long" = "Шлях до Wine Mono задовгий";
-"Wine Mono's setup finished (code %d), but “%@” doesn't list it. The log is in %@." = "Налаштування Wine Mono завершилося (код %d), але в «%@» його не видно. Журнал: %@.";
+"Wine Mono's setup finished (code %@), but “%@” doesn't list it. The log is in %@." = "Налаштування Wine Mono завершилося (код %@), але в «%@» його не видно. Журнал: %@.";
 "Wine Staging setting for the whole space. G-Player sets it again on every launch, like the Retina setting." = "Налаштування Wine Staging для всього простору. G-Player задає його заново під час кожного запуску, як і налаштування Retina.";
 "Wine Staging's libraries lack %@, which G-Player Wine needs." = "У бібліотеках Wine Staging немає %@, а G-Player Wine без цього не працює.";
 "Wine can't start programs from a path that long, and keeps trying until the Mac runs out of processes." = "Wine не може запускати програми з такого довгого шляху і пробує знову й знову, поки на Mac не скінчаться процеси.";
@@ -845,7 +847,7 @@
 "unknown error" = "невідома помилка";
 "winetricks %@ doesn't look the way G-Player expects. Update G-Player." = "winetricks %@ виглядає не так, як очікує G-Player. Оновіть G-Player.";
 "winetricks has no checksum for one of the downloads, so G-Player didn't install it. Details: %@" = "winetricks не має контрольної суми для одного із завантажень, тому G-Player його не встановив. Подробиці: %@";
-"winetricks stopped with code %d.%@ Details: %@" = "winetricks завершився з кодом %d.%@ Подробиці: %@";
+"winetricks stopped with code %@.%@ Details: %@" = "winetricks завершився з кодом %@.%@ Подробиці: %@";
 "“%@” closes, so anything you haven't saved may be lost." = "«%@» закриється, тож усе незбережене може зникнути.";
 "“%@” didn't start" = "Не вдалося запустити «%@»";
 "“%@” has no G-Player library in it. Choose the folder that holds library.json." = "У «%@» немає бібліотеки G-Player. Виберіть папку, де лежить library.json.";

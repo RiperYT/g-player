@@ -43,7 +43,7 @@ import Testing
     }
 
     @Test func theOtherLaunchersAreSetUpTheSameOnEveryEngine() {
-        for preset in AppPresets.all where preset.id != epic.id {
+        for preset in AppPresets.known where preset.id != epic.id {
             for kind in kinds {
                 #expect(preset.helpersToWrap(on: kind) == preset.chromiumHelpers)
                 #expect(preset.helpersToUnwrap(on: kind).isEmpty)
@@ -295,7 +295,7 @@ import Testing
         #expect(epic.engineForNewSpace(installed: [staging, gplayerWine]).id == gplayerWine.id)
         #expect(epic.engineForNewSpace(installed: [revision1, staging]).id == revision1.id)     // works offline, moves later
         // The other launchers follow what any new space gets.
-        for preset in AppPresets.all where preset.id != epic.id {
+        for preset in AppPresets.known where preset.id != epic.id {
             #expect(preset.engineForNewSpace(installed: [staging]).id == staging.id)
             #expect(preset.engineForNewSpace(installed: [staging, gplayerWine]).id == gplayerWine.id)
         }

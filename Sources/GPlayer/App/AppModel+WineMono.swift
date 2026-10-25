@@ -111,8 +111,9 @@ extension AppModel {
         let log = InstallLog(title: "Install Wine Mono \(engine.info.mono?.version ?? "") for \(engine.info.id)")
         let logs = manager.paths.logs
         let work = Task.detached {
-            try await manager.installWineMono(into: engine) { [weak self] fraction, message in
-                log.record(message)
+            var logged = manager
+            logged.log = { log.record($0) }                  // English, whatever the app's language
+            try await logged.installWineMono(into: engine) { [weak self] fraction, message in
                 Task { @MainActor in self?.progress(activity, fraction, message) }
             }
         }

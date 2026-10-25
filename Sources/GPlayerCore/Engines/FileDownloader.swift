@@ -136,7 +136,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             failure = RangeRefused()
             return completionHandler(.cancel)
         case .failed(let status):
-            failure = ShellError.failed(String(localized: "The server answered \(status) for \(name)."))
+            failure = ShellError.said("The server answered \(status) for \(name).")
             return completionHandler(.cancel)
         }
         completionHandler(.allow)

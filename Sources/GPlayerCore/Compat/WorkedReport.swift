@@ -109,7 +109,7 @@ public struct WorkedReport: Sendable, Equatable {
                 redaction: Redaction, includesSteamAppID: Bool = false) {
         var lines = ["G-Player: \(machine.appVersion)", "macOS: \(machine.macOSVersion)"]
         if let chip = machine.chip { lines.append("Mac: \(chip)") }
-        lines.append("Engine: \(engine.displayName)")
+        lines.append("Engine: \(engine.englishName)")
         lines.append("Engine ID: \(engine.id)")
         let backend = Self.workedBackend(of: game, on: engine, planned: planned)
         lines.append("Graphics backend: \(backend == .auto ? "Automatic" : backend.displayName)")      // English: the others are product names

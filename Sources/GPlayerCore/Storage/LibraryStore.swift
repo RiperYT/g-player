@@ -98,7 +98,7 @@ public struct LibraryStore: Sendable {
         let data = try Data(contentsOf: paths.previousFile)
         let state = try Self.decoder.decode(LibraryState.self, from: data)
         if FileManager.default.fileExists(atPath: paths.libraryFile.path), keepBrokenCopy(now: now) == nil {
-            throw ShellError.failed(String(localized: "G-Player couldn't keep a copy of library.json, so it won't replace it."))
+            throw ShellError.said("G-Player couldn't keep a copy of library.json, so it won't replace it.")
         }
         try data.write(to: paths.libraryFile, options: .atomic)
         return state

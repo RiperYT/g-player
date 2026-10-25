@@ -239,8 +239,10 @@ public enum CompatResolver {
         // A store starts and updates its own launchers, so only games added by hand need them in the space.
         if !input.isStoreGame {
             for launcher in a.launchers {
-                plan.notes.append(CompatNote(.warning, String(localized: "Needs \(launcher)"),
-                    String(localized: "The game starts through \(launcher). Install it into the same space from Get Apps.")))
+                let how = AppPresets.offered(launcher: launcher) != nil
+                    ? String(localized: "The game starts through \(launcher). Install it into the same space from Get Apps.")
+                    : String(localized: "The game starts through \(launcher), which G-Player doesn't offer. Install it into the same space with Run Program…")
+                plan.notes.append(CompatNote(.warning, String(localized: "Needs \(launcher)"), how))
             }
         }
 

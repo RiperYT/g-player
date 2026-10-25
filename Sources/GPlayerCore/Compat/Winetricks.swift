@@ -31,9 +31,9 @@ public struct Winetricks: Sendable {
     /// and a message.
     public func install(_ verb: String, in space: Space, engine: Engine, timeout: TimeInterval = 15 * 60,
                         progress: @escaping @Sendable (Double?, String) -> Void) async throws {
-        guard Self.isVerb(verb) else { throw ShellError.failed(String(localized: "\(verb) isn't a component winetricks can install.")) }
+        guard Self.isVerb(verb) else { throw ShellError.said("\(verb) isn't a component winetricks can install.") }
         guard let shims = CoreResources.url("shims") else {
-            throw ShellError.failed(String(localized: "G-Player's helper scripts are missing. Reinstall G-Player."))
+            throw ShellError.said("G-Player's helper scripts are missing. Reinstall G-Player.")
         }
         progress(nil, String(localized: "Getting winetricks"))
         let pristine = try await RuntimeInstaller.fetch(Self.script, into: toolsFolder)
@@ -66,7 +66,7 @@ public struct Winetricks: Sendable {
     func prepareScript(from pristine: URL) throws -> URL {
         let original = try String(contentsOf: pristine, encoding: .utf8)
         guard let edited = Self.hardened(original) else {
-            throw ShellError.failed(String(localized: "winetricks \(Self.version) doesn't look the way G-Player expects. Update G-Player."))
+            throw ShellError.said("winetricks \(Self.version) doesn't look the way G-Player expects. Update G-Player.")
         }
         let target = toolsFolder.appendingPathComponent("winetricks-gplayer")
         try edited.write(to: target, atomically: true, encoding: .utf8)
@@ -167,7 +167,7 @@ public struct Winetricks: Sendable {
         }
         let warning = output.split(separator: "\n").last { $0.hasPrefix("Note: ") || $0.hasPrefix("warning: ") }
         let detail = warning.map { " " + String($0.prefix(200)) } ?? ""
-        return String(localized: "winetricks stopped with code \(status).\(detail) Details: \(logName)")
+        return String(localized: "winetricks stopped with code \(String(status)).\(detail) Details: \(logName)")
     }
 
     // MARK: Process

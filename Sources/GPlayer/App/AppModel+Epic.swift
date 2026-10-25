@@ -335,7 +335,7 @@ extension AppModel {
         let log = paths.logs.appendingPathComponent("Epic install \(Files.safeName(title)) \(stamp).log")
         let work = Task.detached {
             try await legendary.install(appName, basePath: base, log: log,
-                                        hasRoom: { DiskSpace.problem(needing: $0, available: DiskSpace.available(at: base), for: String(localized: "It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) },
+                                        hasRoom: { DiskSpace.problem(needing: $0, available: DiskSpace.available(at: base), for: LocalizedStringResource("It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) },
                                         status: { [weak self] status in
                 Task { @MainActor in self?.progress(activity, status.fraction, status.message) }
             })

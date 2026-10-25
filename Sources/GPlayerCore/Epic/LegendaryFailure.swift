@@ -51,7 +51,7 @@ public enum LegendaryFailure {
             ?? lines.last ?? ""
         let clean = LaunchSecrets.scrub(String(text.prefix(300)))
         if status == 0 { return clean.isEmpty ? String(localized: "Legendary didn't say why.") : clean }
-        return clean.isEmpty ? String(localized: "Legendary stopped with code \(status).") : String(localized: "\(clean) (Legendary code \(status))")
+        return clean.isEmpty ? String(localized: "Legendary stopped with code \(String(status)).") : String(localized: "\(clean) (Legendary code \(String(status)))")
     }
 
     /// The message of a log line that says something went wrong: `[cli] ERROR: …`, or the `! Failure: …` of a check that

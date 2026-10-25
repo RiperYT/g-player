@@ -149,4 +149,10 @@ public enum AppPresets {
     /// Apple Silicon), but a space set up for one earlier keeps its launcher's settings.
     public static let known = all + [gog, ubisoft]
     public static func preset(_ id: String?) -> AppPreset? { known.first { $0.id == id } }
+
+    /// The preset Get Apps offers for a launcher that a game's files name ("Steam", "Epic", "EA App"), or nil when it isn't offered.
+    public static func offered(launcher: String) -> AppPreset? {
+        let name = launcher.replacingOccurrences(of: "_", with: " ").lowercased()
+        return all.first { $0.name.lowercased().hasPrefix(name) }
+    }
 }

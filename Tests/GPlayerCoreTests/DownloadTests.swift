@@ -543,10 +543,15 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
 
         let firstWhileUnpackingTheSecond = LockedValue<Bool?>(nil)
         let first = manager.downloadFile(items[0], of: info)
-        let installed = try await manager.install(info) { _, message in
+        // What the install's log gets: the steps in English.
+        let logged = LockedValue<[String]>([])
+        var withLog = manager
+        withLog.log = { line in logged.update { $0.append(line) } }
+        let installed = try await withLog.install(info) { _, message in
             if message == "Unpacking extra.tar" { firstWhileUnpackingTheSecond.set(FileManager.default.fileExists(atPath: first.path)) }
         }
         #expect(firstWhileUnpackingTheSecond.get() == true)         // not deleted as soon as it was unpacked
+        #expect(logged.get().contains("Unpacking extra.tar") && logged.get().last == "Ready")
         #expect(manager.isInstalled(info) && installed.info.id == info.id)
         #expect(FileManager.default.fileExists(atPath: manager.folder(for: info).appendingPathComponent("extra.txt").path))
         #expect(!FileManager.default.fileExists(atPath: manager.downloadFolder(for: info).path))

@@ -159,7 +159,7 @@ public enum WineMono {
     /// to quit so the registry is on disk when it looks: call it only when no program runs in the space.
     public static func register(_ package: WineMonoPackage, engine: Engine, space: Space, logsFolder: URL) async throws {
         guard isUnpacked(package, in: engine.wineRoot) else {
-            throw ShellError.failed(String(localized: "Wine Mono isn't in \(engine.info.name) yet."))
+            throw ShellError.said("Wine Mono isn't in \(engine.info.name) yet.")
         }
         let status = try await WineLauncher.runAndWait(
             engine: engine, space: space, arguments: registerArguments(package, wineRoot: engine.wineRoot, in: space),
@@ -169,7 +169,7 @@ public enum WineMono {
         await WineLauncher.waitForAll(engine: engine, space: space, timeout: 30)
         try Task.checkCancellation()
         guard isRegistered(package, in: space) else {
-            throw ShellError.failed(String(localized: "Wine Mono's setup finished (code \(status)), but “\(space.name)” doesn't list it. The log is in \(logsFolder.path)."))
+            throw ShellError.said("Wine Mono's setup finished (code \(String(status))), but “\(space.name)” doesn't list it. The log is in \(logsFolder.path).")
         }
     }
 }

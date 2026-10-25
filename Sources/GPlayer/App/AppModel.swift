@@ -576,8 +576,9 @@ final class AppModel {
         let log = InstallLog(title: "\(updating ? "Update" : "Install") \(info.name) \(info.id)")
         let logs = manager.paths.logs
         do {
-            let engine = try await manager.install(info) { [weak self] fraction, message in
-                log.record(message)
+            var logged = manager
+            logged.log = { log.record($0) }                  // English, whatever the app's language
+            let engine = try await logged.install(info) { [weak self] fraction, message in
                 Task { @MainActor in self?.progress(activity, fraction, message) }
             }
             log.write(outcome: "Ready", to: logs)

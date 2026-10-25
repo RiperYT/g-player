@@ -62,7 +62,7 @@ public enum EpicGames {
         if let engineDownloadBytes {
             lines.append(String(localized: "G-Player Wine isn't installed yet, so G-Player downloads it first (about \(EngineCatalog.megabytes(engineDownloadBytes)) MB)."))
         }
-        let problem = sizeBytes.flatMap { DiskSpace.problem(needing: $0, available: availableBytes, for: String(localized: "It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) }
+        let problem = sizeBytes.flatMap { DiskSpace.problem(needing: $0, available: availableBytes, for: LocalizedStringResource("It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) }
         return InstallDetails(lines: lines, problem: problem)
     }
 
