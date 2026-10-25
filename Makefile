@@ -1,13 +1,16 @@
-.PHONY: help build test app run release publish wrapper icon clean
+.PHONY: help build test l10n app run release publish wrapper icon clean
 
 help: ## Show targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
 
 build: ## Debug build of the package
 	swift build
 
 test: ## Unit tests (no Wine needed)
 	swift test
+
+l10n: ## Check the Ukrainian translation against the code's strings
+	scripts/l10n.sh
 
 app: ## Build build/G-Player.app
 	scripts/build-app.sh
