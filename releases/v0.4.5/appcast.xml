@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>G-Player</title>
+    <item>
+      <title>G-Player 0.4.5</title>
+      <sparkle:version>151</sparkle:version>
+      <sparkle:shortVersionString>0.4.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body { font: 13px -apple-system, sans-serif; } li { margin-bottom: 6px; }</style>
+<ul>
+<li><b>G-Player speaks Ukrainian.</b> With macOS set to Ukrainian, the whole app is in Ukrainian: library, spaces, Get Apps, Settings, menus, alerts and the messages G-Player shows when something goes wrong. English stays the main language and is what every other Mac gets. Reports for <b>Share What Worked…</b> and the logs stay in English. Translators: see <code>Localization/README.md</code>; <code>make l10n</code> lists what isn't translated yet.</li>
+<li><b>A new icon:</b> a play mark with the letter G.</li>
+<li><b>Get Apps offers Steam and Epic.</b> GOG Galaxy and Ubisoft Connect were never checked from start to finish on Apple Silicon, so they are no longer offered. A space you set up for one keeps working as before.</li>
+</ul>]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/RiperYT/g-player/releases</sparkle:fullReleaseNotesLink>
+      <pubDate>Sun, 25 Oct 2026 15:16:37 +0000</pubDate>
+      <enclosure url="https://github.com/RiperYT/g-player/releases/download/v0.4.5/G-Player-0.4.5.dmg" sparkle:edSignature="ZR9hGGBaZuK0MaiD3ppng7XfoRm9sMWEpmHLlp9jxfiXPiFruxnIz1mOj0Cd6lEi68hLUCSbRMgPdXCZulb4Bw==" length="13742114" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
