@@ -33,8 +33,13 @@ private struct AppsList: View {
                         if preset.id == AppPresets.epic.id { EpicCard() } else { PresetCard(preset: preset) }
                     }
                 }
-                Text("Experimental apps install, but haven't been checked from start to finish on Apple Silicon yet. Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) don't run under Wine.")
-                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: 620, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    if AppPresets.all.contains(where: \.experimental) {
+                        Text("Experimental apps install, but haven't been checked from start to finish on Apple Silicon yet.")
+                    }
+                    Text("Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) don't run under Wine.")
+                }
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: 620, alignment: .leading)
             }
             .padding(Theme.pagePadding)
         }

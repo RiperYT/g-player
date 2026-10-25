@@ -143,6 +143,10 @@ public enum AppPresets {
                       "Program Files/Ubisoft/Ubisoft Game Launcher/UbisoftConnect.exe"],
         chromiumHelpers: [], launchArguments: [], dllOverrides: [], environment: qtWebEngine, discovery: .none)
 
-    public static let all = [steam, epic, gog, ubisoft]
-    public static func preset(_ id: String?) -> AppPreset? { all.first { $0.id == id } }
+    /// The apps Get Apps offers.
+    public static let all = [steam, epic]
+    /// Every app G-Player knows. GOG Galaxy and Ubisoft Connect are no longer offered (never checked from start to finish on
+    /// Apple Silicon), but a space set up for one earlier keeps its launcher's settings.
+    public static let known = all + [gog, ubisoft]
+    public static func preset(_ id: String?) -> AppPreset? { known.first { $0.id == id } }
 }
