@@ -137,7 +137,7 @@ struct EngineRows: View {
     var body: some View {
         Group {
             if showsSummary { Text(info.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-            LabeledContent("Version", value: info.basedOn ?? info.version)
+            LabeledContent("Version", value: info.basedOnLabel ?? info.versionLabel)
             LabeledContent("Graphics", value: info.backends.map(\.displayName).joined(separator: ", "))
             if model.isInstalled(info) {
                 LabeledContent("Status") { Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -186,7 +186,8 @@ struct EngineRows: View {
     }
 
     private func list(_ names: [String]) -> String {
-        names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.first ?? ""
+        guard names.count > 1, let last = names.last else { return names.first ?? "" }
+        return String(localized: "\(names.dropLast().joined(separator: ", ")) and \(last)", comment: "A list of names: “A, B and C”")
     }
 }
 
@@ -197,7 +198,7 @@ private struct EngineUpdateStatus: View {
 
     var body: some View {
         let download = model.download(of: info)
-        LabeledContent("Status") { Text(download?.message ?? "Starting").foregroundStyle(.secondary) }
+        LabeledContent("Status") { Text(download?.message ?? String(localized: "Starting")).foregroundStyle(.secondary) }
         if let progress = download?.progress { ProgressView(value: progress) }
         Text(EngineMigration.updateNote(for: info)).font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -254,7 +255,7 @@ struct AppleToolkitSection: View {
 
     private func chooseDownload() {
         let panel = NSOpenPanel()
-        panel.message = "Choose Apple's Game Porting Toolkit disk image, or an opened toolkit disk."
+        panel.message = String(localized: "Choose Apple's Game Porting Toolkit disk image, or an opened toolkit disk.")
         panel.allowedContentTypes = [.diskImage, .folder]
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
@@ -265,11 +266,11 @@ struct AppleToolkitSection: View {
 /// One numbered step of the toolkit how-to.
 private struct ToolkitStep: View {
     let number: Int
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
+            Text(verbatim: "\(number)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
                 .frame(width: 20, height: 20).background(.quaternary, in: Circle())
             Text(text).fixedSize(horizontal: false, vertical: true)
         }

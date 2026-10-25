@@ -57,19 +57,19 @@ public enum LogDiagnosis {
         })).sorted()
         if !components.isEmpty {
             let dlls = Array(Set(missing)).sorted().prefix(4).joined(separator: ", ")
-            results.append(Diagnosis(kind: .missingComponent, title: "Missing Windows components",
-                                     detail: "The game needs \(dlls), which isn't in this space.",
+            results.append(Diagnosis(kind: .missingComponent, title: String(localized: "Missing Windows components"),
+                                     detail: String(localized: "The game needs \(dlls), which isn't in this space."),
                                      remedy: .installComponents(components)))
         } else if !missing.isEmpty {
             let dlls = Array(Set(missing)).sorted().prefix(4).joined(separator: ", ")
-            results.append(Diagnosis(kind: .missingComponent, title: "A file the game needs is missing",
-                                     detail: "Wine couldn't find \(dlls). Reinstalling the game or adding the file next to its .exe can help.",
+            results.append(Diagnosis(kind: .missingComponent, title: String(localized: "A file the game needs is missing"),
+                                     detail: String(localized: "Wine couldn't find \(dlls). Reinstalling the game or adding the file next to its .exe can help."),
                                      remedy: .none))
         }
 
         if antiCheatFailures.contains(where: lower.contains) && seconds < 60 {
-            results.append(Diagnosis(kind: .antiCheat, title: "Anti-cheat stopped the game",
-                                     detail: "Kernel anti-cheat doesn't run under Wine on macOS. Online modes won't work.",
+            results.append(Diagnosis(kind: .antiCheat, title: String(localized: "Anti-cheat stopped the game"),
+                                     detail: String(localized: "Kernel anti-cheat doesn't run under Wine on macOS. Online modes won't work."),
                                      remedy: .none))
         }
 
@@ -78,11 +78,11 @@ public enum LogDiagnosis {
             // ones still have a similar vkAllocateMemory message, "handle types", which means something else.)
             if lower.contains("vkcreatebuffer(): only external memory handle type ")
                 || lower.contains("vkcreateimage(): only external memory handle type ") {
-                results.append(Diagnosis(kind: .graphics, title: "This engine can't run 32-bit DirectX 11",
+                results.append(Diagnosis(kind: .graphics, title: String(localized: "This engine can't run 32-bit DirectX 11"),
                                          detail: CompatResolver.oldMoltenVK, remedy: .none))
             } else {
-                results.append(Diagnosis(kind: .graphics, title: "Graphics didn't start",
-                                         detail: "The game couldn't create its graphics device.",
+                results.append(Diagnosis(kind: .graphics, title: String(localized: "Graphics didn't start"),
+                                         detail: String(localized: "The game couldn't create its graphics device."),
                                          remedy: profile == .compatible ? .none : .useProfile(.compatible)))
             }
         }
@@ -90,8 +90,8 @@ public enum LogDiagnosis {
         let crashed = lower.contains("unhandled page fault") || lower.contains("unhandled exception")
             || lower.contains("caused an access violation")
         if results.isEmpty && crashed {
-            results.append(Diagnosis(kind: .crash, title: "The game crashed",
-                                     detail: "Wine reported a crash while the game was starting.",
+            results.append(Diagnosis(kind: .crash, title: String(localized: "The game crashed"),
+                                     detail: String(localized: "Wine reported a crash while the game was starting."),
                                      remedy: nextStep(profile: profile, installed: installed)))
         }
 
@@ -144,8 +144,8 @@ public enum LogDiagnosis {
     /// A game that quit within seconds without a log that says why (a store game's output goes to its launcher, so
     /// G-Player only sees it come and go).
     public static func closedRightAway(seconds: Double, profile: LaunchProfile, installed: Set<String>) -> Diagnosis {
-        Diagnosis(kind: .closedRightAway, title: "The game closed right away",
-                  detail: "It quit after \(max(1, Int(seconds))) seconds without saying why.",
+        Diagnosis(kind: .closedRightAway, title: String(localized: "The game closed right away"),
+                  detail: String(localized: "It quit after \(max(1, Int(seconds))) seconds without saying why."),
                   remedy: nextStep(profile: profile, installed: installed))
     }
 
@@ -155,7 +155,7 @@ public enum LogDiagnosis {
         guard tried.count > 1, let first = found.first else { return found }
         var result = found
         result[0] = Diagnosis(kind: first.kind, title: first.title,
-                              detail: first.detail + " Graphics tried: \(CompatResolver.list(tried.map(\.displayName))).",
+                              detail: first.detail + " " + String(localized: "Graphics tried: \(CompatResolver.list(tried.map(\.displayName)))."),
                               remedy: first.remedy)
         return result
     }

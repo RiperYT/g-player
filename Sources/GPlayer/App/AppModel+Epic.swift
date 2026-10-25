@@ -41,7 +41,7 @@ struct EpicState: Equatable {
     /// A new install, sign-in or fetch has to wait.
     var isOccupied: Bool { busy != nil || refreshing }
     /// What Legendary is doing, in words, when it is doing anything.
-    var activity: String? { busy ?? (refreshing ? "getting your games" : nil) }
+    var activity: String? { busy ?? (refreshing ? String(localized: "getting your games") : nil) }
 }
 
 /// Plans a launch again with Legendary's parameters (`LaunchPlanner.plan(legendary:)`), right before it starts.
@@ -130,7 +130,7 @@ extension AppModel {
             catch {
                 if !epicBackupWarned {
                     epicBackupWarned = true
-                    errorMessage = "G-Player couldn't keep a copy of library.json before adding your first Epic game, so your Epic games aren't in the library yet. \(error.localizedDescription)"
+                    errorMessage = String(localized: "G-Player couldn't keep a copy of library.json before adding your first Epic game, so your Epic games aren't in the library yet. \(error.localizedDescription)")
                 }
                 return
             }
@@ -193,19 +193,19 @@ extension AppModel {
     private func prepareLegendary(_ legendary: Legendary) async -> Bool {
         guard !legendary.isDownloaded else {
             do { try await legendary.ensureInstalled(); return true }               // checks the file quietly
-            catch { errorMessage = "Couldn't get Legendary: \(error.localizedDescription)"; return false }
+            catch { errorMessage = String(localized: "Couldn't get Legendary: \(error.localizedDescription)"); return false }
         }
-        let activity = begin("Getting Legendary", "Downloading about 15 MB", progress: 0)
+        let activity = begin(String(localized: "Getting Legendary"), String(localized: "Downloading about 15 MB"), progress: 0)
         defer { end(activity); cancellers[activity] = nil }
         let work = Task {
             try await legendary.ensureInstalled { [weak self] fraction in
-                Task { @MainActor in self?.progress(activity, fraction, "Downloading about 15 MB") }
+                Task { @MainActor in self?.progress(activity, fraction, String(localized: "Downloading about 15 MB")) }
             }
         }
-        setStop(activity, help: "Stop downloading Legendary.") { work.cancel() }
+        setStop(activity, help: String(localized: "Stop downloading Legendary.")) { work.cancel() }
         do { try await work.value; return true }
         catch is CancellationError { return false }
-        catch { errorMessage = "Couldn't get Legendary: \(error.localizedDescription)"; return false }
+        catch { errorMessage = String(localized: "Couldn't get Legendary: \(error.localizedDescription)"); return false }
     }
 
     // MARK: Signing in and out
@@ -213,7 +213,7 @@ extension AppModel {
     /// Gets Legendary (the first time) and opens the sign-in sheet.
     func beginEpicSignIn() {
         guard let paths, !epic.isOccupied else { return }
-        epic.busy = "Getting Legendary"
+        epic.busy = String(localized: "Getting Legendary")
         Task {
             defer { epic.busy = nil }
             if await prepareLegendary(Legendary(paths: paths)) { epic.showSignIn = true }
@@ -232,8 +232,8 @@ extension AppModel {
     }
 
     private func signInToEpic(code: String, paths: LibraryPaths) async -> Bool {
-        epic.busy = "Signing in"
-        let activity = begin("Signing in to Epic Games", "Checking with Epic")
+        epic.busy = String(localized: "Signing in")
+        let activity = begin(String(localized: "Signing in to Epic Games"), String(localized: "Checking with Epic"))
         defer { end(activity); epic.busy = nil }
         do {
             let legendary = Legendary(paths: paths)
@@ -253,7 +253,7 @@ extension AppModel {
     /// Forgets the login on this Mac and the list of games. The games stay installed, and need a sign-in to start.
     func signOutOfEpic() {
         guard let paths, !epic.isOccupied else { return }
-        epic.busy = "Signing out"
+        epic.busy = String(localized: "Signing out")
         Task {
             defer { epic.busy = nil }
             do {
@@ -267,7 +267,7 @@ extension AppModel {
                 epic.fetched = false
                 EpicGames.forgetCache(in: paths)
             } catch {
-                errorMessage = "Couldn't sign out: \(error.localizedDescription)"
+                errorMessage = String(localized: "Couldn't sign out: \(error.localizedDescription)")
             }
         }
     }
@@ -304,7 +304,7 @@ extension AppModel {
     func installEpicGame(_ game: EpicGame) {
         guard let paths, epic.isSignedIn, !epic.isOccupied else { return }
         epic.installRequest = nil
-        epic.busy = "Installing “\(game.title)”"
+        epic.busy = String(localized: "Installing “\(game.title)”")
         epic.installing = game.appName
         Task {
             defer { epic.busy = nil; epic.installing = nil }
@@ -328,22 +328,22 @@ extension AppModel {
         let title = game.title, appName = game.appName
         // Not "setup": quitting doesn't ask whether to stop setting up (that question is about the first run), and an install
         // that is cut short goes on from where it stopped.
-        let activity = begin("Installing “\(title)”", "Preparing")
+        let activity = begin(String(localized: "Installing “\(title)”"), String(localized: "Preparing"))
         defer { end(activity); cancellers[activity] = nil }
         try? FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let log = paths.logs.appendingPathComponent("Epic install \(Files.safeName(title)) \(stamp).log")
         let work = Task.detached {
             try await legendary.install(appName, basePath: base, log: log,
-                                        hasRoom: { DiskSpace.problem(needing: $0, available: DiskSpace.available(at: base), for: "It") },
+                                        hasRoom: { DiskSpace.problem(needing: $0, available: DiskSpace.available(at: base), for: LocalizedStringResource("It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) },
                                         status: { [weak self] status in
                 Task { @MainActor in self?.progress(activity, status.fraction, status.message) }
             })
         }
-        setStop(activity, help: "Stop installing. It goes on from where it stopped the next time.") { work.cancel() }
+        setStop(activity, help: String(localized: "Stop installing. It goes on from where it stopped the next time.")) { work.cancel() }
         do { try await work.value }
         catch is CancellationError { }                                           // stopped: what came stays for next time
-        catch { errorMessage = "Couldn't install “\(title)”. \(error.localizedDescription)" }
+        catch { errorMessage = String(localized: "Couldn't install “\(title)”. \(error.localizedDescription)") }
         lookAtEpic()
         await epicLooking?.value
     }
@@ -351,22 +351,22 @@ extension AppModel {
     /// Removes an Epic game and its files, after the user said so. It leaves the library's list once Legendary no longer lists it.
     func uninstallEpicGame(_ game: Game) {
         guard case .legendary(let appName) = game.source, let paths else { return }
-        if let reason = epicUninstallBlock(for: game) { errorMessage = "Can't uninstall “\(game.title)” now. \(reason)"; return }
-        epic.busy = "Uninstalling “\(game.title)”"
+        if let reason = epicUninstallBlock(for: game) { errorMessage = String(localized: "Can't uninstall “\(game.title)” now. \(reason)"); return }
+        epic.busy = String(localized: "Uninstalling “\(game.title)”")
         epic.uninstalling = appName
         let folder = epic.installed[appName]?.folder
         Task {
             defer { epic.busy = nil; epic.uninstalling = nil }
             let legendary = Legendary(paths: paths)
             guard await prepareLegendary(legendary) else { return }
-            let activity = begin("Uninstalling “\(game.title)”", "Removing its files")
+            let activity = begin(String(localized: "Uninstalling “\(game.title)”"), String(localized: "Removing its files"))
             defer { end(activity) }
             do { try await legendary.uninstall(appName); dropEpicEntry(game) }
-            catch { errorMessage = "Couldn't uninstall “\(game.title)”. \(error.localizedDescription)" }
+            catch { errorMessage = String(localized: "Couldn't uninstall “\(game.title)”. \(error.localizedDescription)") }
             lookAtEpic()
             await epicLooking?.value
             if let folder, !epic.installed.keys.contains(appName), FileManager.default.fileExists(atPath: folder.path) {
-                errorMessage = "“\(game.title)” is uninstalled, but some of its files are still in \(folder.path). You can delete that folder."
+                errorMessage = String(localized: "“\(game.title)” is uninstalled, but some of its files are still in \(folder.path). You can delete that folder.")
             }
         }
     }
@@ -429,7 +429,7 @@ extension AppModel {
     func repairEpicGame(_ game: Game) {
         guard let appName = game.legendaryAppName, let paths, !epic.isOccupied,
               case .filesNotFound(let base?) = epicHealth(of: game) else { return }
-        epic.busy = "Repairing “\(game.title)”"
+        epic.busy = String(localized: "Repairing “\(game.title)”")
         Task {
             defer { epic.busy = nil }
             let legendary = Legendary(paths: paths)
@@ -437,7 +437,7 @@ extension AppModel {
                 try await legendary.ensureInstalled()
                 try await legendary.relink(appName, to: base)
             } catch {
-                errorMessage = "Couldn't repair “\(game.title)”. \(error.localizedDescription)"
+                errorMessage = String(localized: "Couldn't repair “\(game.title)”. \(error.localizedDescription)")
             }
             lookAtEpic()
             await epicLooking?.value
@@ -447,7 +447,7 @@ extension AppModel {
     /// Remove…, for a game that can't be started: Legendary forgets it (no file is touched) and it leaves the library.
     func forgetEpicGame(_ game: Game) {
         guard let appName = game.legendaryAppName, let paths, !epic.isOccupied, epicHealth(of: game) != .ok else { return }
-        epic.busy = "Removing “\(game.title)”"
+        epic.busy = String(localized: "Removing “\(game.title)”")
         Task {
             defer { epic.busy = nil }
             let legendary = Legendary(paths: paths)
@@ -456,7 +456,7 @@ extension AppModel {
                 try await legendary.uninstall(appName, keepFiles: true)
                 dropEpicEntry(game)
             } catch {
-                errorMessage = "Couldn't remove “\(game.title)”. \(error.localizedDescription)"
+                errorMessage = String(localized: "Couldn't remove “\(game.title)”. \(error.localizedDescription)")
             }
             lookAtEpic()
         }

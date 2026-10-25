@@ -86,7 +86,7 @@ public enum Files {
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let temporary = folder.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString.prefix(8))")
         guard fm.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-            throw ShellError.failed("Couldn't write \(url.lastPathComponent).")
+            throw ShellError.said("Couldn't write \(url.lastPathComponent).")
         }
         do {
             if fm.fileExists(atPath: url.path) { _ = try fm.replaceItemAt(url, withItemAt: temporary) }
@@ -112,4 +112,6 @@ public enum Files {
 
 public extension Int64 {
     var formattedBytes: String { ByteCountFormatter.string(fromByteCount: self, countStyle: .file) }
+    /// The same in English, for logs.
+    var englishBytes: String { formatted(.byteCount(style: .file).locale(Locale(identifier: "en"))) }
 }

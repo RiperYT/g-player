@@ -138,9 +138,9 @@ public enum WineMono {
     }
 
     /// What the sidebar calls the download: "Downloading Wine Mono".
-    public static let downloadTitle = "Downloading Wine Mono"
+    public static let downloadTitle = String(localized: "Downloading Wine Mono")
     /// What it is called to those who wait behind it in a space's queue.
-    public static let registerTitle = "Setting up Wine Mono"
+    public static let registerTitle = String(localized: "Setting up Wine Mono")
 
     /// The room fetching it takes: the tarball and what it unpacks to, less what a stopped download already has on disk.
     public static func neededBytes(_ package: WineMonoPackage, alreadyDownloaded: Int64) -> Int64 {
@@ -149,7 +149,7 @@ public enum WineMono {
 
     /// "Wine Mono, 40 MB", for the line that says what is being fetched.
     public static func sizeLabel(_ package: WineMonoPackage) -> String {
-        "\(EngineCatalog.megabytes(package.download.approximateBytes)) MB"
+        String(localized: "\(EngineCatalog.megabytes(package.download.approximateBytes)) MB", comment: "A size in megabytes")
     }
 
     // MARK: Registering
@@ -159,7 +159,7 @@ public enum WineMono {
     /// to quit so the registry is on disk when it looks: call it only when no program runs in the space.
     public static func register(_ package: WineMonoPackage, engine: Engine, space: Space, logsFolder: URL) async throws {
         guard isUnpacked(package, in: engine.wineRoot) else {
-            throw ShellError.failed("Wine Mono isn't in \(engine.info.name) yet.")
+            throw ShellError.said("Wine Mono isn't in \(engine.info.name) yet.")
         }
         let status = try await WineLauncher.runAndWait(
             engine: engine, space: space, arguments: registerArguments(package, wineRoot: engine.wineRoot, in: space),
@@ -169,7 +169,7 @@ public enum WineMono {
         await WineLauncher.waitForAll(engine: engine, space: space, timeout: 30)
         try Task.checkCancellation()
         guard isRegistered(package, in: space) else {
-            throw ShellError.failed("Wine Mono's setup finished (code \(status)), but “\(space.name)” doesn't list it. The log is in \(logsFolder.path).")
+            throw ShellError.said("Wine Mono's setup finished (code \(String(status))), but “\(space.name)” doesn't list it. The log is in \(logsFolder.path).")
         }
     }
 }

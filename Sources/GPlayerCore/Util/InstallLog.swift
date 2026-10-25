@@ -12,7 +12,8 @@ public final class InstallLog: @unchecked Sendable {
 
     public init(title: String) { self.title = title }
 
-    /// Records `message` when it starts a new step: progress within one ("Downloading 41 of 98 MB", then 42 of 98) is
+    /// Records `message` when it starts a new step. The log is English whatever the app's language, so `message` must be
+    /// English too (`EngineManager.log` gets it so): progress within one ("Downloading 41 of 98 MB", then 42 of 98) is
     /// one step, so the log stays short.
     public func record(_ message: String) {
         let step = Self.step(of: message)
@@ -47,8 +48,10 @@ public final class InstallLog: @unchecked Sendable {
         try? text(outcome: outcome).write(to: file, atomically: true, encoding: .utf8)
     }
 
-    /// How an install that threw ended, in words: the error's description, and its full form when that says more.
+    /// How an install that threw ended, in words: the error's description, and its full form when that says more. English where
+    /// G-Player wrote the text (`ShellError`); an error of the system says it in the system's language.
     public static func failure(_ error: Error) -> String {
+        if let error = error as? ShellError { return "Failed: \(error.englishDescription)" }
         let shown = error.localizedDescription
         let full = String(describing: error)
         return full == shown ? "Failed: \(shown)" : "Failed: \(shown)\n\(full)"

@@ -16,9 +16,9 @@ public enum LegendaryFailure {
         case other
     }
 
-    public static let signedOutMessage = "You're signed out of Epic Games. Sign in again from \(EpicGames.libraryPlace)."
+    public static let signedOutMessage = String(localized: "You're signed out of Epic Games. Sign in again from \(EpicGames.libraryPlace).")
 
-    public static let installMissingMessage = "Legendary can't find the game's files where it recorded them. If your library moved, open the game in \(EpicGames.libraryPlace) and choose Repair."
+    public static let installMissingMessage = String(localized: "Legendary can't find the game's files where it recorded them. If your library moved, open the game in \(EpicGames.libraryPlace) and choose Repair.")
 
     /// What Legendary's log (stderr) says went wrong. Its stdout is not looked at: it can hold a game's description.
     public static func kind(stderr text: String) -> Kind {
@@ -38,8 +38,8 @@ public enum LegendaryFailure {
     public static func reason(stdout: String, stderr: String, status: Int32) -> String {
         switch kind(stderr: stderr) {
         case .signedOut: return signedOutMessage
-        case .busy: return "Epic Games is busy with another install. Wait for it to finish, then try again."
-        case .network: return "Couldn't connect to Epic Games. Check your internet connection, then try again."
+        case .busy: return String(localized: "Epic Games is busy with another install. Wait for it to finish, then try again.")
+        case .network: return String(localized: "Couldn't connect to Epic Games. Check your internet connection, then try again.")
         case .installMissing: return installMissingMessage
         case .other: break
         }
@@ -50,8 +50,8 @@ public enum LegendaryFailure {
             ?? lines.last { $0.range(of: #"^[A-Za-z_.]+(Error|Exception): "#, options: .regularExpression) != nil }
             ?? lines.last ?? ""
         let clean = LaunchSecrets.scrub(String(text.prefix(300)))
-        if status == 0 { return clean.isEmpty ? "Legendary didn't say why." : clean }
-        return clean.isEmpty ? "Legendary stopped with code \(status)." : "\(clean) (Legendary code \(status))"
+        if status == 0 { return clean.isEmpty ? String(localized: "Legendary didn't say why.") : clean }
+        return clean.isEmpty ? String(localized: "Legendary stopped with code \(String(status)).") : String(localized: "\(clean) (Legendary code \(String(status)))")
     }
 
     /// The message of a log line that says something went wrong: `[cli] ERROR: …`, or the `! Failure: …` of a check that

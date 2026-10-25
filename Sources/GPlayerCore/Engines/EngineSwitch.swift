@@ -36,7 +36,7 @@ public enum EngineSwitch {
     /// The line under that offer, or nil for a space of another kind.
     public static func launcherMoveDetail(presetID: String?) -> String? {
         guard let preset = AppPresets.preset(presetID), preset.needsGPlayerWine else { return nil }
-        return "\(preset.name) opens only on G-Player Wine. Moving asks first."
+        return String(localized: "\(preset.name) opens only on G-Player Wine. Moving asks first.")
     }
 
     /// The Wine release an engine is made from: 11.18 for Wine Staging 11.18, 11.0 for G-Player Wine, 7.7 for Apple's toolkit.
@@ -56,28 +56,31 @@ public enum EngineSwitch {
     }
 
     public static func title(space: String, to target: EngineInfo) -> String {
-        "Move “\(space)” to \(target.name)?"
+        String(localized: "Move “\(space)” to \(target.name)?")
     }
 
     /// The question's text. `current` is nil when the space's engine isn't one G-Player knows.
     public static func message(space: String, from current: EngineInfo?, to target: EngineInfo, downloadBytes: Int64) -> String {
-        var text = "Every program in “\(space)” will run on \(label(target))"
-        text += current.map { " instead of \(label($0))." } ?? "."
-        if downloadBytes > 0 { text += " \(target.name) downloads first, about \(EngineCatalog.megabytes(downloadBytes)) MB." }
+        // Whole sentences, each translated on its own.
+        var parts = [current.map { String(localized: "Every program in “\(space)” will run on \(label(target)) instead of \(label($0)).") }
+                     ?? String(localized: "Every program in “\(space)” will run on \(label(target)).")]
+        if downloadBytes > 0 {
+            parts.append(String(localized: "\(target.name) downloads first, about \(EngineCatalog.megabytes(downloadBytes)) MB."))
+        }
         switch current.map({ age(of: target, comparedTo: $0) }) {
         case .newer:
-            text += " It's a newer Wine than the space has now, so the space's files are updated for it the first time it starts, and the older Wine may not open the space afterwards."
+            parts.append(String(localized: "It's a newer Wine than the space has now, so the space's files are updated for it the first time it starts, and the older Wine may not open the space afterwards."))
         case .older:
-            text += " It's an older Wine than the space has now, and a space that a newer Wine has updated may not open on it."
+            parts.append(String(localized: "It's an older Wine than the space has now, and a space that a newer Wine has updated may not open on it."))
         case .same, nil:
             break
         }
-        return text
+        return parts.joined(separator: " ")
     }
 
     /// Why Switch is off while programs run in the space.
     public static func busyMessage(space: String) -> String {
-        "Programs are running in “\(space)”. Stop them (Stop All, in the space) and switch then."
+        String(localized: "Programs are running in “\(space)”. Stop them (Stop All, in the space) and switch then.")
     }
 
     private static func label(_ info: EngineInfo) -> String {

@@ -139,7 +139,7 @@ public enum GameImporter {
         try fm.createDirectory(at: target, withIntermediateDirectories: true)
         // Walks by path inside the folder: the URLs of a walk of a folder under /var come out as /private/var, which a
         // link's path then doesn't match (and the link would be skipped).
-        guard let walker = fm.enumerator(atPath: source.path) else { throw ShellError.failed("Couldn't read \(source.lastPathComponent).") }
+        guard let walker = fm.enumerator(atPath: source.path) else { throw ShellError.said("Couldn't read \(source.lastPathComponent).") }
         var done: Int64 = 0
         var reported = Date.distantPast
         for case let inside as String in walker {
@@ -168,7 +168,7 @@ public enum GameImporter {
             if let any = ExecutableScanner.scan(url, maxDepth: 2).first(where: { ExecutableScanner.isInstallerName($0.name) }) {
                 return any.url
             }
-            throw ShellError.failed("No installer (setup.exe, install.exe or .msi) found in \(url.lastPathComponent).")
+            throw ShellError.said("No installer (setup.exe, install.exe or .msi) found in \(url.lastPathComponent).")
         case .archive(let url):
             let folder = try await ArchiveExtractor.extract(url, into: workFolder, name: title, expectedBytes: totalBytes, progress: progress)
             return try await installer(for: .folder(folder), workFolder: workFolder, title: title)
@@ -187,7 +187,7 @@ public enum GameImporter {
         await WineLauncher.waitForAll(engine: engine, space: space)
         let found = ProgramSnapshot.newPrograms(in: space, since: before)
         if found.isEmpty, status != 0 {
-            throw ShellError.failed("The installer stopped (code \(status)) without installing a program.")
+            throw ShellError.said("The installer stopped (code \(String(status))) without installing a program.")
         }
         return found
     }

@@ -20,7 +20,7 @@ struct LibraryView: View {
         return list
     }
 
-    private var title: String {
+    private var title: LocalizedStringKey {
         switch filter {
         case .all: "All Games"
         case .recent: "Recently Played"
@@ -115,13 +115,13 @@ struct LibraryToolbar: ToolbarContent {
                 .help("Look for games Steam or Epic installed")
             Button { model.openAddGame() } label: { Label("Add Game", systemImage: "plus") }
                 .disabled(model.addGameBlock != nil)
-                .help(model.addGameBlock?.message ?? "Add a game folder, archive or installer")
+                .help(model.addGameBlock?.message ?? String(localized: "Add a game folder, archive or installer"))
         }
     }
 }
 
 struct GameGrid: View {
-    let title: String
+    let title: LocalizedStringKey
     let games: [Game]
 
     var body: some View {
@@ -159,7 +159,7 @@ struct GameTile: View {
                                 .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
                         }
                         .buttonStyle(.plain)
-                        .help(model.isRunning(game) ? model.stopHelp(game) : "Play")
+                        .help(model.isRunning(game) ? model.stopHelp(game) : String(localized: "Play"))
                         .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
                 }
@@ -188,11 +188,11 @@ struct GameTile: View {
     }
 
     private var subtitle: String {
-        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…" }
-        if model.isRunning(game) { return "Running" }
-        if let d = game.lastPlayedAt { return "Played " + d.formatted(.relative(presentation: .named)) }
-        if game.kind == .app { return "Launcher" }
-        if case .executable = game.source { return "Not played yet" }
+        if model.isPreparing(game) { return model.isWaitingForInstalls(game) ? String(localized: "Waiting for installs…") : model.epic.startStatus[game.id] ?? String(localized: "Starting…") }
+        if model.isRunning(game) { return String(localized: "Running") }
+        if let d = game.lastPlayedAt { return String(localized: "Played \(d.formatted(.relative(presentation: .named)))") }
+        if game.kind == .app { return String(localized: "Launcher") }
+        if case .executable = game.source { return String(localized: "Not played yet") }
         return game.source.label
     }
 }

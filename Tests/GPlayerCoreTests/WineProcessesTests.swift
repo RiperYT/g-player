@@ -322,7 +322,9 @@ import Testing
     @Test func theMessageSaysWhatHappenedAndWhatCausesIt() {
         let load = WineProcesses.load(of: steam, from: explorers(2310, in: steam))
         let text = load.message(spaceName: "Main")
-        #expect(text.contains("“Main”") && text.contains("2310 Windows programs") && text.contains("2310 of them Windows Explorer"))
+        // Counts in a sentence are written the way the language does (2,310 in English).
+        let count = 2310.formatted()
+        #expect(text.contains("“Main”") && text.contains("\(count) Windows programs") && text.contains("\(count) of them Windows Explorer"))
         #expect(text.contains("stopped everything") && text.contains("keep your Mac usable"))
         #expect(text.contains("under \(PrefixPath.maxLength) characters"))
         // Too many programs of other kinds: no word about Explorer.

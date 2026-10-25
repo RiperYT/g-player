@@ -37,11 +37,11 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
     }
 
     @Test func onlyEpicsLauncherNeedsDotNet() {
-        #expect(AppPresets.all.filter(\.needsDotNet).map(\.id) == ["epic"])
+        #expect(AppPresets.known.filter(\.needsDotNet).map(\.id) == ["epic"])
         #expect(AppPresets.epic.wineMono(on: EngineCatalog.crossover) == mono)
         #expect(AppPresets.epic.wineMono(on: EngineCatalog.crossoverRevision1) == mono)
         #expect(AppPresets.epic.wineMono(on: EngineCatalog.wineStaging) == nil)         // nothing to give it there
-        for preset in AppPresets.all where preset.id != "epic" {
+        for preset in AppPresets.known where preset.id != "epic" {
             #expect(preset.wineMono(on: EngineCatalog.crossover) == nil, "\(preset.id)")
         }
     }
@@ -587,6 +587,6 @@ private func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(
     @Test func theCardSaysWhatTheFirstStartAdds() {
         #expect(WineMono.sizeLabel(mono) == "40 MB" && WineMono.installedSizeLabel(mono) == "245 MB")
         #expect(AppPresets.epic.dotNetReason == "Epic Online Services" && AppPresets.epic.needsDotNet)
-        #expect(AppPresets.all.filter { $0.dotNetReason != nil }.map(\.id) == ["epic"])
+        #expect(AppPresets.known.filter { $0.dotNetReason != nil }.map(\.id) == ["epic"])
     }
 }

@@ -118,11 +118,11 @@ extension CompatResolver {
         /// One plain line for the inspector: what is used and why.
         public var summary: String {
             let name = backend.displayName
-            if worked { return "\(name) — picked automatically, worked last time" }
-            if failed.isEmpty { return "\(name) — picked automatically" }
+            if worked { return String(localized: "\(name) — picked automatically, worked last time") }
+            if failed.isEmpty { return String(localized: "\(name) — picked automatically") }
             let list = CompatResolver.list(failed.map(\.displayName))
-            return failed.contains(backend) ? "\(name) — picked automatically, though \(list) didn't work last time"
-                                            : "\(name) — picked automatically, \(list) didn't work"
+            return failed.contains(backend) ? String(localized: "\(name) — picked automatically, though \(list) didn't work last time")
+                                            : String(localized: "\(name) — picked automatically, \(list) didn't work")
         }
     }
 

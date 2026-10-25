@@ -18,7 +18,7 @@ public enum GraphicsBackend: String, Codable, CaseIterable, Sendable, Identifiab
 
     public var displayName: String {
         switch self {
-        case .auto: "Automatic"
+        case .auto: String(localized: "Automatic")
         case .dxvk: "DXVK"
         case .wined3d: "WineD3D"
         case .d3dmetal: "D3DMetal"
@@ -28,11 +28,11 @@ public enum GraphicsBackend: String, Codable, CaseIterable, Sendable, Identifiab
 
     public var summary: String {
         switch self {
-        case .auto: "G-Player picks the graphics and, if the game doesn't start, tries the next ones by itself."
-        case .dxvk: "DirectX 10 and 11 through Vulkan and MoltenVK."
-        case .wined3d: "Wine's OpenGL renderer. Good for older DirectX 9 games."
-        case .d3dmetal: "Apple's translator for DirectX 11 and 12, from your own Game Porting Toolkit."
-        case .dxmt: "DirectX 10 and 11 straight to Metal. Needs the G-Player Wine engine."
+        case .auto: String(localized: "G-Player picks the graphics and, if the game doesn't start, tries the next ones by itself.")
+        case .dxvk: String(localized: "DirectX 10 and 11 through Vulkan and MoltenVK.")
+        case .wined3d: String(localized: "Wine's OpenGL renderer. Good for older DirectX 9 games.")
+        case .d3dmetal: String(localized: "Apple's translator for DirectX 11 and 12, from your own Game Porting Toolkit.")
+        case .dxmt: String(localized: "DirectX 10 and 11 straight to Metal. Needs the G-Player Wine engine.")
         }
     }
 }
@@ -43,6 +43,6 @@ extension EngineInfo {
     public func graphicsHint(for choice: GraphicsBackend, profile: LaunchProfile) -> String {
         let shown = backends.contains(choice) ? choice : .auto
         guard shown == .auto, profile == .custom else { return shown.summary }
-        return "Uses \(defaultBackend.displayName), this engine's usual graphics. G-Player never switches it."
+        return String(localized: "Uses \(defaultBackend.displayName), this engine's usual graphics. G-Player never switches it.")
     }
 }

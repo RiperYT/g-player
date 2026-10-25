@@ -216,7 +216,7 @@ extension AppModel {
             }
             var learned = (game.autoGraphics ?? AutoGraphics(engineID: auto.engineID)).current(on: auto.engineID)
             learned.markFailed(auto.backend)
-            playAgain(game, "\(auto.backend.displayName) didn't work for “\(game.title)”. Trying \(next.displayName)…",
+            playAgain(game, String(localized: "\(auto.backend.displayName) didn't work for “\(game.title)”. Trying \(next.displayName)…"),
                       stopping: false, retry: GraphicsRetryLaunch(learned: learned, automatic: true)) { [weak self] cancelled in
                 // It couldn't start (it would have asked something) or was stopped: the failure stays what is shown.
                 if cancelled { self?.diagnoses[id] = found } else { self?.report(found, for: id) }
@@ -239,7 +239,7 @@ extension AppModel {
               !preparing.contains(g.id) else { return }
         failedAutoLaunches[g.id] = nil
         learn(g.id, on: auto.engineID) { $0.markFailed(auto.backend) }
-        playAgain(g, "Trying \(next.displayName) for “\(g.title)”…", stopping: false,
+        playAgain(g, String(localized: "Trying \(next.displayName) for “\(g.title)”…"), stopping: false,
                   retry: GraphicsRetryLaunch(learned: nil, automatic: false))
     }
 
@@ -261,16 +261,17 @@ extension AppModel {
     /// What the confirmation says. Steam is only said to restart when it will do so without asking.
     func otherGraphicsMessage(for request: OtherGraphicsRequest) -> String {
         guard let game = game(request.gameID) else { return "" }
-        var text = "“\(game.title)” closes, so anything you haven't saved may be lost."
+        var parts = [String(localized: "“\(game.title)” closes, so anything you haven't saved may be lost.")]
         if case .steam = game.source, let space = space(game.spaceID) {
-            text += mayRestartSteamSilently(for: game, in: space) ? " Steam restarts too."
-                                                                  : " Steam may ask to restart first."
+            parts.append(mayRestartSteamSilently(for: game, in: space) ? String(localized: "Steam restarts too.")
+                                                                       : String(localized: "Steam may ask to restart first."))
         }
-        text += " G-Player then starts it again with other graphics"
         if let next = graphicsChoice(for: game).flatMap({ GraphicsRetry.otherGraphics(for: $0, launched: request.launched.backend) }) {
-            text += " (\(next.displayName))"
+            parts.append(String(localized: "G-Player then starts it again with other graphics (\(next.displayName))."))
+        } else {
+            parts.append(String(localized: "G-Player then starts it again with other graphics."))
         }
-        return text + "."
+        return parts.joined(separator: " ")
     }
 
     /// The user confirmed: stops the game, writes its graphics down as not working, and plays it again with the next ones.
@@ -278,12 +279,12 @@ extension AppModel {
     func tryOtherGraphics(_ request: OtherGraphicsRequest) {
         guard let g = game(request.gameID) else { return }
         guard !preparing.contains(g.id) else {
-            errorMessage = "“\(g.title)” is starting. Try again once it has opened."
+            errorMessage = String(localized: "“\(g.title)” is starting. Try again once it has opened.")
             return
         }
         let auto = request.launched
         guard let next = graphicsChoice(for: g).flatMap({ GraphicsRetry.otherGraphics(for: $0, launched: auto.backend) }) else {
-            errorMessage = "G-Player has no other graphics left to try for “\(g.title)”."
+            errorMessage = String(localized: "G-Player has no other graphics left to try for “\(g.title)”.")
             return
         }
         let wasRunning = isRunning(g)
@@ -292,7 +293,7 @@ extension AppModel {
         launches[g.id] = nil
         storeLaunches[g.id] = nil
         learn(g.id, on: auto.engineID) { $0.markFailed(auto.backend) }
-        playAgain(g, "Trying \(next.displayName) for “\(g.title)” instead of \(auto.backend.displayName)…", stopping: wasRunning,
+        playAgain(g, String(localized: "Trying \(next.displayName) for “\(g.title)” instead of \(auto.backend.displayName)…"), stopping: wasRunning,
                   retry: GraphicsRetryLaunch(learned: nil, automatic: false))
     }
 
@@ -307,8 +308,8 @@ extension AppModel {
         // A try the user asks for starts a new round; an earlier Stop doesn't count against it.
         if !retry.automatic { stoppedRetries.remove(id) }
         preparing.insert(id)
-        let activity = begin("Trying other graphics", note)
-        setStop(activity, help: "Stop trying other graphics. Nothing more is started.") { [weak self] in self?.cancelRetry(id) }
+        let activity = begin(String(localized: "Trying other graphics"), note)
+        setStop(activity, help: String(localized: "Stop trying other graphics. Nothing more is started.")) { [weak self] in self?.cancelRetry(id) }
         let token = UUID()
         retryTasks[id] = GraphicsRetryTask(token: token, task: Task {
             var started = false

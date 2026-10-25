@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld Windows programs were running</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>працювали %lld програми Windows</string>
+			<key>many</key>
+			<string>працювало %lld програм Windows</string>
+			<key>one</key>
+			<string>працювала %lld програма Windows</string>
+			<key>other</key>
+			<string>працювало %lld програми Windows</string>
+		</dict>
+	</dict>
+	<key>%lld Windows programs were running, %lld of them Windows Explorer</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@, з них %lld — Провідник Windows</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>працювали %lld програми Windows</string>
+			<key>many</key>
+			<string>працювало %lld програм Windows</string>
+			<key>one</key>
+			<string>працювала %lld програма Windows</string>
+			<key>other</key>
+			<string>працювало %lld програми Windows</string>
+		</dict>
+	</dict>
+	<key>%lld environment settings</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld змінні середовища</string>
+			<key>many</key>
+			<string>%lld змінних середовища</string>
+			<key>one</key>
+			<string>%lld змінна середовища</string>
+			<key>other</key>
+			<string>%lld змінної середовища</string>
+		</dict>
+	</dict>
+	<key>%lld hidden games in this space</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ у цьому просторі</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld приховані гри</string>
+			<key>many</key>
+			<string>%lld прихованих ігор</string>
+			<key>one</key>
+			<string>%lld прихована гра</string>
+			<key>other</key>
+			<string>%lld прихованої гри</string>
+		</dict>
+	</dict>
+	<key>%lld registry settings</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld параметри реєстру</string>
+			<key>many</key>
+			<string>%lld параметрів реєстру</string>
+			<key>one</key>
+			<string>%lld параметр реєстру</string>
+			<key>other</key>
+			<string>%lld параметра реєстру</string>
+		</dict>
+	</dict>
+	<key>G-Player stopped everything in it to keep your Mac usable. A long folder path is the usual cause. Keep a space's path under %lld characters.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>G-Player зупинив усе в цьому просторі, щоб Mac працював далі. Зазвичай причина — задовгий шлях до папки. Шлях до простору має бути коротшим за %#@count@.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld символи</string>
+			<key>many</key>
+			<string>%lld символів</string>
+			<key>one</key>
+			<string>%lld символ</string>
+			<key>other</key>
+			<string>%lld символу</string>
+		</dict>
+	</dict>
+	<key>It quit after %lld seconds without saying why.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Гра закрилася через %#@count@, нічого не пояснивши.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld секунди</string>
+			<key>many</key>
+			<string>%lld секунд</string>
+			<key>one</key>
+			<string>%lld секунду</string>
+			<key>other</key>
+			<string>%lld секунди</string>
+		</dict>
+	</dict>
+	<key>It took longer than %lld minutes, so G-Player stopped it.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Процес тривав понад %#@count@, тож G-Player його зупинив.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld хвилини</string>
+			<key>many</key>
+			<string>%lld хвилин</string>
+			<key>one</key>
+			<string>%lld хвилину</string>
+			<key>other</key>
+			<string>%lld хвилини</string>
+		</dict>
+	</dict>
+	<key>It took longer than %lld seconds, so G-Player stopped it.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Процес тривав понад %#@count@, тож G-Player його зупинив.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld секунди</string>
+			<key>many</key>
+			<string>%lld секунд</string>
+			<key>one</key>
+			<string>%lld секунду</string>
+			<key>other</key>
+			<string>%lld секунди</string>
+		</dict>
+	</dict>
+	<key>Its path is %lld characters long; the limit is %lld.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Шлях до простору має довжину %#@count@, а межа — %lld.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld символи</string>
+			<key>many</key>
+			<string>%lld символів</string>
+			<key>one</key>
+			<string>%lld символ</string>
+			<key>other</key>
+			<string>%lld символу</string>
+		</dict>
+	</dict>
+	<key>New spaces can't be made in this library: its folder's path is %lld characters long and the limit is %lld.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>У цій бібліотеці не можна створювати нові простори: шлях до її папки має довжину %#@count@, а межа — %lld.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld символи</string>
+			<key>many</key>
+			<string>%lld символів</string>
+			<key>one</key>
+			<string>%lld символ</string>
+			<key>other</key>
+			<string>%lld символу</string>
+		</dict>
+	</dict>
+	<key>The Rosetta 2 install took longer than %lld minutes, so G-Player stopped waiting. Choose Install to try again.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Встановлення Rosetta 2 тривало понад %#@count@, тож G-Player перестав чекати. Натисніть «Встановити», щоб спробувати ще раз.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld хвилини</string>
+			<key>many</key>
+			<string>%lld хвилин</string>
+			<key>one</key>
+			<string>%lld хвилину</string>
+			<key>other</key>
+			<string>%lld хвилини</string>
+		</dict>
+	</dict>
+	<key>The library folder's path is %lld characters long; the limit is %lld.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Шлях до папки бібліотеки має довжину %#@count@, а межа — %lld.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld символи</string>
+			<key>many</key>
+			<string>%lld символів</string>
+			<key>one</key>
+			<string>%lld символ</string>
+			<key>other</key>
+			<string>%lld символу</string>
+		</dict>
+	</dict>
+	<key>Use %lld known fixes for this game</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Застосовувати %lld відомі виправлення для цієї гри</string>
+			<key>many</key>
+			<string>Застосовувати %lld відомих виправлень для цієї гри</string>
+			<key>one</key>
+			<string>Застосовувати %lld відоме виправлення для цієї гри</string>
+			<key>other</key>
+			<string>Застосовувати %lld відомого виправлення для цієї гри</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

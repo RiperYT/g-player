@@ -17,7 +17,7 @@ public struct Game: Codable, Identifiable, Hashable, Sendable {
 
         public var label: String {
             switch self {
-            case .executable: "Added by you"
+            case .executable: String(localized: "Added by you")
             case .steam: "Steam"
             case .epic: "Epic"
             case .legendary: "Epic Games"

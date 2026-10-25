@@ -212,6 +212,21 @@ import Testing
         #expect(manual.warnings.map(\.title) == ["Needs Ubisoft", "Needs EA App"])
     }
 
+    @Test func aLauncherGetAppsDoesntOfferIsInstalledByHand() {
+        // Get Apps offers Steam and Epic only: for another launcher it can't be where the note sends people.
+        func detail(of launcher: String) -> String? {
+            let input = CompatResolver.Input(engine: staging, analysis: GameAnalysis(launchers: [launcher]), fixes: [],
+                                             options: .default, isStoreGame: false)
+            return CompatResolver.resolve(input).warnings.first { $0.title == "Needs \(launcher)" }?.detail
+        }
+        for launcher in ["Ubisoft", "EA App", "Rockstar", "Paradox_Launcher"] {
+            let text = detail(of: launcher) ?? ""
+            #expect(text.contains("Run Program…") && !text.contains("Get Apps"), "\(text)")
+        }
+        #expect(detail(of: "Epic")?.contains("from Get Apps") == true)
+        #expect(AppPresets.offered(launcher: "Ubisoft") == nil && AppPresets.offered(launcher: "Epic")?.id == "epic")
+    }
+
     // MARK: Profiles
 
     @Test func fastIsOnlyOfferedWhereD3DMetalIs() {

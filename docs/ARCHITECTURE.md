@@ -15,7 +15,8 @@ Sources/
                         stores, hidden state included), ShellLink + ShortcutScanner (.lnk),
                         PEInfo (CPU, .NET, 32-bit warning) + PEIcon (.exe icon → .ico) read from PE headers,
                         EnvironmentFinder (CrossOver/Whisky/~/Games prefixes, old launcher scripts)
-    Presets/            AppPreset (Steam, Epic, GOG, Ubisoft), PresetInstaller, LaunchPlanner
+    Presets/            AppPreset (Get Apps offers Steam and Epic; GOG and Ubisoft are kept for spaces that have
+                        them), PresetInstaller, LaunchPlanner
     Epic/               Legendary (the runner and its pinned download), LegendaryCommand (command lines),
                         LegendaryOutput / LegendaryInstallStatus / LegendaryFailure (what it prints),
                         EpicSignIn (the code from Epic's sign-in page), EpicGames (space, library merge)

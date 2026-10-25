@@ -31,11 +31,11 @@ public struct Winetricks: Sendable {
     /// and a message.
     public func install(_ verb: String, in space: Space, engine: Engine, timeout: TimeInterval = 15 * 60,
                         progress: @escaping @Sendable (Double?, String) -> Void) async throws {
-        guard Self.isVerb(verb) else { throw ShellError.failed("\(verb) isn't a component winetricks can install.") }
+        guard Self.isVerb(verb) else { throw ShellError.said("\(verb) isn't a component winetricks can install.") }
         guard let shims = CoreResources.url("shims") else {
-            throw ShellError.failed("G-Player's helper scripts are missing. Reinstall G-Player.")
+            throw ShellError.said("G-Player's helper scripts are missing. Reinstall G-Player.")
         }
-        progress(nil, "Getting winetricks")
+        progress(nil, String(localized: "Getting winetricks"))
         let pristine = try await RuntimeInstaller.fetch(Self.script, into: toolsFolder)
         let runnable = try prepareScript(from: pristine)
         try FileManager.default.createDirectory(at: cacheFolder, withIntermediateDirectories: true)
@@ -49,7 +49,7 @@ public struct Winetricks: Sendable {
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let log = paths.logs.appendingPathComponent("winetricks \(Files.safeName(verb)) \(stamp).log")
         let env = Self.environment(engine: engine, space: space, shims: shims, cache: cacheFolder, temporary: scratch)
-        progress(nil, "Installing \(verb)")
+        progress(nil, String(localized: "Installing \(verb)"))
         let result = try await Self.run(URL(fileURLWithPath: "/bin/bash"), Self.arguments(script: runnable, verb: verb),
                                         environment: env, currentDirectory: cacheFolder, log: log,
                                         timeout: timeout) { line in
@@ -66,7 +66,7 @@ public struct Winetricks: Sendable {
     func prepareScript(from pristine: URL) throws -> URL {
         let original = try String(contentsOf: pristine, encoding: .utf8)
         guard let edited = Self.hardened(original) else {
-            throw ShellError.failed("winetricks \(Self.version) doesn't look the way G-Player expects. Update G-Player.")
+            throw ShellError.said("winetricks \(Self.version) doesn't look the way G-Player expects. Update G-Player.")
         }
         let target = toolsFolder.appendingPathComponent("winetricks-gplayer")
         try edited.write(to: target, atomically: true, encoding: .utf8)
@@ -150,24 +150,24 @@ public struct Winetricks: Sendable {
     /// One line of winetricks output as a short status, or nil when it isn't worth showing.
     static func progressMessage(forLine line: String, verb: String) -> String? {
         if line.hasPrefix("Downloading "), let url = line.dropFirst("Downloading ".count).split(separator: " ").first {
-            return "Downloading \(url.split(separator: "/").last.map(String.init) ?? "files")"
+            return String(localized: "Downloading \(url.split(separator: "/").last.map(String.init) ?? String(localized: "files", comment: "Inside “Downloading …”"))")
         }
-        if line.hasPrefix("Executing wine ") || line.hasPrefix("Executing arch ") { return "Installing \(verb)" }
-        if line.hasPrefix("Executing cabextract ") { return "Unpacking \(verb)" }
+        if line.hasPrefix("Executing wine ") || line.hasPrefix("Executing arch ") { return String(localized: "Installing \(verb)") }
+        if line.hasPrefix("Executing cabextract ") { return String(localized: "Unpacking \(verb)") }
         return nil
     }
 
     /// What to tell the user when winetricks stopped. `output` is the end of its output.
     static func failureReason(output: String, status: Int32, logName: String) -> String {
         if output.contains("SHA256 mismatch!") {
-            return "A download doesn't match its checksum. The publisher may have replaced it, so nothing from it was installed. Details: \(logName)"
+            return String(localized: "A download doesn't match its checksum. The publisher may have replaced it, so nothing from it was installed. Details: \(logName)")
         }
         if output.contains("No SHA-256 checksum for") {
-            return "winetricks has no checksum for one of the downloads, so G-Player didn't install it. Details: \(logName)"
+            return String(localized: "winetricks has no checksum for one of the downloads, so G-Player didn't install it. Details: \(logName)")
         }
         let warning = output.split(separator: "\n").last { $0.hasPrefix("Note: ") || $0.hasPrefix("warning: ") }
         let detail = warning.map { " " + String($0.prefix(200)) } ?? ""
-        return "winetricks stopped with code \(status).\(detail) Details: \(logName)"
+        return String(localized: "winetricks stopped with code \(String(status)).\(detail) Details: \(logName)")
     }
 
     // MARK: Process

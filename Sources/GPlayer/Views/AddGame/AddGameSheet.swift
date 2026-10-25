@@ -75,10 +75,10 @@ struct AddGameSheet: View {
 
     private var stepCaption: String {
         switch step {
-        case .choose: "A folder, an archive or an installer"
+        case .choose: String(localized: "A folder, an archive or an installer")
         case .details: source.map { $0.url.lastPathComponent } ?? ""
-        case .working: mode == .installer ? "Installing" : "Copying"
-        case .pick: "Which program starts the game?"
+        case .working: mode == .installer ? String(localized: "Installing") : String(localized: "Copying")
+        case .pick: String(localized: "Which program starts the game?")
         }
     }
 
@@ -141,9 +141,13 @@ struct AddGameSheet: View {
     /// What the step says: where the installer is, or the work's own message.
     private var message: String {
         switch installer?.phase {
-        case .queued: "Waiting for \(targetSpace.flatMap { model.queueHolder(in: $0.id) } ?? "other work in this space")…"
-        case .finishing: "Looking for what it installed…"
-        default: workMessage
+        case .queued:
+            let holder = targetSpace.flatMap { model.queueHolder(in: $0.id) } ?? String(localized: "other work in this space", comment: "Inside “Waiting for …”")
+            return String(localized: "Waiting for \(holder)…", comment: "What the space's queue is busy with follows, e.g. “the installer of “Game””")
+        case .finishing:
+            return String(localized: "Looking for what it installed…")
+        default:
+            return workMessage
         }
     }
 
@@ -212,7 +216,7 @@ struct AddGameSheet: View {
 
     private func open(_ url: URL) {
         guard let s = ImportSource(url) else {
-            model.errorMessage = "\(url.lastPathComponent) isn't a folder, an archive or a Windows program."
+            model.errorMessage = String(localized: "\(url.lastPathComponent) isn't a folder, an archive or a Windows program.")
             return
         }
         pick(s)
@@ -274,7 +278,7 @@ struct AddGameSheet: View {
             stoppable = false
             var space = existing
             if space == nil {
-                workMessage = "Creating the space “\(name)”…"
+                workMessage = String(localized: "Creating the space “\(name)”…")
                 space = await model.createSpace(name: name)
                 if let made = space { spaceChoice = made.id; createdSpaceID = made.id; createdSpaceUsed = false }
             }
@@ -283,25 +287,25 @@ struct AddGameSheet: View {
             // From here Add Game counts as work in the space: its engine isn't switched or deleted under the steps below.
             model.beginAddGame(in: space.id)
             defer { model.endAddGame(in: space.id) }
-            if model.engine(for: space) == nil { workMessage = "Downloading \(EngineCatalog.info(space.engineID)?.name ?? "the engine")…" }
+            if model.engine(for: space) == nil { workMessage = String(localized: "Downloading \(EngineCatalog.info(space.engineID)?.name ?? String(localized: "the engine", comment: "Inside “Downloading …”"))…") }
             guard await model.engineReady(for: space) != nil else { step = .details; return }       // checked now, looked up again to start
             try Task.checkCancellation()
             targetSpace = space
             stoppable = true
             if mode == .portable {
-                workMessage = source.url.hasDirectoryPath || Files.isDirectory(source.url) ? "Copying the game…" : "Unpacking the archive…"
+                workMessage = source.url.hasDirectoryPath || Files.isDirectory(source.url) ? String(localized: "Copying the game…") : String(localized: "Unpacking the archive…")
                 createdSpaceUsed = createdSpaceUsed || space.id == createdSpaceID
                 let folder = try await GameImporter.copyIntoSpace(source, space: space, title: name, move: move,
                                                                   totalBytes: plan.totalBytes, progress: showProgress)
                 candidates = await Task.detached { ExecutableScanner.scan(folder, title: name) }.value
             } else {
-                workMessage = "Preparing the installer…"
+                workMessage = String(localized: "Preparing the installer…")
                 let folder = paths.downloads.appendingPathComponent("install-\(UUID().uuidString.prefix(8))")
                 unpacked = folder
                 let setup = try await GameImporter.installer(for: source, workFolder: folder, title: name,
                                                              totalBytes: plan.totalBytes, progress: showProgress)
                 workProgress = nil; workDetail = ""
-                workMessage = "Running \(setup.lastPathComponent)…"
+                workMessage = String(localized: "Running \(setup.lastPathComponent)…")
                 let run = InstallerRun()
                 installer = run
                 createdSpaceUsed = createdSpaceUsed || space.id == createdSpaceID
@@ -337,7 +341,7 @@ struct AddGameSheet: View {
 
     /// Looks at what the work will take and refuses it when the disk can't hold it, before anything is written.
     private func checkedPlan(_ source: ImportSource, move: Bool, destination: URL, name: String) async throws -> GameImporter.ImportPlan {
-        workMessage = "Checking free space…"
+        workMessage = String(localized: "Checking free space…")
         let plan = await GameImporter.plan(source, move: move, destination: destination)
         if let problem = GameImporter.spaceProblem(for: plan, destination: destination, title: name) { throw ShellError.failed(problem) }
         try Task.checkCancellation()
@@ -349,7 +353,7 @@ struct AddGameSheet: View {
         { done, total in
             Task { @MainActor in
                 workProgress = total > 0 ? min(1, Double(done) / Double(total)) : nil
-                workDetail = total > 0 ? "\(done.formattedBytes) of \(total.formattedBytes)" : "\(done.formattedBytes) so far"
+                workDetail = total > 0 ? String(localized: "\(done.formattedBytes) of \(total.formattedBytes)") : String(localized: "\(done.formattedBytes) so far")
             }
         }
     }
@@ -380,7 +384,7 @@ private struct InstallerNote: View {
     var body: some View {
         switch run.phase {
         case .queued:
-            Text("The installer starts when \(holder ?? "the other work in this space") is done. Two installers at once would fail.")
+            Text("The installer starts when \(holder ?? String(localized: "the other work in this space")) is done. Two installers at once would fail.")
                 .font(.callout).foregroundStyle(.secondary)
         case .running:
             Text("Finish the installer in its own window. You can uncheck “Launch game” at the end. G-Player continues when the installer closes.")

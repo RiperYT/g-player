@@ -15,11 +15,11 @@ public struct PresetInstaller: Sendable {
     public func install(_ preset: AppPreset, in space: Space, engine: Engine, dotNetAvailable: Bool = false,
                         progress: @escaping Progress) async throws {
         let installer = paths.downloads.appendingPathComponent(preset.installerFileName)
-        progress(0, "Downloading \(preset.name)")
-        try await FileDownloader.download(preset.installerURL, to: installer) { f in progress(f * 0.4, "Downloading \(preset.name)") }
+        progress(0, String(localized: "Downloading \(preset.name)"))
+        try await FileDownloader.download(preset.installerURL, to: installer) { f in progress(f * 0.4, String(localized: "Downloading \(preset.name)")) }
         defer { try? FileManager.default.removeItem(at: installer) }
 
-        progress(nil, "Installing \(preset.name)")
+        progress(nil, String(localized: "Installing \(preset.name)"))
         let status = try await WineLauncher.runAndWait(
             engine: engine, space: space,
             arguments: WineLauncher.arguments(toOpen: installer, extra: preset.installerArguments),
@@ -30,17 +30,17 @@ public struct PresetInstaller: Sendable {
         try Task.checkCancellation()
         guard preset.isInstalled(in: space) else {
             let looked = preset.executables.map { "C:\\" + $0.replacingOccurrences(of: "/", with: "\\") }.joined(separator: ", ")
-            throw ShellError.failed("The \(preset.name) installer finished (code \(status)), but \(preset.name) isn't in \(looked). The installer's log is in \(paths.logs.path).")
+            throw ShellError.said("The \(preset.name) installer finished (code \(String(status))), but \(preset.name) isn't in \(looked). The installer's log is in \(paths.logs.path).")
         }
         if preset.id == "steam" { try await finishSteamSetup(space: space, engine: engine, progress: progress) }
-        progress(1, "\(preset.name) is ready")
+        progress(1, String(localized: "\(preset.name) is ready"))
     }
 
     /// The installer only leaves Steam's bootstrapper. Start it once so it downloads the real client,
     /// then stop it: from the next start on, the helper wrapper stays in place and the window draws.
     func finishSteamSetup(space: Space, engine: Engine, progress: @escaping Progress) async throws {
         guard !SteamLibrary.isClientReady(in: space) else { return }
-        progress(nil, "Steam is downloading its client. This takes a few minutes.")
+        progress(nil, String(localized: "Steam is downloading its client. This takes a few minutes."))
         let steam = AppPresets.steam
         let program = try WineLauncher.start(
             engine: engine, space: space,
@@ -53,7 +53,7 @@ public struct PresetInstaller: Sendable {
             while !SteamLibrary.isClientReady(in: space), Date() < deadline {
                 try await Task.sleep(for: .seconds(3))
                 if !program.isRunning && !SteamLibrary.isClientReady(in: space) {
-                    throw ShellError.failed("Steam quit before it finished downloading. Open it from the library to continue.")
+                    throw ShellError.said("Steam quit before it finished downloading. Open it from the library to continue.")
                 }
             }
             try await Task.sleep(for: .seconds(8))      // let it finish writing the new files
@@ -64,7 +64,7 @@ public struct PresetInstaller: Sendable {
         }
         await WineLauncher.killAll(engine: engine, space: space)
         guard SteamLibrary.isClientReady(in: space) else {
-            throw ShellError.failed("Steam didn't finish downloading in 20 minutes. Open it from the library to continue.")
+            throw ShellError.said("Steam didn't finish downloading in 20 minutes. Open it from the library to continue.")
         }
     }
 }

@@ -30,10 +30,10 @@ public struct LegendaryInstallStatus: Equatable, Sendable {
 
     /// What the sidebar says: "Preparing" until the download starts, then "12% · 123 MB · about 2 min left".
     public var message: String {
-        guard let fraction else { return "Preparing" }
+        guard let fraction else { return String(localized: "Preparing") }
         var parts = ["\(Int((fraction * 100).rounded(.down)))%"]
         if let downloadedBytes, downloadedBytes > 0 { parts.append(downloadedBytes.formattedBytes) }
-        if let remaining { parts.append(Self.duration(remaining) + " left") }
+        if let remaining { parts.append(String(localized: "\(Self.duration(remaining)) left")) }
         return parts.joined(separator: " · ")
     }
 
@@ -83,9 +83,9 @@ public struct LegendaryInstallStatus: Equatable, Sendable {
     /// "under a minute", "about 5 min", "about 1 h 20 min".
     static func duration(_ seconds: TimeInterval) -> String {
         let minutes = Int((seconds / 60).rounded(.up))
-        if seconds < 60 { return "under a minute" }
-        if minutes < 60 { return "about \(minutes) min" }
+        if seconds < 60 { return String(localized: "under a minute") }
+        if minutes < 60 { return String(localized: "about \(minutes) min") }
         let rest = minutes % 60
-        return rest == 0 ? "about \(minutes / 60) h" : "about \(minutes / 60) h \(rest) min"
+        return rest == 0 ? String(localized: "about \(minutes / 60) h") : String(localized: "about \(minutes / 60) h \(rest) min")
     }
 }

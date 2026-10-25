@@ -13,12 +13,15 @@ extension EngineManager {
     }
 
     /// Why Wine Mono can't be fetched on this disk now (not enough room), for the user, or nil.
-    public func wineMonoDiskProblem(for info: EngineInfo) -> String? {
+    public func wineMonoDiskProblem(for info: EngineInfo) -> String? { wineMonoDiskError(for: info)?.errorDescription }
+
+    /// `wineMonoDiskProblem` as an error to throw, with its English for the install's log.
+    func wineMonoDiskError(for info: EngineInfo) -> ShellError? {
         guard let package = info.mono else { return nil }
         let file = wineMonoDownloadFile(package, of: info)
         let have = Files.size(of: file) + Files.size(of: FileDownloader.partialFile(for: file))
-        return DiskSpace.problem(needing: WineMono.neededBytes(package, alreadyDownloaded: have),
-                                 available: DiskSpace.available(at: paths.root), for: "Installing Wine Mono")
+        return DiskSpace.error(needing: WineMono.neededBytes(package, alreadyDownloaded: have),
+                               available: DiskSpace.available(at: paths.root), for: "Installing Wine Mono")
     }
 
     /// Downloads the engine's Wine Mono (`EngineInfo.mono`), checks it against its pinned SHA-256, and unpacks it to
@@ -27,29 +30,29 @@ extension EngineManager {
     /// when it is whole, so a stop or a failure leaves the engine as it was. `progress` gets 0…1 and what to say.
     public func installWineMono(into engine: Engine, progress: @escaping @Sendable (Double, String) -> Void) async throws {
         guard let package = engine.info.mono else {
-            throw ShellError.failed("G-Player doesn't know a Wine Mono for \(engine.info.name).")
+            throw ShellError.said("G-Player doesn't know a Wine Mono for \(engine.info.name).")
         }
         guard !WineMono.isUnpacked(package, in: engine.wineRoot) else { return }
         try requireInstalled(engine)
-        if let problem = wineMonoDiskProblem(for: engine.info) { throw ShellError.failed(problem) }
+        if let problem = wineMonoDiskError(for: engine.info) { throw problem }
         try paths.createFolders()
         let item = package.download
         let file = wineMonoDownloadFile(package, of: engine.info)
         if !(FileManager.default.fileExists(atPath: file.path) && (try? Files.sha256(of: file)) == item.sha256) {
             try await fetch(item, to: file) { received, note in
                 let fraction = item.approximateBytes > 0 ? Double(received) / Double(item.approximateBytes) : 0
-                progress(min(0.9, fraction * 0.9), note ?? DownloadResume.message(received: received, total: item.approximateBytes))
+                progress(min(0.9, fraction * 0.9), note ?? say(DownloadResume.resource(received: received, total: item.approximateBytes)))
             }
         }
-        progress(0.92, "Unpacking Wine Mono")
+        progress(0.92, say("Unpacking Wine Mono"))
         // A hidden folder of the kind `cleanLeftovers` removes when an unpack never ended.
         let staging = paths.engines.appendingPathComponent(".\(engine.info.id)-\(UUID().uuidString.prefix(8))", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: staging) }
         let unpack = try await Shell.runStoppable(Shell.tool("tar"), ["-xf", file.path, "-C", staging.path])
-        guard unpack.succeeded else { throw ShellError.failed("Couldn't unpack \(item.fileName): \(unpack.stderr)") }
+        guard unpack.succeeded else { throw ShellError.said("Couldn't unpack \(item.fileName): \(unpack.stderr)") }
         let unpacked = staging.appendingPathComponent(package.folderName, isDirectory: true)
-        guard WineMono.isWhole(unpacked) else { throw ShellError.failed("\(item.fileName) doesn't hold \(package.folderName).") }
+        guard WineMono.isWhole(unpacked) else { throw ShellError.said("\(item.fileName) doesn't hold \(package.folderName).") }
         try Task.checkCancellation()
         // The engine may have been removed while this downloaded: its folders are not made again for a Wine Mono nothing runs on.
         try requireInstalled(engine)
@@ -63,13 +66,13 @@ extension EngineManager {
             throw error
         }
         try? FileManager.default.removeItem(at: wineMonoDownloadFolder(for: engine.info))
-        progress(1, "Ready")
+        progress(1, say("Ready"))
     }
 
     /// The engine is still installed (its Wine is there to run).
     private func requireInstalled(_ engine: Engine) throws {
         guard Self.wineBinary(in: engine.wineRoot) != nil else {
-            throw ShellError.failed("\(engine.info.name) was removed while Wine Mono was being added to it.")
+            throw ShellError.said("\(engine.info.name) was removed while Wine Mono was being added to it.")
         }
     }
 }

@@ -33,7 +33,7 @@ struct Activity: Identifiable, Equatable {
     var message: String
     var progress: Double?
     /// What the Stop button does, for its tooltip.
-    var stopHelp = "Stop"
+    var stopHelp = String(localized: "Stop")
     /// Stop was pressed; the work is winding down.
     var stopping = false
     /// Setting something up (an engine, a space, Windows components, a store app): quitting asks first (`quitQuestion`).
@@ -295,7 +295,7 @@ final class AppModel {
             return false
         case .ready(var loaded):
             libraryProblem = nil
-            do { try store.paths.createFolders() } catch { errorMessage = "Couldn't create the library folders: \(error.localizedDescription)" }
+            do { try store.paths.createFolders() } catch { errorMessage = String(localized: "Couldn't create the library folders: \(error.localizedDescription)") }
             var moved = false
             if let old = libraryMovedFrom {
                 loaded = loaded.movingLibrary(from: old, to: root)
@@ -322,7 +322,7 @@ final class AppModel {
     /// Locate… on the library screen: `chosen` is the folder the library is in now. A folder without one is refused.
     func locateLibrary(_ chosen: URL) {
         guard let folder = LibraryStore.libraryFolder(in: chosen) else {
-            errorMessage = "“\(chosen.lastPathComponent)” has no G-Player library in it. Choose the folder that holds library.json."
+            errorMessage = String(localized: "“\(chosen.lastPathComponent)” has no G-Player library in it. Choose the folder that holds library.json.")
             return
         }
         if libraryMovedFrom == nil, let old = libraryRoot, old.standardizedFileURL != folder { libraryMovedFrom = old }
@@ -334,7 +334,7 @@ final class AppModel {
     func restorePreviousLibrary() {
         guard let root = libraryRoot else { return }
         do { _ = try LibraryStore(paths: LibraryPaths(root: root)).restorePrevious() }
-        catch { errorMessage = "Couldn't use the previous copy: \(error.localizedDescription)"; return }
+        catch { errorMessage = String(localized: "Couldn't use the previous copy: \(error.localizedDescription)"); return }
         if load() { libraryOpened() }
     }
 
@@ -344,17 +344,17 @@ final class AppModel {
     func startEmptyLibrary() {
         guard let problem = libraryProblem, let root = libraryRoot else { return }
         guard problem.canStartEmpty else {
-            errorMessage = "G-Player has no copy of library.json, so it won't replace the file. Move it away yourself, then try again."
+            errorMessage = String(localized: "G-Player has no copy of library.json, so it won't replace the file. Move it away yourself, then try again.")
             return
         }
         // Before anything is written: if the previous copy can't be kept, the empty library isn't started.
         do { try LibraryStore(paths: LibraryPaths(root: root)).keepPreviousBeforeStartingEmpty() }
         catch {
-            errorMessage = "G-Player couldn't keep the previous copy of the library, so it won't start an empty one. \(error.localizedDescription)"
+            errorMessage = String(localized: "G-Player couldn't keep the previous copy of the library, so it won't start an empty one. \(error.localizedDescription)")
             return
         }
         do { try LibraryPaths(root: root).createFolders() }
-        catch { errorMessage = "Couldn't create the library folder: \(error.localizedDescription)"; return }
+        catch { errorMessage = String(localized: "Couldn't create the library folder: \(error.localizedDescription)"); return }
         libraryProblem = nil
         libraryMovedFrom = nil
         state = LibraryState()
@@ -371,7 +371,7 @@ final class AppModel {
     private func save() {
         guard let paths else { return }
         do { try LibraryStore(paths: paths).save(state) }
-        catch { errorMessage = "Couldn't save the library: \(error.localizedDescription)" }
+        catch { errorMessage = String(localized: "Couldn't save the library: \(error.localizedDescription)") }
     }
 
     func mutate(_ change: (inout LibraryState) -> Void) {
@@ -440,11 +440,11 @@ final class AppModel {
     /// What an engine picker adds after an engine's name: recommended, and whether it needs a download (with its
     /// size). `listsInstalled` also says "installed", for the picker that chooses an engine for a new space.
     func engineNote(_ info: EngineInfo, listsInstalled: Bool = false) -> String {
-        var notes = info.isRecommended ? ["recommended"] : []
-        if isInstalled(info) { if listsInstalled { notes.append("installed") } }
+        var notes = info.isRecommended ? [String(localized: "recommended", comment: "After an engine’s name in a picker: “G-Player Wine · recommended, 640 MB to download”")] : []
+        if isInstalled(info) { if listsInstalled { notes.append(String(localized: "installed", comment: "After an engine’s name in a picker: “Wine Staging 11.18 · installed”")) } }
         else {
             let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: isInstalled(EngineCatalog.wineStaging)))
-            notes.append("\(mb) MB to download")
+            notes.append(String(localized: "\(mb) MB to download"))
         }
         return notes.isEmpty ? "" : "  · " + notes.joined(separator: ", ")
     }
@@ -482,7 +482,7 @@ final class AppModel {
     }
 
     /// What an engine's download is called in the sidebar, and what views look for to show its progress.
-    static func downloadTitle(_ info: EngineInfo) -> String { "Downloading \(info.name)" }
+    static func downloadTitle(_ info: EngineInfo) -> String { String(localized: "Downloading \(info.name)") }
 
     /// The engine's download while it runs.
     func download(of info: EngineInfo) -> Activity? { activities.first { $0.title == Self.downloadTitle(info) } }
@@ -501,7 +501,7 @@ final class AppModel {
     func ensureEngine(_ info: EngineInfo, updating: Bool = false) async -> Engine? {
         guard let manager = engineManager else { return nil }
         if info.kind == .gptk && !useAppleToolkit {
-            errorMessage = "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
+            errorMessage = String(localized: "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines.")
             return nil
         }
         if let e = manager.engine(info) { return e }
@@ -514,8 +514,8 @@ final class AppModel {
         }
         if info.downloads.isEmpty {
             errorMessage = useAppleToolkit
-                ? "\(info.name) isn't installed on this Mac. G-Player doesn't download it; see Settings › Engines."
-                : "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines."
+                ? String(localized: "\(info.name) isn't installed on this Mac. G-Player doesn't download it; see Settings › Engines.")
+                : String(localized: "This space uses \(info.name), which is turned off. Turn it on in Settings › Engines.")
             return nil
         }
         if let running = engineInstalls[info.id] {
@@ -523,7 +523,7 @@ final class AppModel {
             let engine = await running.value
             // A background update that failed said nothing; someone who needed the engine meanwhile hears why.
             if engine == nil, inBackground, !updating, let failure = engineFailures[info.id] {
-                errorMessage = "Couldn't install \(info.name): \(failure.localizedDescription)"
+                errorMessage = String(localized: "Couldn't install \(info.name): \(failure.localizedDescription)")
             }
             return engine
         }
@@ -561,7 +561,7 @@ final class AppModel {
     private func installEngine(_ info: EngineInfo, with manager: EngineManager, updating: Bool) async -> Engine? {
         await leftoversCleaning?.value
         // An update nobody asked for isn't "setup" to quit over: what came is kept, and it goes on at the next start.
-        let activity = begin(Self.downloadTitle(info), "Starting", setup: !updating,
+        let activity = begin(Self.downloadTitle(info), String(localized: "Starting"), setup: !updating,
                              note: updating ? EngineMigration.shortUpdateNote(for: info) : nil)
         defer { end(activity); cancellers[activity] = nil; engineInstalls[info.id] = nil; updatingEngines.remove(info.id) }
         engineFailures[info.id] = nil
@@ -569,15 +569,16 @@ final class AppModel {
         closedUpdateNotices.remove(info.id)
         stoppedEngines.remove(info.id)
         // What came stays on disk, so downloading again goes on from there.
-        setStop(activity, help: "Stop downloading \(info.name). What came is kept, and the download goes on from there next time.") { [weak self] in
+        setStop(activity, help: String(localized: "Stop downloading \(info.name). What came is kept, and the download goes on from there next time.")) { [weak self] in
             self?.stoppedEngines.insert(info.id)
             self?.engineInstalls[info.id]?.cancel()
         }
         let log = InstallLog(title: "\(updating ? "Update" : "Install") \(info.name) \(info.id)")
         let logs = manager.paths.logs
         do {
-            let engine = try await manager.install(info) { [weak self] fraction, message in
-                log.record(message)
+            var logged = manager
+            logged.log = { log.record($0) }                  // English, whatever the app's language
+            let engine = try await logged.install(info) { [weak self] fraction, message in
                 Task { @MainActor in self?.progress(activity, fraction, message) }
             }
             log.write(outcome: "Ready", to: logs)
@@ -593,7 +594,7 @@ final class AppModel {
             log.write(outcome: InstallLog.failure(error), to: logs)
             engineFailures[info.id] = error
             if updating { engineUpdateFailures[info.id] = error.localizedDescription }       // no alert: a line says so
-            else { errorMessage = "Couldn't install \(info.name): \(error.localizedDescription)" }
+            else { errorMessage = String(localized: "Couldn't install \(info.name): \(error.localizedDescription)") }
             return nil
         }
     }
@@ -647,14 +648,14 @@ final class AppModel {
                     pausedNoteClosed = false
                     break
                 }
-                failures.append(errorMessage ?? "\(info.name) wasn't installed.")
+                failures.append(errorMessage ?? String(localized: "\(info.name) wasn't installed."))
                 errorMessage = nil                                  // shown together below, not one over the other
             }
             if !failures.isEmpty {
                 let gplayerWine = EngineCatalog.installedGPlayerWine(in: installedEngines) != nil, staging = isInstalled(EngineCatalog.wineStaging)
                 failures.append(gplayerWine ? "" : staging
-                    ? "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines."
-                    : "Download G-Player Wine again in Settings › Engines. The first spaces are made once it is installed.")
+                    ? String(localized: "Your first spaces will use Wine Staging instead. Download G-Player Wine later in Settings › Engines.")
+                    : String(localized: "Download G-Player Wine again in Settings › Engines. The first spaces are made once it is installed."))
                 errorMessage = failures.filter { !$0.isEmpty }.joined(separator: "\n\n")
             }
             firstRunInstall = nil
@@ -718,7 +719,8 @@ final class AppModel {
     /// with ("Waiting for the installer of “Game”…").
     func message(of activity: Activity) -> String {
         guard let space = activity.waitsIn, !activity.stopping else { return activity.message }
-        return "Waiting for \(queueHolder(in: space) ?? "other work in this space")…"
+        let holder = queueHolder(in: space) ?? String(localized: "other work in this space", comment: "Inside “Waiting for …”")
+        return String(localized: "Waiting for \(holder)…", comment: "What the space's queue is busy with follows, e.g. “the installer of “Game””")
     }
 
     /// The queue's turn has come for an activity that waited.
@@ -757,7 +759,7 @@ final class AppModel {
     /// Stops an activity. It stays in the sidebar, saying so, until its work has really ended.
     func cancel(_ id: UUID) {
         guard let stop = cancellers.removeValue(forKey: id) else { return }
-        progress(id, nil, "Stopping…")
+        progress(id, nil, String(localized: "Stopping…"))
         if let i = activities.firstIndex(where: { $0.id == id }) { activities[i].stopping = true }
         stop()
     }
@@ -823,14 +825,14 @@ final class AppModel {
         var chosen = await ensureEngine(wanted)
         if chosen == nil, wanted.id == EngineCatalog.defaultForNewSpaces.id,
            let staging = engineManager?.engine(EngineCatalog.wineStaging) {
-            errorMessage = (errorMessage ?? "\(wanted.name) wasn't installed.")
-                + "\n\n“\(name)” uses \(staging.info.name) instead. You can move it to \(wanted.name) from its page once that is installed."
+            errorMessage = (errorMessage ?? String(localized: "\(wanted.name) wasn't installed."))
+                + "\n\n" + String(localized: "“\(name)” uses \(staging.info.name) instead. You can move it to \(wanted.name) from its page once that is installed.")
             chosen = staging
         }
         guard let engine = chosen else { return nil }
         // A caller that was stopped while the engine downloaded (Cancel in Add Game) doesn't want the space any more.
         if Task.isCancelled { return nil }
-        let activity = begin("Creating “\(name)”", "Setting up Windows. This takes about a minute the first time.", setup: true)
+        let activity = begin(String(localized: "Creating “\(name)”"), String(localized: "Setting up Windows. This takes about a minute the first time."), setup: true)
         defer { end(activity) }
         do {
             let space = try await SpaceManager(paths: paths).create(name: name, engine: engine,
@@ -838,12 +840,12 @@ final class AppModel {
             mutate { $0.spaces.append(space) }
             // Queued now, so a store setup that follows waits for these installers.
             let base = CompatResolver.baseComponents
-            enqueue(in: space.id, holds: "Windows components for “\(name)”") {
-                await self.installNow(base, in: space, engine: engine, reason: "for “\(name)”", retryFailed: false)
+            enqueue(in: space.id, holds: String(localized: "Windows components for “\(name)”", comment: "Follows “Waiting for” in the sidebar: “Waiting for Windows components for “Main”…”")) {
+                await self.installNow(base, in: space, engine: engine, reason: String(localized: "for “\(name)”", comment: "Ends “Installing Windows components …”: what they are for"), retryFailed: false)
             }
             return space
         } catch {
-            errorMessage = "Couldn't create the space: \(error.localizedDescription)"
+            errorMessage = String(localized: "Couldn't create the space: \(error.localizedDescription)")
             return nil
         }
     }
@@ -852,7 +854,7 @@ final class AppModel {
     /// too long for Wine is refused, with the reason shown.
     @discardableResult
     func adopt(_ found: FoundEnvironment) -> Bool {
-        if let problem = found.pathProblem { errorMessage = "Couldn't add “\(found.name)”. \(problem)"; return false }
+        if let problem = found.pathProblem { errorMessage = String(localized: "Couldn't add “\(found.name)”. \(problem)"); return false }
         let space = Space(name: found.name, path: found.url.path, engineID: found.suggestedEngineID, origin: .external,
                           originNote: found.originNote, presetID: found.presetID, colorIndex: nextColor())
         mutate { s in
@@ -870,7 +872,7 @@ final class AppModel {
     func removeSpace(_ space: Space, deleteFiles: Bool, permanently: Bool = false) {
         if deleteFiles, let paths {
             do { try SpaceManager(paths: paths).delete(space, permanently: permanently) }
-            catch { errorMessage = "Couldn't delete the space: \(error.localizedDescription)"; return }
+            catch { errorMessage = String(localized: "Couldn't delete the space: \(error.localizedDescription)"); return }
         }
         let icons = state.games(in: space).compactMap(\.iconFile)
         mutate { s in
@@ -927,12 +929,12 @@ final class AppModel {
         var ready = engine(for: space)
         if ready == nil { ready = await ensureEngine(EngineCatalog.info(space.engineID) ?? .wineStaging) }
         guard let engine = ready else { return }
-        let activity = begin("Setting up \(preset.name)", "Starting", setup: true, waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
+        let activity = begin(String(localized: "Setting up \(preset.name)"), String(localized: "Starting"), setup: true, waitsIn: queueHolder(in: space.id) == nil ? nil : space.id)
         defer { end(activity); cancellers[activity] = nil }
-        let help = "Stop setting up \(preset.name). You can set it up again later."
+        let help = String(localized: "Stop setting up \(preset.name). You can set it up again later.")
         setStop(activity, help: help) { [weak self] in self?.end(activity) }    // while waiting, Stop drops the setup
         // After the space's base components: Steam's first start stops every program in the space.
-        await enqueue(in: space.id, holds: "\(preset.name) to finish setting up") {
+        await enqueue(in: space.id, holds: String(localized: "\(preset.name) to finish setting up", comment: "Follows “Waiting for” in the sidebar: “Waiting for Steam to finish setting up…”")) {
             self.startedWaiting(activity)
             // Stopped while waiting (the activity is gone), or set up by an earlier press of the same button.
             guard self.activities.contains(where: { $0.id == activity && !$0.stopping }),
@@ -947,8 +949,8 @@ final class AppModel {
             if let monoPlan {
                 // No program exists yet to start without .NET: the installer runs, and the launcher's first start tries again.
                 let outcome = await self.prepareWineMono(
-                    monoPlan, engine: engine, in: space, program: preset.name, purpose: preset.dotNetReason ?? "this app",
-                    consequence: "The installer of \(preset.name) runs without .NET, and its first start tries again.")
+                    monoPlan, engine: engine, in: space, program: preset.name, purpose: preset.dotNetReason ?? String(localized: "this app", comment: "What .NET is needed for, in “… needs .NET”"),
+                    consequence: String(localized: "The installer of \(preset.name) runs without .NET, and its first start tries again."))
                 if case .stopped(everything: true) = outcome { return }
                 dotNet = outcome == .ready
             } else {
@@ -1055,7 +1057,7 @@ final class AppModel {
             try FileManager.default.copyItem(at: image, to: target)
             forgetImage(name)
             g.coverFile = name; update(g)
-        } catch { errorMessage = "Couldn't use that image: \(error.localizedDescription)" }
+        } catch { errorMessage = String(localized: "Couldn't use that image: \(error.localizedDescription)") }
     }
 
     func clearCover(for game: Game) {
@@ -1370,8 +1372,8 @@ final class AppModel {
             if found.isEmpty {
                 var d = LogDiagnosis.closedRightAway(seconds: seconds, profile: profile, installed: installed)
                 if !opened {
-                    d = Diagnosis(kind: .closedRightAway, title: "The game didn't open",
-                                  detail: "Steam started it, but no window came up in time. It may have closed right away.",
+                    d = Diagnosis(kind: .closedRightAway, title: String(localized: "The game didn't open"),
+                                  detail: String(localized: "Steam started it, but no window came up in time. It may have closed right away."),
                                   remedy: d.remedy)
                 }
                 found = [d]
@@ -1417,7 +1419,7 @@ final class AppModel {
         // A launcher that is open may be started again: that brings its window back.
         guard paths != nil, space(game.spaceID) != nil, !preparing.contains(game.id),
               !isRunning(game) || game.kind == .app else { return }
-        if let reason = epicPlayBlock(for: game) { errorMessage = "Can't start “\(game.title)”. \(reason)"; return }
+        if let reason = epicPlayBlock(for: game) { errorMessage = String(localized: "Can't start “\(game.title)”. \(reason)"); return }
         preparing.insert(game.id)
         Task {
             await launch(game, skipping: skipped)
@@ -1445,7 +1447,7 @@ final class AppModel {
         // Epic's launcher never gets past its loading screen off G-Player Wine: the move is offered instead of that start.
         if game.kind == .app, retry == nil, let preset = AppPresets.preset(found.presetID),
            preset.offersMoveBeforeStart(on: (EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging).kind) {
-            offerGPlayerWine(for: game.id, because: "\(preset.name) opens only on \(EngineCatalog.crossover.name).")
+            offerGPlayerWine(for: game.id, because: String(localized: "\(preset.name) opens only on \(EngineCatalog.crossover.name)."))
             return false
         }
         guard let engine = await ensureEngine(EngineCatalog.info(found.engineID) ?? EngineCatalog.wineStaging) else { return false }
@@ -1462,7 +1464,7 @@ final class AppModel {
             let startsSteam = space.presetID == AppPresets.steam.id && (current.kind == .app || current.storeKey != nil)
             if startsSteam, closingSteam.contains(space.id) || (steamRestarts[space.id].map { $0 != game.id } ?? false) {
                 // A game started now would be handed to the Steam that is quitting.
-                errorMessage = "Steam is restarting. Try again in a moment."
+                errorMessage = String(localized: "Steam is restarting. Try again in a moment.")
                 return false
             }
             if current.kind == .game, needsAnalysis(current), let a = await analyze(current, force: true) { current.analysis = a }
@@ -1491,7 +1493,7 @@ final class AppModel {
                     steamRestarts[space.id] = game.id
                     guard !retryStopped(retry, game.id), (await quitSteam(in: space)).gone, !retryStopped(retry, game.id) else {
                         if retry?.automatic != true, !retryStopped(retry, game.id) {
-                            errorMessage = "Steam didn't quit. Quit it from its menu (Steam › Exit), then press Play again."
+                            errorMessage = String(localized: "Steam didn't quit. Quit it from its menu (Steam › Exit), then press Play again.")
                         }
                         return false
                     }
@@ -1528,7 +1530,7 @@ final class AppModel {
             }
             // Waits for installs queued in the space before it, and starts the program in the same turn of the
             // queue, so an installer never runs next to it.
-            let started = await enqueue(in: space.id, isInstall: false, holds: "“\(current.title)” to start") {
+            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "“\(current.title)” to start", comment: "Follows “Waiting for” in the sidebar: “Waiting for “Game” to start…”")) {
                 await self.prepareAndStart(current, plan: plan, in: space, engine: engine, paths: paths, retry: retry, replan: replan)
             }.value
             let program = try started.get()
@@ -1583,10 +1585,10 @@ final class AppModel {
         if self.space(space.id)?.mayChange == true {
             let wanted = plan.components.filter { !(skippedComponents[space.id]?.contains($0) ?? false) }
             if !wanted.isEmpty {
-                switch await installNow(wanted, in: space, engine: engine, reason: "for \(game.title)", retryFailed: false) {
+                switch await installNow(wanted, in: space, engine: engine, reason: String(localized: "for \(game.title)", comment: "Ends “Installing Windows components …”: what they are for"), retryFailed: false) {
                 case .waiting:
                     diagnoses[game.id] = [Diagnosis(kind: .missingComponent, title: Self.componentsLaterTitle,
-                        detail: "Another program is open in “\(space.name)”, so the game started without \(componentsLabel(wanted)). G-Player installs them once everything in the space has quit.",
+                        detail: String(localized: "Another program is open in “\(space.name)”, so the game started without \(componentsLabel(wanted)). G-Player installs them once everything in the space has quit."),
                         remedy: .none)]
                 case .cancelled:
                     skippedComponents[space.id, default: []].formUnion(wanted)
@@ -1605,7 +1607,7 @@ final class AppModel {
                     let preset = AppPresets.preset(space.presetID)
                     let outcome = await prepareWineMono(
                         mono, engine: engine, in: space, program: preset?.name ?? game.title,
-                        purpose: preset?.dotNetReason ?? "this program", consequence: "\(game.title) starts without .NET.")
+                        purpose: preset?.dotNetReason ?? String(localized: "this program", comment: "What .NET is needed for, in “… needs .NET”"), consequence: String(localized: "\(game.title) starts without .NET."))
                     if case .stopped(everything: true) = outcome { return .failure(CancellationError()) }
                     monoReady = outcome == .ready
                 }
@@ -1645,7 +1647,7 @@ final class AppModel {
         }.value
     }
 
-    static let componentsLaterTitle = "Components install later"
+    static let componentsLaterTitle = String(localized: "Components install later")
 
     /// A program of the game quit. A second copy of a launcher that handed over to the open one leaves it running.
     private func finished(_ gameID: UUID, status: Int32) {
@@ -1698,8 +1700,9 @@ final class AppModel {
 
     /// What Stop does for this entry, for its tooltip.
     func stopHelp(_ game: Game) -> String {
-        if case .steam = game.source, game.kind == .game { return "Quits the game. Steam stays open." }
-        return "Quits everything running in “\(space(game.spaceID)?.name ?? "its space")”."
+        if case .steam = game.source, game.kind == .game { return String(localized: "Quits the game. Steam stays open.") }
+        let name = space(game.spaceID)?.name ?? String(localized: "its space", comment: "Inside “Quits everything running in “…”.”")
+        return String(localized: "Quits everything running in “\(name)”.")
     }
 
     /// Stops one game's programs and nothing else in the space. The programs are looked up again first, so a pid
@@ -1731,7 +1734,7 @@ final class AppModel {
             // Starts after the installs queued in the space, as a launch does: an installer started next to Windows components
             // being installed fails (error 1618, another installation is in progress).
             let verbose = verboseLogs
-            let started = await enqueue(in: space.id, isInstall: false, holds: "\(file.lastPathComponent) to start") { () -> Result<RunningProgram, Error> in
+            let started = await enqueue(in: space.id, isInstall: false, holds: String(localized: "\(file.lastPathComponent) to start", comment: "Follows “Waiting for” in the sidebar")) { () -> Result<RunningProgram, Error> in
                 Result {
                     try WineLauncher.start(engine: engine, space: space, arguments: WineLauncher.arguments(toOpen: file),
                                            workingDirectory: file.deletingLastPathComponent(), backend: .auto,

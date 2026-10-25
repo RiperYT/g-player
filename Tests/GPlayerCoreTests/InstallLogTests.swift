@@ -20,6 +20,21 @@ import Testing
         #expect(InstallLog.step(of: "Unpacking gstreamer-1.0-1.28.8-universal.pkg") == "Unpacking gstreamer-1.0-1.28.8-universal.pkg")
     }
 
+    @Test func aFailureGPlayerWordedIsLoggedInEnglish() {
+        // The words come from the app's language on the screen and from English in the log.
+        let said = ShellError.said("\("a.tar") doesn't hold Wine's libraries.")
+        #expect(InstallLog.failure(said) == "Failed: a.tar doesn't hold Wine's libraries.")
+        let translated = ShellError.translated("Не вистачає місця", english: "Not enough room")
+        #expect(InstallLog.failure(translated) == "Failed: Not enough room")
+    }
+
+    @Test func theEnglishOfAMessageIsWhatAnInstallLogsWhateverItSaysOnScreen() async throws {
+        let message = LocalizedStringResource("Unpacking \("engine.tar")")
+        #expect(message.english == "Unpacking engine.tar")
+        #expect(EngineCatalog.gptk.englishName == "Game Porting Toolkit installed by you")
+        #expect(EngineCatalog.crossover.englishName == "G-Player Wine (Wine 11 from CrossOver 26.3)")
+    }
+
     @Test func itIsWrittenToTheLogsFolder() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("installlog-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }

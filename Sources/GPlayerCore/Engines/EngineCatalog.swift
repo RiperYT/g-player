@@ -31,7 +31,7 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     /// Files to download. Empty when G-Player never downloads the engine (Apple's toolkit).
     public let downloads: [PinnedDownload]
     /// What the build is made from, when its own number says too little: G-Player Wine's "11.0" next to Wine
-    /// Staging's "11.18" would look older than it is.
+    /// Staging's "11.18" would look older than it is. English; `basedOnLabel` is for the screen.
     public var basedOn: String? = nil
     /// The room the unpacked engine takes on disk, measured and rounded up. Installing needs this plus the room its files
     /// take while it runs (`installWorkBytes`, `EngineCatalog.diskBytes`).
@@ -47,7 +47,19 @@ public struct EngineInfo: Identifiable, Sendable, Hashable {
     public var isRetired: Bool { replacedBy != nil }
 
     /// The name with its version, for rows and pickers: "Wine Staging 11.18", "G-Player Wine (Wine 11 from CrossOver 26.3)".
-    public var displayName: String { basedOn.map { "\(name) (\($0))" } ?? "\(name) \(version)" }
+    public var displayName: String { basedOnLabel.map { "\(name) (\($0))" } ?? "\(name) \(versionLabel)" }
+    /// `displayName` in English, whatever the app's language: for logs and the "Share What Worked" report.
+    public var englishName: String { basedOn.map { "\(name) (\($0))" } ?? "\(name) \(version)" }
+    /// The version as the screen says it. Apple's toolkit has none of its own: it is whatever the user installed.
+    public var versionLabel: String { kind == .gptk ? String(localized: "installed by you") : version }
+    /// What the build is made from, as the screen says it.
+    public var basedOnLabel: String? {
+        switch basedOn {
+        case nil: nil
+        case "Wine 11 from CrossOver 26.3": String(localized: "Wine 11 from CrossOver 26.3")
+        case let other: other
+        }
+    }
     public var defaultBackend: GraphicsBackend { backends.first ?? .wined3d }
     /// The room installing takes besides the unpacked engine while it runs, free again when it has succeeded: every archive it
     /// downloads (they stay until then, so a late failure doesn't download again) and the biggest scratch room working on one
@@ -89,7 +101,7 @@ public enum EngineCatalog {
         name: "Wine Staging",
         version: "11.18",
         kind: .wineStaging,
-        summary: "Open-source Wine with DXVK. Runs Steam and most DirectX 9–11 games.",
+        summary: String(localized: "Open-source Wine with DXVK. Runs Steam and most DirectX 9–11 games."),
         backends: [.dxvk, .wined3d],
         downloads: [
             PinnedDownload(
@@ -117,7 +129,7 @@ public enum EngineCatalog {
         name: "G-Player Wine",
         version: "11.0",
         kind: .crossover,
-        summary: "Wine 11 built from CodeWeavers' CrossOver source. Runs Steam and DirectX 9–11 games like Wine Staging, with DXVK or DXMT, and DirectX 12 through Apple's D3DMetal when you add it from your own toolkit.",
+        summary: String(localized: "Wine 11 built from CodeWeavers' CrossOver source. Runs Steam and DirectX 9–11 games like Wine Staging, with DXVK or DXMT, and DirectX 12 through Apple's D3DMetal when you add it from your own toolkit."),
         // DXVK is what Steam and games without a better choice run with; 64-bit DirectX 10–12 games take D3DMetal once
         // it is copied in (`CompatResolver`).
         backends: [.dxvk, .d3dmetal, .dxmt, .wined3d],
@@ -207,7 +219,7 @@ public enum EngineCatalog {
         name: "Game Porting Toolkit",
         version: "installed by you",
         kind: .gptk,
-        summary: "Apple's D3DMetal for DirectX 11 and 12 games, from a toolkit you installed yourself.",
+        summary: String(localized: "Apple's D3DMetal for DirectX 11 and 12 games, from a toolkit you installed yourself."),
         backends: [.d3dmetal, .wined3d],
         downloads: [])
 

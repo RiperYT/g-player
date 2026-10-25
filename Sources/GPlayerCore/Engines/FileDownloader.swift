@@ -26,7 +26,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
     /// The server wouldn't give the rest of the file (`DownloadResume.Answer.rangeRefused`).
     private struct RangeRefused: LocalizedError {
-        var errorDescription: String? { "The server wouldn't send the file." }
+        var errorDescription: String? { String(localized: "The server wouldn't send the file.") }
     }
 
     private init(destination: URL, skip: Int64, progress: @escaping @Sendable (Int64, Int64) -> Void) {
@@ -109,7 +109,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        let name = dataTask.originalRequest?.url?.lastPathComponent ?? "the file"
+        let name = dataTask.originalRequest?.url?.lastPathComponent ?? String(localized: "the file", comment: "Inside “The server answered 404 for …”")
         let length = response.expectedContentLength > 0 ? response.expectedContentLength : nil
         let http = response as? HTTPURLResponse
         // A file: URL has no status or ranges: its answer is the whole file.
@@ -136,7 +136,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             failure = RangeRefused()
             return completionHandler(.cancel)
         case .failed(let status):
-            failure = ShellError.failed("The server answered \(status) for \(name).")
+            failure = ShellError.said("The server answered \(status) for \(name).")
             return completionHandler(.cancel)
         }
         completionHandler(.allow)

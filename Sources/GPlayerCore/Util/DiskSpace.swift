@@ -17,10 +17,28 @@ public enum DiskSpace {
     }
 
     /// Nil when `available` covers `needed` (or isn't known), else why not, for the user.
-    public static func problem(needing needed: Int64, available: Int64?, for what: String) -> String? {
+    /// `english`: the text for a log, in English whatever the app's language.
+    public static func problem(needing needed: Int64, available: Int64?, for what: LocalizedStringResource,
+                               english: Bool = false) -> String? {
         guard let available, needed > 0, available < needed else { return nil }
-        return "\(what) needs about \(needed.formattedBytes) free, and this disk has \(available.formattedBytes). "
-            + "Free some space, then try again."
+        var phrase = what, message: LocalizedStringResource
+        if english {
+            phrase.locale = Locale(identifier: "en")
+            message = LocalizedStringResource("\(String(localized: phrase)) needs about \(needed.englishBytes) free, and this disk has \(available.englishBytes). Free some space, then try again.",
+                                              comment: "What is about to be done, as a phrase (“Installing G-Player Wine”, “Adding “Game””), comes first")
+            message.locale = Locale(identifier: "en")
+        } else {
+            message = LocalizedStringResource("\(String(localized: phrase)) needs about \(needed.formattedBytes) free, and this disk has \(available.formattedBytes). Free some space, then try again.",
+                                              comment: "What is about to be done, as a phrase (“Installing G-Player Wine”, “Adding “Game””), comes first")
+        }
+        return String(localized: message)
+    }
+
+    /// An error for a message from `problem`, with its English for a log.
+    public static func error(needing needed: Int64, available: Int64?, for what: LocalizedStringResource) -> ShellError? {
+        guard let text = problem(needing: needed, available: available, for: what),
+              let english = problem(needing: needed, available: available, for: what, english: true) else { return nil }
+        return .translated(text, english: english)
     }
 
     /// True when both places are on the same disk (a move there is a rename, and a copy can be a clone).

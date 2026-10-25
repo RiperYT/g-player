@@ -33,8 +33,13 @@ private struct AppsList: View {
                         if preset.id == AppPresets.epic.id { EpicCard() } else { PresetCard(preset: preset) }
                     }
                 }
-                Text("Experimental apps install, but haven't been checked from start to finish on Apple Silicon yet. Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) don't run under Wine.")
-                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: 620, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    if AppPresets.all.contains(where: \.experimental) {
+                        Text("Experimental apps install, but haven't been checked from start to finish on Apple Silicon yet.")
+                    }
+                    Text("Games with kernel anti-cheat (EasyAntiCheat, BattlEye, Vanguard) don't run under Wine.")
+                }
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: 620, alignment: .leading)
             }
             .padding(Theme.pagePadding)
         }
@@ -51,7 +56,7 @@ struct PresetCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(preset.name).font(.headline)
-                    if preset.experimental { CardBadge(text: "Experimental", tint: .orange) }
+                    if preset.experimental { CardBadge(text: String(localized: "Experimental"), tint: .orange) }
                 }
                 Text(preset.summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 PresetButtons(preset: preset).padding(.top, 4)

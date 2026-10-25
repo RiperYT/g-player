@@ -31,7 +31,7 @@ struct ComponentsSection: View {
                             Button { install([c.id]) } label: {
                                 Text(c.approximateBytes.map { "\(c.name) · \($0.formattedBytes)" } ?? c.name)
                             }
-                            .help("\(c.summary) \(c.license).")
+                            .help(Text(verbatim: "\(c.summary) \(c.license)."))
                         }
                     }
                     .fixedSize()
@@ -72,7 +72,7 @@ struct ComponentsSection: View {
 
     private func install(_ ids: [String], retry: Bool = false) {
         Task {
-            await model.installComponents(ids, in: space, reason: "in “\(space.name)”", retryFailed: retry)
+            await model.installComponents(ids, in: space, reason: String(localized: "in “\(space.name)”", comment: "Ends “Installing Windows components …”: where they are installed"), retryFailed: retry)
             await reload()
         }
     }
@@ -99,7 +99,7 @@ private struct ExternalSpaceNote: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(space.allowsChanges == false
                  ? "You chose to keep this space as it is: G-Player doesn't install components or .NET (Wine Mono), change its settings or replace its graphics files."
-                 : "This space belongs to \(space.originNote ?? "another app"). G-Player asks before it installs anything into it.")
+                 : "This space belongs to \(space.originNote ?? String(localized: "another app", comment: "Inside “This space belongs to …”")). G-Player asks before it installs anything into it.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if space.allowsChanges == false, let preset = AppPresets.preset(space.presetID), let purpose = preset.dotNetReason {
                 Text(WineMono.refusedLine(program: preset.name, purpose: purpose))

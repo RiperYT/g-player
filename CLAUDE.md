@@ -14,6 +14,8 @@ Native SwiftUI, Cupertino-minimal. Everything in this repository is English.
 - Every engine and component download is pinned by SHA-256 (`EngineCatalog`, `RuntimeCatalog`); store installers come
   straight from the store's own HTTPS address. No telemetry. Never add Apple Game Porting Toolkit files.
 - UI text: short, plain verbs, says what happens. Native controls and SF Symbols; tokens in `Views/Components/Theme.swift`.
+- UI text is localizable: a literal given to SwiftUI is a key; text built in code is `String(localized: "…")` (core too), in whole
+  sentences. English is the source; Ukrainian is `Localization/uk.lproj`. `make l10n` checks it (`Localization/README.md`).
 - Split big `@ViewBuilder` bodies into sub-views (Swift 6.3 crashed on a large one with `Task { await … }` in a tuple).
 
 ## Commands
@@ -23,6 +25,7 @@ make app      # build/G-Player.app
 make run      # build and open
 make release  # zip into releases/v<VERSION>/
 make publish  # release + GitHub release
+make l10n     # keys the code has that Localization/uk.lproj doesn't, and the other way round
 make wrapper  # rebuild the Chromium helper wrapper (brew install mingw-w64)
 ```
 

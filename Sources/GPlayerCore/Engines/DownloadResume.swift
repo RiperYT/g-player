@@ -76,6 +76,11 @@ public enum DownloadResume {
     /// "Downloading 41 of 98 MB". Rounded, like every size G-Player shows (`EngineCatalog.megabytes`): "288 of 288 MB" at the
     /// end, not 287. The part never shows more than the whole: the sizes in the catalogue are approximate.
     public static func message(received: Int64, total: Int64) -> String {
+        String(localized: resource(received: received, total: total))
+    }
+
+    /// `message` before it is turned into text, so a log can have it in English too (`EngineManager.say`).
+    static func resource(received: Int64, total: Int64) -> LocalizedStringResource {
         guard total > 0 else { return "Downloading \(EngineCatalog.megabytes(received)) MB" }
         return "Downloading \(EngineCatalog.megabytes(min(received, total))) of \(EngineCatalog.megabytes(total)) MB"
     }

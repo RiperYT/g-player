@@ -9,9 +9,37 @@ public struct ProcessResult: Sendable {
 }
 
 public enum ShellError: LocalizedError {
+    /// A message that is only text (the output of a tool, a text made by the caller).
     case failed(String)
+    /// A message for the screen that a log keeps in English (`englishDescription`).
+    case said(LocalizedStringResource)
+    /// A message made in the user's language, with the same in English for a log.
+    case translated(String, english: String)
+
     public var errorDescription: String? {
-        switch self { case .failed(let message): message }
+        switch self {
+        case .failed(let message): message
+        case .said(let message): String(localized: message)
+        case .translated(let message, _): message
+        }
+    }
+
+    /// The same in English, whatever the app's language: logs are English.
+    public var englishDescription: String {
+        switch self {
+        case .failed(let message): message
+        case .said(let message): message.english
+        case .translated(_, let english): english
+        }
+    }
+}
+
+public extension LocalizedStringResource {
+    /// This text in English, whatever the app's language: for logs and reports, which are English.
+    var english: String {
+        var resource = self
+        resource.locale = Locale(identifier: "en")
+        return String(localized: resource)
     }
 }
 
@@ -86,7 +114,7 @@ public enum Shell {
         let script = "do shell script \"/usr/sbin/softwareupdate --install-rosetta --agree-to-license\" with administrator privileges"
         do { _ = try await runStoppable(tool("osascript"), ["-e", script], timeout: timeout) }
         catch is Supervised.TimedOut {
-            throw ShellError.failed("The Rosetta 2 install took longer than \(Int(timeout / 60)) minutes, so G-Player stopped waiting. Choose Install to try again.")
+            throw ShellError.said("The Rosetta 2 install took longer than \(Int(timeout / 60)) minutes, so G-Player stopped waiting. Choose Install to try again.")
         }
     }
 

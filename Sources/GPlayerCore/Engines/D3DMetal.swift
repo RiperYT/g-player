@@ -12,11 +12,11 @@ public struct D3DMetalStore: Sendable {
         case notFound, notSignedByApple(String), missingModule(String), couldNotOpen, copyFailed(String)
         public var errorDescription: String? {
             switch self {
-            case .notFound: "That doesn't contain D3DMetal. Choose Apple's Game Porting Toolkit download or the toolkit you installed."
-            case .notSignedByApple(let item): "\(item) isn't signed by Apple, so G-Player won't use it."
-            case .missingModule(let name): "This Game Porting Toolkit is missing \(name)."
-            case .couldNotOpen: "Couldn't open the disk image, most likely because Apple's license has to be accepted first. Open it in Finder, agree to the license, then choose it again (or the opened disk)."
-            case .copyFailed(let message): "Couldn't copy D3DMetal. \(message)"
+            case .notFound: String(localized: "That doesn't contain D3DMetal. Choose Apple's Game Porting Toolkit download or the toolkit you installed.")
+            case .notSignedByApple(let item): String(localized: "\(item) isn't signed by Apple, so G-Player won't use it.")
+            case .missingModule(let name): String(localized: "This Game Porting Toolkit is missing \(name).")
+            case .couldNotOpen: String(localized: "Couldn't open the disk image, most likely because Apple's license has to be accepted first. Open it in Finder, agree to the license, then choose it again (or the opened disk).")
+            case .copyFailed(let message): String(localized: "Couldn't copy D3DMetal. \(message)")
             }
         }
     }

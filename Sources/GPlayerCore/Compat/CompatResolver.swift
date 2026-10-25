@@ -123,15 +123,15 @@ public enum CompatResolver {
 
     /// Why a 32-bit DirectX 10/11 game fails when the engine's MoltenVK is older than 1.4.1 (G-Player updates it in
     /// the Wine Staging it downloads, see `EngineFixes.moltenVK`).
-    public static let oldMoltenVK = "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. Windows components won't help. Move this space to G-Player Wine, which has a newer one."
+    public static let oldMoltenVK = String(localized: "Its MoltenVK is older than 1.4.1 and refuses the graphics memory Wine sets up for 32-bit programs. Windows components won't help. Move this space to G-Player Wine, which has a newer one.")
 
     /// The blocker for a game that only Apple's D3DMetal can run here, which the app offers to fix.
-    public static let needsDirectX12 = "Needs DirectX 12"
+    public static let needsDirectX12 = String(localized: "Needs DirectX 12")
     /// Why an Unreal game built for DirectX 12 alone doesn't start on an engine without D3DMetal.
-    public static let onlyDirect3D12 = "The game is built for DirectX 12 alone, and it stops at start when asked for DirectX 11. Only Apple's D3DMetal gives DirectX 12 on a Mac."
-    static let useCrossOver = "Move this space to G-Player Wine and turn on Apple's D3DMetal in Settings › Engines: Steam keeps running there too."
-    static let turnOnD3DMetal = "Turn on Apple's D3DMetal in Settings › Engines; G-Player copies it from your own Game Porting Toolkit."
-    static let chooseD3DMetal = "This space has D3DMetal: choose the Recommended profile, or D3DMetal under Advanced."
+    public static let onlyDirect3D12 = String(localized: "The game is built for DirectX 12 alone, and it stops at start when asked for DirectX 11. Only Apple's D3DMetal gives DirectX 12 on a Mac.")
+    static let useCrossOver = String(localized: "Move this space to G-Player Wine and turn on Apple's D3DMetal in Settings › Engines: Steam keeps running there too.")
+    static let turnOnD3DMetal = String(localized: "Turn on Apple's D3DMetal in Settings › Engines; G-Player copies it from your own Game Porting Toolkit.")
+    static let chooseD3DMetal = String(localized: "This space has D3DMetal: choose the Recommended profile, or D3DMetal under Advanced.")
 
     public static func resolve(_ input: Input) -> CompatPlan {
         let a = input.analysis ?? GameAnalysis()
@@ -145,11 +145,11 @@ public enum CompatResolver {
         for name in a.antiCheat {
             switch AntiCheatPolicy.severity(of: name) {
             case .blocker:
-                plan.notes.append(CompatNote(.blocker, "Uses \(name)",
-                    "Games with \(name) usually refuse to run under Wine on macOS. Single-player modes sometimes work."))
+                plan.notes.append(CompatNote(.blocker, String(localized: "Uses \(name)"),
+                    String(localized: "Games with \(name) usually refuse to run under Wine on macOS. Single-player modes sometimes work.")))
             case .warning:
-                plan.notes.append(CompatNote(.warning, "Uses \(name)",
-                    "Online play with \(name) may not work under Wine on macOS."))
+                plan.notes.append(CompatNote(.warning, String(localized: "Uses \(name)"),
+                    String(localized: "Online play with \(name) may not work under Wine on macOS.")))
             }
         }
         // Runtimes the game's own files use, installed before it first starts.
@@ -157,12 +157,12 @@ public enum CompatResolver {
             .filter { RuntimeCatalog.installsByItself($0) && !baseComponents.contains($0) })
         if !fromFiles.isEmpty {
             plan.components += fromFiles
-            plan.notes.append(CompatNote(.applied, "Adds \(list(fromFiles.map(plainName)))", "The game's files use them."))
+            plan.notes.append(CompatNote(.applied, String(localized: "Adds \(list(fromFiles.map(plainName)))"), String(localized: "The game's files use them.")))
         }
         let fixes = options.useKnownFixes
             ? input.fixes.filter { !options.disabledFixIDs.contains($0.id) } : []
         for fix in input.fixes where fix.macStatus == .broken {
-            plan.notes.append(CompatNote(.blocker, "Known not to work on a Mac", fix.notes))
+            plan.notes.append(CompatNote(.blocker, String(localized: "Known not to work on a Mac"), fix.notes))
         }
 
         // Graphics backend per profile. Fast only gets here on an engine with D3DMetal. Automatic (Recommended and Fast)
@@ -176,7 +176,7 @@ public enum CompatResolver {
             plan.backend = .wined3d
             plan.environment["WINEESYNC"] = "0"
             plan.environment["WINEMSYNC"] = "0"
-            plan.notes.append(CompatNote(.applied, "Compatible mode", "Wine's own renderer and no extra fixes."))
+            plan.notes.append(CompatNote(.applied, String(localized: "Compatible mode"), String(localized: "Wine's own renderer and no extra fixes.")))
         case .custom:
             plan.backend = input.engine.resolve(input.userBackend)
         }
@@ -189,7 +189,7 @@ public enum CompatResolver {
         case .unity:
             if newest == .d3d12 && plan.backend != .d3dmetal {
                 plan.arguments.append("-force-d3d11")
-                plan.notes.append(CompatNote(.applied, "Starts with DirectX 11", "Unity can fall back from DirectX 12."))
+                plan.notes.append(CompatNote(.applied, String(localized: "Starts with DirectX 11"), String(localized: "Unity can fall back from DirectX 12.")))
             }
             switch window {
             case .windowed: plan.arguments += ["-screen-fullscreen", "0"]
@@ -204,7 +204,7 @@ public enum CompatResolver {
                     plan.notes.append(CompatNote(.blocker, Self.needsDirectX12, Self.onlyDirect3D12 + " " + advice))
                 } else {
                     plan.arguments.append("-dx11")
-                    plan.notes.append(CompatNote(.applied, "Starts with DirectX 11", "Unreal Engine can fall back from DirectX 12."))
+                    plan.notes.append(CompatNote(.applied, String(localized: "Starts with DirectX 11"), String(localized: "Unreal Engine can fall back from DirectX 12.")))
                 }
             }
             if window == .windowed { plan.arguments.append("-windowed") }
@@ -217,7 +217,7 @@ public enum CompatResolver {
             if window == .fullscreen { plan.arguments.append("--fullscreen") }
         case .electron, .nwjs, .rpgMaker:
             plan.arguments += chromiumFlags
-            plan.notes.append(CompatNote(.applied, "Chromium drawing fix", "Draws inside one process so the window isn't black."))
+            plan.notes.append(CompatNote(.applied, String(localized: "Chromium drawing fix"), String(localized: "Draws inside one process so the window isn't black.")))
         case .gameMaker, .renPy, .other, .none:
             break
         }
@@ -226,21 +226,23 @@ public enum CompatResolver {
         if newest == .d3d12 && plan.backend != .d3dmetal && a.engine != .unity && a.engine != .unreal {
             // G-Player Wine has DirectX 12 once D3DMetal is turned on; the other engines have none.
             let detail = input.engine.kind == .crossover
-                ? "DirectX 12 needs Apple's D3DMetal. Turn it on in Settings › Engines, or choose DirectX 11 in the game's own settings."
-                : "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in the game's own settings."
-            plan.notes.append(CompatNote(.warning, "Needs DirectX 12", detail))
+                ? String(localized: "DirectX 12 needs Apple's D3DMetal. Turn it on in Settings › Engines, or choose DirectX 11 in the game's own settings.")
+                : String(localized: "This space's engine has no DirectX 12. If the game has a DirectX 11 mode, choose it in the game's own settings.")
+            plan.notes.append(CompatNote(.warning, String(localized: "Needs DirectX 12"), detail))
         }
         // 32-bit DirectX 10/11 runs through DXVK only: WineD3D can't give DirectX 10 or 11 on Apple's OpenGL 4.1.
         if a.architecture == .x86 && !a.isDotNet, let d3d = newest, d3d >= .d3d10, d3d < .d3d12,
            input.engine.kind != .gptk, plan.backend == .wined3d {
-            plan.notes.append(CompatNote(.warning, "32-bit DirectX \(d3d == .d3d10 ? "10" : "11") needs DXVK",
-                "Wine's own renderer can't give it on Apple's OpenGL, so the game most likely won't start this way. The Recommended profile uses DXVK."))
+            plan.notes.append(CompatNote(.warning, String(localized: "32-bit DirectX \(d3d == .d3d10 ? "10" : "11") needs DXVK"),
+                String(localized: "Wine's own renderer can't give it on Apple's OpenGL, so the game most likely won't start this way. The Recommended profile uses DXVK.")))
         }
         // A store starts and updates its own launchers, so only games added by hand need them in the space.
         if !input.isStoreGame {
             for launcher in a.launchers {
-                plan.notes.append(CompatNote(.warning, "Needs \(launcher)",
-                    "The game starts through \(launcher). Install it into the same space from Get Apps."))
+                let how = AppPresets.offered(launcher: launcher) != nil
+                    ? String(localized: "The game starts through \(launcher). Install it into the same space from Get Apps.")
+                    : String(localized: "The game starts through \(launcher), which G-Player doesn't offer. Install it into the same space with Run Program…")
+                plan.notes.append(CompatNote(.warning, String(localized: "Needs \(launcher)"), how))
             }
         }
 
@@ -258,28 +260,28 @@ public enum CompatResolver {
             }
             var applied: [String] = []
             var touched = false
-            if !parts.install.isEmpty { plan.components += parts.install; touched = true; applied.append("Installs " + parts.install.joined(separator: ", ")) }
+            if !parts.install.isEmpty { plan.components += parts.install; touched = true; applied.append(String(localized: "Installs \(parts.install.joined(separator: ", "))")) }
             if !fix.dllOverrides.isEmpty {
                 for (dll, mode) in fix.dllOverrides { plan.dllOverrides[dll.lowercased()] = mode }
                 touched = true
-                applied.append("Wine DLL settings for " + fix.dllOverrides.keys.sorted().joined(separator: ", "))
+                applied.append(String(localized: "Wine DLL settings for \(fix.dllOverrides.keys.sorted().joined(separator: ", "))"))
             }
             if !fix.environment.isEmpty {
                 for (k, v) in fix.environment { plan.environment[k] = v }
                 touched = true
-                applied.append("\(fix.environment.count) environment setting\(fix.environment.count == 1 ? "" : "s")")
+                applied.append(String(localized: "\(fix.environment.count) environment settings"))
             }
             // umu sometimes puts several flags in one string ("-skipdrivercheck -noHDR").
             let args = fix.arguments.flatMap { $0.split(separator: " ").map(String.init) }
-            if !args.isEmpty { plan.arguments += args; touched = true; applied.append("Launch options " + args.joined(separator: " ")) }
+            if !args.isEmpty { plan.arguments += args; touched = true; applied.append(String(localized: "Launch options \(args.joined(separator: " "))")) }
             if !fix.replacements.isEmpty {
                 if input.isStoreGame { skippedReplacements = true }
-                else { plan.replacements += fix.replacements; touched = true; applied.append("Changes how the program starts") }
+                else { plan.replacements += fix.replacements; touched = true; applied.append(String(localized: "Changes how the program starts")) }
             }
             if !fix.registry.isEmpty {
                 plan.registry += fix.registry
                 touched = true
-                applied.append("\(fix.registry.count) registry setting\(fix.registry.count == 1 ? "" : "s")")
+                applied.append(String(localized: "\(fix.registry.count) registry settings"))
             }
             if let version = parts.windowsVersion {
                 let programs = input.programNames.filter(RegistryFile.isSafeProgramName)
@@ -287,26 +289,27 @@ public enum CompatResolver {
                 else {
                     setWindowsVersion(version, for: programs, in: &plan.registry)
                     touched = true
-                    applied.append("Windows version \(version)")
+                    applied.append(String(localized: "Windows version \(version)"))
                 }
             }
-            if parts.hideWineExports == true { hideWineExports = true; touched = true; applied.append("Hides Wine from the game") }
+            if parts.hideWineExports == true { hideWineExports = true; touched = true; applied.append(String(localized: "Hides Wine from the game")) }
             if touched {
                 plan.appliedFixIDs.append(fix.id)
-                plan.notes.append(CompatNote(.applied, "Known fix for \(fix.title ?? "this game")",
-                                             applied.joined(separator: ". ") + "." + (fix.verifiedOnMac ? "" : " From Linux players, not yet checked on a Mac.")))
+                let summary = applied.joined(separator: ". ") + "."
+                plan.notes.append(CompatNote(.applied, String(localized: "Known fix for \(fix.title ?? String(localized: "this game", comment: "Inside “Known fix for …”"))"),
+                                             fix.verifiedOnMac ? summary : summary + " " + String(localized: "From Linux players, not yet checked on a Mac.")))
             }
         }
         if skippedReplacements {
-            plan.notes.append(CompatNote(.warning, "Some known fixes change how the program starts; they work only for games you add yourself."))
+            plan.notes.append(CompatNote(.warning, String(localized: "Some known fixes change how the program starts; they work only for games you add yourself.")))
         }
         if versionNeedsProgram {
-            plan.notes.append(CompatNote(.warning, "A known fix couldn't be applied",
-                "It sets the Windows version for the game's program, and G-Player doesn't know which program that is."))
+            plan.notes.append(CompatNote(.warning, String(localized: "A known fix couldn't be applied"),
+                String(localized: "It sets the Windows version for the game's program, and G-Player doesn't know which program that is.")))
         }
         if hideWineExports {
-            plan.notes.append(CompatNote(.applied, "Hides Wine from the game",
-                "Wine Staging setting for the whole space. G-Player sets it again on every launch, like the Retina setting."))
+            plan.notes.append(CompatNote(.applied, String(localized: "Hides Wine from the game"),
+                String(localized: "Wine Staging setting for the whole space. G-Player sets it again on every launch, like the Retina setting.")))
         }
 
         // Plain-word switches. Hiding Wine's exports is one value for the whole space, so every launch says which way it goes.
@@ -320,7 +323,7 @@ public enum CompatResolver {
         plan.components = unique(plan.components)
         let cannot = unique(unsupported)
         if !cannot.isEmpty {
-            plan.notes.append(CompatNote(.warning, "Needs \(list(cannot.map(plainName))), which G-Player can't install yet."))
+            plan.notes.append(CompatNote(.warning, String(localized: "Needs \(list(cannot.map(plainName))), which G-Player can't install yet.")))
         }
         return plan
     }
@@ -363,12 +366,13 @@ public enum CompatResolver {
 
     /// How a note names a component or setting G-Player can't install.
     static func plainName(_ id: String) -> String {
-        id.contains("=") ? "the \(id) setting" : RuntimeCatalog.plainName(id)
+        id.contains("=") ? String(localized: "the \(id) setting", comment: "Inside “Needs …, which G-Player can’t install yet.”") : RuntimeCatalog.plainName(id)
     }
 
     /// "a", "a and b", "a, b and c".
     public static func list(_ names: [String]) -> String {
-        names.count < 2 ? names.joined() : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+        names.count < 2 ? names.joined()
+            : String(localized: "\(names.dropLast().joined(separator: ", ")) and \(names[names.count - 1])", comment: "A list of names: “A, B and C”")
     }
 
     static func unique(_ ids: [String]) -> [String] {

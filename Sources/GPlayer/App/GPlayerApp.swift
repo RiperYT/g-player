@@ -44,7 +44,7 @@ struct GPlayerApp: App {
     }
 
     var body: some Scene {
-        Window("G-Player", id: "main") {
+        Window(Text(verbatim: "G-Player"), id: "main") {
             RootView()
                 .environment(model)
                 .frame(minWidth: 900, minHeight: 600)
@@ -115,8 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.messageText = question.title
         alert.informativeText = question.detail
-        alert.addButton(withTitle: "Keep Setting Up")
-        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: String(localized: "Keep Setting Up"))
+        alert.addButton(withTitle: String(localized: "Quit"))
         if alert.runModal() == .alertSecondButtonReturn { return .terminateNow }
         // Closing the last window asked to quit; staying means the window comes back, not an app with none.
         if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {

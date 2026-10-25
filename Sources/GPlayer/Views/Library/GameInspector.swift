@@ -248,14 +248,14 @@ private struct PlayStopButton: View {
     @ViewBuilder private func label(retry: RetryState, running: Bool) -> some View {
         switch retry {
         case .stopping:
-            busy("Stopping…")
+            busy(String(localized: "Stopping…"))
         case .starting:
             Label("Stop Trying Other Graphics", systemImage: "stop.fill").frame(maxWidth: .infinity)
         case .trying:
             Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity)
         case .none:
             if model.isPreparing(game) {
-                busy(model.isWaitingForInstalls(game) ? "Waiting for installs…" : model.epic.startStatus[game.id] ?? "Starting…")
+                busy(model.isWaitingForInstalls(game) ? String(localized: "Waiting for installs…") : model.epic.startStatus[game.id] ?? String(localized: "Starting…"))
             } else {
                 Label(running ? "Stop" : "Play", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity)
             }
@@ -272,8 +272,8 @@ private struct PlayStopButton: View {
 
     private func help(retry: RetryState, running: Bool) -> String {
         switch retry {
-        case .trying: "Stops trying other graphics. Nothing more is started."
-        case .starting: "The game is already starting and opens in a moment. This only stops G-Player from trying other graphics for it."
+        case .trying: String(localized: "Stops trying other graphics. Nothing more is started.")
+        case .starting: String(localized: "The game is already starting and opens in a moment. This only stops G-Player from trying other graphics for it.")
         case .stopping, .none: running ? model.stopHelp(game) : ""
         }
     }

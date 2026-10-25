@@ -33,7 +33,7 @@ public struct SpaceManager: Sendable {
         let boot = try await WineLauncher.runTool(engine: engine, space: space, ["wineboot", "--init"])
         await WineLauncher.waitForAll(engine: engine, space: space)
         guard space.exists else {
-            throw ShellError.failed("Wine couldn't create the space. \(boot.stderr.suffix(400))")
+            throw ShellError.said("Wine couldn't create the space. \(boot.stderr.suffix(400))")
         }
         // Command works like Ctrl in Windows programs (copy, paste, game shortcuts).
         try await WineLauncher.runTool(engine: engine, space: space,
@@ -124,7 +124,7 @@ public struct SpaceManager: Sendable {
             // Never for good outside the library's own Spaces folder, whatever the record says.
             let spaces = paths.spaces.standardizedFileURL.resolvingSymlinksInPath().path + "/"
             guard space.url.standardizedFileURL.resolvingSymlinksInPath().path.hasPrefix(spaces) else {
-                throw ShellError.failed("“\(space.name)” isn't in the library's Spaces folder, so G-Player leaves it where it is.")
+                throw ShellError.said("“\(space.name)” isn't in the library's Spaces folder, so G-Player leaves it where it is.")
             }
             try FileManager.default.removeItem(at: space.url)
         }

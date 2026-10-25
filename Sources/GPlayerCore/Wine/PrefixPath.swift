@@ -38,9 +38,9 @@ public enum PrefixPath {
     public static func libraryRootProblem(_ root: URL) -> String? {
         let n = length(of: LibraryPaths(root: root).root.path)
         guard n > maxLibraryRootLength else { return nil }
-        return "The library folder's path is \(n) characters long; the limit is \(maxLibraryRootLength). Wine can't start programs "
-            + "from a path that long, and keeps trying until the Mac runs out of processes. "
-            + "Choose a folder closer to the top of a disk, such as your home folder."
+        return String(localized: "The library folder's path is \(n) characters long; the limit is \(maxLibraryRootLength).") + " "
+            + String(localized: "Wine can't start programs from a path that long, and keeps trying until the Mac runs out of processes.") + " "
+            + String(localized: "Choose a folder closer to the top of a disk, such as your home folder.")
     }
 
     /// Why no new space can be made in a library that already exists, for the user, or nil when its folder is fine. An older
@@ -51,21 +51,19 @@ public enum PrefixPath {
         let folder = LibraryPaths(root: root).root
         let n = length(of: folder.path)
         guard n > maxLibraryRootLength else { return nil }
-        return "New spaces can't be made in this library: its folder's path is \(n) characters long and the limit is "
-            + "\(maxLibraryRootLength). Windows paths stop at 260 characters, and Wine runs programs from inside a space, so a "
-            + "longer path makes Wine fail to start programs and keep trying until the Mac runs out of processes. "
-            + "The spaces already in the library keep working.\n\n"
-            + "To move the library: quit G-Player, move the folder “\(folder.lastPathComponent)” closer to the top of a disk, "
-            + "such as your home folder, then open G-Player and choose Locate… on the screen that appears."
+        return String(localized: "New spaces can't be made in this library: its folder's path is \(n) characters long and the limit is \(maxLibraryRootLength).") + " "
+            + String(localized: "Windows paths stop at 260 characters, and Wine runs programs from inside a space, so a longer path makes Wine fail to start programs and keep trying until the Mac runs out of processes.") + " "
+            + String(localized: "The spaces already in the library keep working.") + "\n\n"
+            + String(localized: "To move the library: quit G-Player, move the folder “\(folder.lastPathComponent)” closer to the top of a disk, such as your home folder, then open G-Player and choose Locate… on the screen that appears.")
     }
 
     /// Why a Wine prefix at `url` can't be used, for the user, or nil when it is fine.
     public static func problem(forPrefix url: URL) -> String? {
         let n = length(of: url.standardizedFileURL.path)
         guard n > maxLength else { return nil }
-        return "Its path is \(n) characters long; the limit is \(maxLength). Wine can't start programs "
-            + "from a path that long, and keeps trying until the Mac runs out of processes. "
-            + "Move it closer to the top of a disk, such as your home folder."
+        return String(localized: "Its path is \(n) characters long; the limit is \(maxLength).") + " "
+            + String(localized: "Wine can't start programs from a path that long, and keeps trying until the Mac runs out of processes.") + " "
+            + String(localized: "Move it closer to the top of a disk, such as your home folder.")
     }
 }
 

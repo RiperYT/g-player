@@ -77,9 +77,9 @@ struct OnboardingView: View {
             title("Windows games on your Mac")
             Text("G-Player keeps your Windows games in one library and runs them with Wine, the open-source layer that lets Windows programs run on macOS.")
                 .foregroundStyle(.secondary)
-            facts([("square.grid.2x2", "One library", "Steam, Epic and games you add yourself, side by side."),
-                   ("shippingbox", "Spaces", Copy.space),
-                   ("square.and.arrow.down", "Drop to add", "Drop a folder, an archive or an installer, and pick what starts the game.")])
+            facts([("square.grid.2x2", String(localized: "One library"), String(localized: "Steam, Epic and games you add yourself, side by side.")),
+                   ("shippingbox", String(localized: "Spaces"), Copy.space),
+                   ("square.and.arrow.down", String(localized: "Drop to add"), String(localized: "Drop a folder, an archive or an installer, and pick what starts the game."))])
     }
 
     @ViewBuilder private var locationStep: some View {
@@ -121,7 +121,7 @@ struct OnboardingView: View {
             rosettaRow
             ForEach(EngineCatalog.firstRunInstalls) { engineRow($0) }
             checkRow(ok: false, icon: "info.circle", title: "Apple's Game Porting Toolkit",
-                     detail: "Not needed to start. A few newer DirectX 12 games need it, and G-Player tells you when one does. You get it yourself from Apple; G-Player never downloads it.",
+                     detail: String(localized: "Not needed to start. A few newer DirectX 12 games need it, and G-Player tells you when one does. You get it yourself from Apple; G-Player never downloads it."),
                      actionTitle: nil, action: {})
     }
 
@@ -129,13 +129,13 @@ struct OnboardingView: View {
     private var rosettaRow: some View {
         let detail: String
         switch (rosetta, installingRosetta) {
-        case (_, true): detail = "Installing… Enter your Mac's password if it asks. Cancel stops waiting."
-        case (nil, _): detail = "Checking…"
-        case (true?, _): detail = "Installed"
-        case (false?, _): detail = "Needed to run Windows programs. Install asks for your Mac's password."
+        case (_, true): detail = String(localized: "Installing… Enter your Mac's password if it asks. Cancel stops waiting.")
+        case (nil, _): detail = String(localized: "Checking…")
+        case (true?, _): detail = String(localized: "Installed")
+        case (false?, _): detail = String(localized: "Needed to run Windows programs. Install asks for your Mac's password.")
         }
         return checkRow(ok: rosetta == true, title: "Rosetta 2", detail: detail, working: installingRosetta,
-                        actionTitle: installingRosetta ? "Cancel" : rosetta == false ? "Install" : nil,
+                        actionTitle: installingRosetta ? String(localized: "Cancel") : rosetta == false ? String(localized: "Install") : nil,
                         action: installingRosetta ? cancelRosetta : installRosetta)
     }
 
@@ -195,7 +195,7 @@ struct OnboardingView: View {
 
     // MARK: Pieces
 
-    private func title(_ text: String) -> some View {
+    private func title(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.system(size: 30, weight: .bold)).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -237,16 +237,16 @@ struct OnboardingView: View {
         let download = model.download(of: info)
         return checkRow(ok: installed, title: info.displayName, detail: engineDetail(info, installed: installed, download: download),
                         progress: download,
-                        actionTitle: installed || model.isEngineBusy || model.isInstallingFirstRun ? nil : "Download", action: downloadEngines)
+                        actionTitle: installed || model.isEngineBusy || model.isInstallingFirstRun ? nil : String(localized: "Download"), action: downloadEngines)
     }
 
     private func engineDetail(_ info: EngineInfo, installed: Bool, download: Activity?) -> String {
-        if installed { return "Installed" }
+        if installed { return String(localized: "Installed") }
         if let download { return download.message }
-        if model.isInstallingFirstRun { return "Starting…" }
+        if model.isInstallingFirstRun { return String(localized: "Starting…") }
         // The size is what the first run downloads: less when a Wine Staging that is installed already has the libraries.
         let mb = EngineCatalog.megabytes(info.downloadBytes(wineStagingInstalled: model.isInstalled(EngineCatalog.wineStaging)))
-        return "Runs Steam and DirectX 9–11 games. \(mb) MB."
+        return String(localized: "Runs Steam and DirectX 9–11 games. \(mb) MB.")
     }
 
     private var hasSteamAlready: Bool {

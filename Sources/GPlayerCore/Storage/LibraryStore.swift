@@ -98,7 +98,7 @@ public struct LibraryStore: Sendable {
         let data = try Data(contentsOf: paths.previousFile)
         let state = try Self.decoder.decode(LibraryState.self, from: data)
         if FileManager.default.fileExists(atPath: paths.libraryFile.path), keepBrokenCopy(now: now) == nil {
-            throw ShellError.failed("G-Player couldn't keep a copy of library.json, so it won't replace it.")
+            throw ShellError.said("G-Player couldn't keep a copy of library.json, so it won't replace it.")
         }
         try data.write(to: paths.libraryFile, options: .atomic)
         return state
@@ -215,12 +215,12 @@ public struct LibraryStore: Sendable {
             path.enumerated().map { i, key in key.intValue.map { "[\($0)]" } ?? (i == 0 ? key.stringValue : "." + key.stringValue) }.joined()
         }
         switch error {
-        case .keyNotFound(let key, let context): return "\(place(context.codingPath + [key])): missing"
-        case .valueNotFound(_, let context): return "\(place(context.codingPath)): no value"
-        case .typeMismatch(_, let context): return "\(place(context.codingPath)): wrong kind of value"
+        case .keyNotFound(let key, let context): return String(localized: "\(place(context.codingPath + [key])): missing")
+        case .valueNotFound(_, let context): return String(localized: "\(place(context.codingPath)): no value")
+        case .typeMismatch(_, let context): return String(localized: "\(place(context.codingPath)): wrong kind of value")
         case .dataCorrupted(let context):
             let at = place(context.codingPath)
-            return at.isEmpty ? "not valid JSON" : "\(at): \(context.debugDescription)"
+            return at.isEmpty ? String(localized: "not valid JSON") : "\(at): \(context.debugDescription)"
         @unknown default: return error.localizedDescription
         }
     }

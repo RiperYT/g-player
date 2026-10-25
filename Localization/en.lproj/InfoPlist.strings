@@ -1,0 +1,6 @@
+/* English is the source language: the user-visible text lives in the code and in scripts/Info.plist.
+   This file exists so that macOS offers "en" as a language of the app: with only uk.lproj in the bundle, a Mac set
+   to German would be matched to Ukrainian. */
+"Windows game or installer" = "Windows game or installer";
+"Game folder" = "Game folder";
+"NSHumanReadableCopyright" = "G-Player contributors. Apache License 2.0.";

@@ -9,7 +9,7 @@ public enum EpicGames {
     public static let presetID = "legendary"
     /// Where the page of the account and its games is, for messages that send people there: it opens from the Epic Games card in
     /// Get Apps, and from the Epic Games space's page.
-    public static let libraryPlace = "Get Apps › Epic Games"
+    public static let libraryPlace = String(localized: "Get Apps › Epic Games")
 
     public static func space(in spaces: [Space]) -> Space? {
         spaces.first { isGamesSpace($0) && $0.origin == .managed }
@@ -20,7 +20,7 @@ public enum EpicGames {
 
     /// What the buttons that open the page of the account and its games say: the second way on Get Apps' Epic Games card, and the
     /// link on the Epic Games space's page. It is a place, not an action that needs more input, so no ellipsis.
-    public static let libraryTitle = "Your Epic Library"
+    public static let libraryTitle = String(localized: "Your Epic Library")
 
     /// Where Legendary puts the games of the space (it makes a folder for each): `C:\Games\Epic`.
     public static func installBase(in space: Space) -> URL {
@@ -56,23 +56,23 @@ public enum EpicGames {
     public static func installDetails(sizeBytes: Int64?, availableBytes: Int64?, spaceExists: Bool,
                                       engineDownloadBytes: Int64?) -> InstallDetails {
         var lines: [String] = []
-        if let sizeBytes { lines.append("It takes about \(sizeBytes.formattedBytes) on disk.") }
-        lines.append(spaceExists ? "It goes into the “\(spaceName)” space."
-                                 : "It goes into the “\(spaceName)” space, which G-Player makes first.")
+        if let sizeBytes { lines.append(String(localized: "It takes about \(sizeBytes.formattedBytes) on disk.")) }
+        lines.append(spaceExists ? String(localized: "It goes into the “\(spaceName)” space.")
+                                 : String(localized: "It goes into the “\(spaceName)” space, which G-Player makes first."))
         if let engineDownloadBytes {
-            lines.append("G-Player Wine isn't installed yet, so G-Player downloads it first (about \(EngineCatalog.megabytes(engineDownloadBytes)) MB).")
+            lines.append(String(localized: "G-Player Wine isn't installed yet, so G-Player downloads it first (about \(EngineCatalog.megabytes(engineDownloadBytes)) MB)."))
         }
-        let problem = sizeBytes.flatMap { DiskSpace.problem(needing: $0, available: availableBytes, for: "It") }
+        let problem = sizeBytes.flatMap { DiskSpace.problem(needing: $0, available: availableBytes, for: LocalizedStringResource("It", comment: "Starts “It needs about 5 GB free, and this disk has …”")) }
         return InstallDetails(lines: lines, problem: problem)
     }
 
     // MARK: Starting
 
     /// What the game's tile says while Legendary is asked how to start it (a few seconds, and up to `Legendary.Limits` when Epic is slow).
-    public static let askingEpic = "Asking Epic for the launch parameters…"
+    public static let askingEpic = String(localized: "Asking Epic for the launch parameters…")
 
     /// The one line for a game that was started without Epic's login, since Epic couldn't be reached.
-    public static func offlineNote(reason: String) -> String { "Started offline: \(reason)" }
+    public static func offlineNote(reason: String) -> String { String(localized: "Started offline: \(reason)") }
 
     // MARK: What is kept between runs
 
@@ -114,7 +114,7 @@ public enum EpicGames {
     }
 
     /// The line for a look that failed.
-    public static func lookFailureLine(_ error: Error) -> String { "Couldn't reach Legendary: \(error.localizedDescription)" }
+    public static func lookFailureLine(_ error: Error) -> String { String(localized: "Couldn't reach Legendary: \(error.localizedDescription)") }
 
     /// Which of the page's states is shown: the account and its games, the sign-in card, a wait, or only the failure.
     public enum Page: Equatable, Sendable { case signedIn, signedOut, checking, failed }
@@ -140,15 +140,15 @@ public enum EpicGames {
     /// Why a game can't be uninstalled right now (for the button's help), or nil. A running game has its files open and a starting
     /// one is about to; and Legendary does one thing at a time (`busy` says what it does).
     public static func uninstallBlock(gameIsRunning: Bool, gameIsStarting: Bool, busy: String?) -> String? {
-        if gameIsRunning { return "Quit the game first." }
-        if gameIsStarting { return "The game is starting. Wait for it, then quit it." }
-        if let busy { return "Epic Games is busy (\(busy)). Wait for it to finish." }
+        if gameIsRunning { return String(localized: "Quit the game first.") }
+        if gameIsStarting { return String(localized: "The game is starting. Wait for it, then quit it.") }
+        if let busy { return String(localized: "Epic Games is busy (\(busy)). Wait for it to finish.") }
         return nil
     }
 
     /// Why a game can't be started right now: it is being uninstalled.
     public static func playBlock(appName: String, uninstalling: String?) -> String? {
-        uninstalling == appName ? "It is being uninstalled." : nil
+        uninstalling == appName ? String(localized: "It is being uninstalled.") : nil
     }
 
     // MARK: In the library
@@ -240,17 +240,17 @@ public enum EpicGames {
         case .ok:
             return nil
         case .filesNotFound(.some):
-            return Note(title: "Files not found",
-                        detail: "Legendary's record of “\(title)” points at its old place, but its files are in this library's Epic Games space. Repair points the record at them.",
-                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace).")
+            return Note(title: String(localized: "Files not found"),
+                        detail: String(localized: "Legendary's record of “\(title)” points at its old place, but its files are in this library's Epic Games space. Repair points the record at them."),
+                        removal: String(localized: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace)."))
         case .filesNotFound(nil):
-            return Note(title: "Files not found",
-                        detail: "“\(title)” isn't where Epic Games installed it. If you moved its files, put them back, or remove it and install it again.",
-                        removal: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace).")
+            return Note(title: String(localized: "Files not found"),
+                        detail: String(localized: "“\(title)” isn't where Epic Games installed it. If you moved its files, put them back, or remove it and install it again."),
+                        removal: String(localized: "Legendary forgets that “\(title)” is installed and it leaves the library. No file is deleted. You can install it again from \(libraryPlace)."))
         case .notRecorded:
-            return Note(title: "Not installed",
-                        detail: "Legendary has no record of “\(title)” any more. Remove it from the library, then install it again from \(libraryPlace).",
-                        removal: "“\(title)” leaves the library. Legendary has no record of it, and no file is deleted.")
+            return Note(title: String(localized: "Not installed"),
+                        detail: String(localized: "Legendary has no record of “\(title)” any more. Remove it from the library, then install it again from \(libraryPlace)."),
+                        removal: String(localized: "“\(title)” leaves the library. Legendary has no record of it, and no file is deleted."))
         }
     }
 }

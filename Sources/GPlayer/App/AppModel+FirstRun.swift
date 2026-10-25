@@ -49,7 +49,7 @@ extension AppModel {
         case settingUp
 
         var message: String? {
-            self == .settingUp ? "G-Player is still setting up. You can add a game when that's done." : nil
+            self == .settingUp ? String(localized: "G-Player is still setting up. You can add a game when that's done.") : nil
         }
     }
 
